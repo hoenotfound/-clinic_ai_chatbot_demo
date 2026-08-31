@@ -6,6 +6,14 @@ const sessions = new Map();
 const ipCreations = new Map();
 const dailyMessageCounts = new Map();
 
+const PRICE_PATTERN = /\bprice\b|how much|\bcost\b|rm\s?\d|promo|package|harga|berapa|\bkos\b|promosi|pakej|多少钱|多少錢|价格|價格|价钱|價錢|收费|收費/i;
+const INTEREST_PATTERN = /\binterested\b|want to|suitable|works?\s+for\s+me|\bresult\b|\bberminat\b|nak buat|mahu buat|sesuai|hasil|有兴趣|有興趣|想做|想了解|适合|適合|效果/i;
+const CONTACT_PATTERN = /my number|call me|contact me|hubungi saya|telefon saya|nombor saya|联系我|聯繫我|打给我|打給我/i;
+const BOOKING_PATTERN = /\bbook(?:ing)?\b|\bappointment\b|\bslot\b|available\s+(?:slot|appointment|time)|can\s+i\s+come|come\s+in|visit\s+(?:the\s+)?clinic|want\s+to\s+visit|\btempah\b|\btemujanji\b|janji\s+temu|ada\s+slot|boleh\s+datang|nak\s+datang|mahu\s+datang|预约|預約|约(?:个)?时间|約(?:個)?時間|有空位|可以来|可以來|想来|想來|来咨询|來諮詢/i;
+const NEGATIVE_PATTERN = /not interested|no longer interested|never ?mind|don['’]t want|do not want|not booking|cancel(?: it| that| my appointment)?|no thanks|tak berminat|tidak berminat|tak nak|tidak mahu|tak jadi|tidak jadi|\bbatal\b|不要了|不想做|没兴趣|沒興趣|算了|取消|不预约|不預約/i;
+const TIMING_PATTERN = /weekend|saturday|sunday|weekday|monday|tuesday|wednesday|thursday|friday|morning|afternoon|evening|night|hujung minggu|sabtu|ahad|hari biasa|isnin|selasa|rabu|khamis|jumaat|pagi|petang|malam|周末|週末|周六|週六|星期六|周日|週日|星期日|平日|工作日|星期一|星期二|星期三|星期四|星期五|早上|上午|下午|晚上/i;
+const BRANCH_PATTERN = /petaling jaya|\bpj\b|kuala lumpur|\bkl\b|bukit bintang|八打灵再也|八打靈再也|吉隆坡/i;
+
 function intEnv(name, fallback) {
   const value = Number.parseInt(process.env[name] || "", 10);
   return Number.isFinite(value) && value > 0 ? value : fallback;
@@ -21,6 +29,12 @@ const limits = {
 
 function dayKey() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function touchSession(session) {
+  const now = Date.now();
+  session.updatedAt = now;
+  session.expiresAt = now + limits.sessionMinutes * 60_000;
 }
 
 function enforceSessionCreationLimit(ip) {
@@ -126,12 +140,12 @@ function appendMessage(session, role, content, source) {
     createdAt: Date.now(),
   };
   session.messages.push(message);
-  session.updatedAt = Date.now();
+  touchSession(session);
   return message;
 }
 
 function detectInterests(text) {
-  const lower = text.toLowerCase();
+  const lower = String(text || "").toLowerCase();
   return clinic.services
     .filter((service) =>
       [service.name, ...service.aliases].some((term) => lower.includes(term.toLowerCase()))
@@ -147,8 +161,8 @@ function buildNaturalSummary({ interests, bookingIntent, negativeIntentActive, p
 
   if (negativeIntentActive) {
     return treatmentText
-      ? `The visitor asked about ${treatmentText}, but their latest message indicates they are no longer interested in booking right now.`
-      : "The visitor’s latest message indicates they are no longer interested in booking right now.";
+      ? `The visitor asked about ${treatmentText}, but their latest intent indicates they are no longer interested in booking right now.`
+      : "The visitor’s latest intent indicates they are no longer interested in booking right now.";
   }
   if (bookingIntent) {
     return treatmentText
@@ -163,57 +177,82 @@ function buildNaturalSummary({ interests, bookingIntent, negativeIntentActive, p
   return "Early-stage enquiry. No specific treatment or appointment intent has been detected yet.";
 }
 
+function latestMatchingMessage(messages, pattern) {
+  return [...messages].reverse().find((message) => pattern.test(message.content)) || null;
+}
+
+function isRenewedInterestMessage(text) {
+  if (!text) return false;
+  return BOOKING_PATTERN.test(text) ||
+    PRICE_PATTERN.test(text) ||
+    INTEREST_PATTERN.test(text) ||
+    CONTACT_PATTERN.test(text) ||
+    detectInterests(text).length > 0;
+}
+
 function updateLead(session) {
   const customerMessages = session.messages.filter((message) => message.role === "user");
-  const customerText = customerMessages.map((message) => message.content).join(" \n");
-  const lower = customerText.toLowerCase();
+  const allText = customerMessages.map((message) => message.content).join(" \n");
 
-  const interests = new Set(session.lead.interests);
-  for (const interest of detectInterests(customerText)) interests.add(interest);
+  let lastNegativeIndex = -1;
+  for (let i = customerMessages.length - 1; i >= 0; i -= 1) {
+    if (NEGATIVE_PATTERN.test(customerMessages[i].content)) {
+      lastNegativeIndex = i;
+      break;
+    }
+  }
 
-  const bookingPattern = /book|booking|appointment|slot|available|come in|visit|this weekend|saturday|sunday|tomorrow/;
-  const negativeIntentPattern = /not interested|no longer interested|never ?mind|don['’]t want|do not want|not booking|cancel(?: it| that| my appointment)?|no thanks/;
-  const latestIntentMessage = [...customerMessages]
-    .reverse()
-    .find((message) => bookingPattern.test(message.content.toLowerCase()) || negativeIntentPattern.test(message.content.toLowerCase()));
-  const latestIntentLower = latestIntentMessage?.content.toLowerCase() || "";
-  const negativeIntentActive = negativeIntentPattern.test(latestIntentLower);
-  const bookingIntent = Boolean(latestIntentMessage) && bookingPattern.test(latestIntentLower) && !negativeIntentActive;
-  const askedPrice = /price|how much|cost|rm\s?\d|promo|package/.test(lower);
+  const messagesAfterNegative = lastNegativeIndex >= 0
+    ? customerMessages.slice(lastNegativeIndex + 1)
+    : customerMessages;
+  const renewedAfterNegative = lastNegativeIndex < 0 || messagesAfterNegative.some((message) => isRenewedInterestMessage(message.content));
+  const negativeIntentActive = lastNegativeIndex >= 0 && !renewedAfterNegative;
+  const activeMessages = lastNegativeIndex >= 0 ? messagesAfterNegative : customerMessages;
+  const activeText = activeMessages.map((message) => message.content).join(" \n");
+
+  const historicalInterests = new Set(session.lead.interests);
+  for (const interest of detectInterests(allText)) historicalInterests.add(interest);
+  const activeInterests = detectInterests(activeText);
+  const interestList = negativeIntentActive
+    ? Array.from(historicalInterests)
+    : activeInterests.length
+      ? activeInterests
+      : Array.from(historicalInterests);
+
+  const bookingIntent = !negativeIntentActive && BOOKING_PATTERN.test(activeText);
+  const askedPrice = !negativeIntentActive && PRICE_PATTERN.test(activeText);
 
   let score = 0;
-  if (interests.size) score += 2;
+  if (interestList.length) score += 2;
   if (askedPrice) score += 2;
-  if (/interested|want to|suitable|works? for me|result/.test(lower)) score += 2;
+  if (!negativeIntentActive && INTEREST_PATTERN.test(activeText)) score += 2;
   if (bookingIntent) score += 5;
-  if (/my number|call me|contact me/.test(lower)) score += 3;
+  if (!negativeIntentActive && CONTACT_PATTERN.test(activeText)) score += 3;
   if (negativeIntentActive) score = 0;
 
   let preferredTiming = null;
-  const latestTimingMessage = [...customerMessages]
-    .reverse()
-    .find((message) => /weekend|saturday|sunday|weekday|monday|tuesday|wednesday|thursday|friday|morning|afternoon|evening|night/i.test(message.content));
+  const latestTimingMessage = latestMatchingMessage(customerMessages, TIMING_PATTERN);
   if (latestTimingMessage) {
-    const timingLower = latestTimingMessage.content.toLowerCase();
-    if (/weekend|saturday|sunday/.test(timingLower)) preferredTiming = "Weekend";
-    else if (/weekday|monday|tuesday|wednesday|thursday|friday/.test(timingLower)) preferredTiming = "Weekday";
-    if (/morning/.test(timingLower)) preferredTiming = preferredTiming ? `${preferredTiming}, morning` : "Morning";
-    if (/afternoon/.test(timingLower)) preferredTiming = preferredTiming ? `${preferredTiming}, afternoon` : "Afternoon";
-    if (/evening|night/.test(timingLower)) preferredTiming = preferredTiming ? `${preferredTiming}, evening` : "Evening";
+    const timing = latestTimingMessage.content.toLowerCase();
+    if (/weekend|saturday|sunday|hujung minggu|sabtu|ahad|周末|週末|周六|週六|星期六|周日|週日|星期日/i.test(timing)) {
+      preferredTiming = "Weekend";
+    } else if (/weekday|monday|tuesday|wednesday|thursday|friday|hari biasa|isnin|selasa|rabu|khamis|jumaat|平日|工作日|星期一|星期二|星期三|星期四|星期五/i.test(timing)) {
+      preferredTiming = "Weekday";
+    }
+    if (/morning|pagi|早上|上午/i.test(timing)) preferredTiming = preferredTiming ? `${preferredTiming}, morning` : "Morning";
+    if (/afternoon|petang|下午/i.test(timing)) preferredTiming = preferredTiming ? `${preferredTiming}, afternoon` : "Afternoon";
+    if (/evening|night|malam|晚上/i.test(timing)) preferredTiming = preferredTiming ? `${preferredTiming}, evening` : "Evening";
   }
 
   let preferredBranch = null;
-  const latestBranchMessage = [...customerMessages]
-    .reverse()
-    .find((message) => /petaling jaya|\bpj\b|kuala lumpur|\bkl\b|bukit bintang/i.test(message.content));
+  const latestBranchMessage = latestMatchingMessage(customerMessages, BRANCH_PATTERN);
   if (latestBranchMessage) {
-    const branchLower = latestBranchMessage.content.toLowerCase();
-    if (/petaling jaya|\bpj\b/.test(branchLower)) preferredBranch = "Petaling Jaya";
-    else if (/kuala lumpur|\bkl\b|bukit bintang/.test(branchLower)) preferredBranch = "Kuala Lumpur";
+    const branch = latestBranchMessage.content.toLowerCase();
+    if (/petaling jaya|\bpj\b|八打灵再也|八打靈再也/i.test(branch)) preferredBranch = "Petaling Jaya";
+    else if (/kuala lumpur|\bkl\b|bukit bintang|吉隆坡/i.test(branch)) preferredBranch = "Kuala Lumpur";
   }
 
   const temperature = score >= 7 ? "hot" : score >= 3 ? "warm" : "cold";
-  const interestList = Array.from(interests);
 
   session.lead = {
     temperature,
@@ -255,9 +294,9 @@ function addCustomerMessage(session, rawText) {
 }
 
 function addAssistantMessage(session, rawText) {
-  const text = sanitizeText(rawText);
-  const handoff = text.includes("[[HANDOFF]]");
-  const cleanText = text.replaceAll("[[HANDOFF]]", "").trim();
+  const raw = typeof rawText === "string" ? rawText : "";
+  const handoff = raw.includes("[[HANDOFF]]");
+  const cleanText = sanitizeText(raw.replaceAll("[[HANDOFF]]", ""));
   if (handoff) {
     session.needsAttention = true;
     session.attentionReason = "AI requested human assistance.";
@@ -274,7 +313,7 @@ function shouldShowPromotion(session) {
 function markPromotionShown(session, messageId) {
   session.promotionShown = true;
   session.promotionAfterMessageId = messageId || null;
-  session.updatedAt = Date.now();
+  touchSession(session);
 }
 
 function addStaffMessage(session, rawText) {
@@ -299,7 +338,7 @@ function setMode(session, mode) {
   session.mode = mode;
   session.needsAttention = false;
   session.attentionReason = null;
-  session.updatedAt = Date.now();
+  touchSession(session);
 }
 
 function setChannel(session, channel) {
@@ -309,7 +348,7 @@ function setChannel(session, channel) {
     throw err;
   }
   session.channel = channel;
-  session.updatedAt = Date.now();
+  touchSession(session);
 }
 
 function publicSession(session) {
