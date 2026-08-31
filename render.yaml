@@ -15,3 +15,7 @@ services:
         sync: false
       - key: GEMINI_MODEL
         value: gemini-2.5-flash
+      - key: SALES_CTA_LABEL
+        value: Set up my clinic
+      - key: SALES_CTA_URL
+        sync: false
