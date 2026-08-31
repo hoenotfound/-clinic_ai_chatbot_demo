@@ -2,7 +2,7 @@
 
 A standalone public demo for selling a multi-channel AI clinic receptionist.
 
-It intentionally **does not connect to Meta APIs**. WhatsApp, Instagram and Messenger are simulated browser interfaces that send messages directly to the same demo chat engine. This lets prospects test the conversation experience without connecting a real phone number, Facebook Page or Instagram account.
+The public demo recreates WhatsApp, Instagram and Messenger customer experiences in the browser while sending messages to the same standalone demo engine. Real client deployments connect the production chatbot to the clinic’s actual messaging accounts.
 
 ## What the demo includes
 
@@ -22,7 +22,10 @@ It intentionally **does not connect to Meta APIs**. WhatsApp, Instagram and Mess
 - Clinic-side inbox view
 - Conversation summary
 - Simple pipeline view
-- First-message sample promotion graphic
+- Guided 60-second customer journey
+- One-tap sample questions on desktop and mobile
+- Configurable end-of-demo sales CTA
+- Context-aware HIFU promotion shown only after HIFU interest is detected
 - Per-session, per-IP and global daily demo limits
 - No database
 - No WhatsApp, Facebook or Instagram credentials
@@ -33,7 +36,7 @@ It intentionally **does not connect to Meta APIs**. WhatsApp, Instagram and Mess
 ```text
 Prospect browser
      |
-     | simulated WhatsApp / Instagram / Messenger
+     | browser customer-channel experience
      v
 Demo HTTP API
      |
@@ -48,7 +51,7 @@ Gemini or Claude
 Browser chat + Clinic Dashboard
 ```
 
-The channel selector changes the simulated customer interface and channel label. It does not call Meta.
+The channel selector changes the customer interface and channel label. The public demo itself does not need Meta credentials.
 
 ## Requirements
 
@@ -131,6 +134,13 @@ ANTHROPIC_API_KEY
 
 No Meta environment variables are needed.
 
+To connect the final **Set up my clinic** button to your WhatsApp or sales page, set:
+
+```env
+SALES_CTA_LABEL=Set up my clinic
+SALES_CTA_URL=https://your-sales-link.example
+```
+
 ## Demo limits
 
 Defaults:
@@ -138,7 +148,7 @@ Defaults:
 ```env
 DEMO_SESSION_MINUTES=60
 DEMO_MAX_MESSAGES=30
-DEMO_MAX_SESSIONS_PER_IP_DAY=5
+DEMO_MAX_SESSIONS_PER_IP_DAY=20
 DEMO_MAX_TOTAL_MESSAGES_PER_DAY=500
 DEMO_MIN_MESSAGE_INTERVAL_MS=900
 ```
@@ -199,4 +209,4 @@ Run:
 npm test
 ```
 
-The included tests cover session isolation, hot-lead detection, preference updates, reduced-interest handling, hidden handoff markers and human takeover.
+The included tests cover session isolation, hot-lead detection, preference updates, reduced-interest handling, hidden handoff markers, human takeover, context-aware promotion behavior, customer-friendly summaries and hiding internal lead scores from the browser.
