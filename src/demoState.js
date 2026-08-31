@@ -4,6 +4,7 @@ const clinic = require("./clinicConfig");
 const CHANNELS = new Set(["whatsapp", "instagram", "facebook"]);
 const sessions = new Map();
 const ipCreations = new Map();
+const dailyMessageCounts = new Map();
 
 function intEnv(name, fallback) {
   const value = Number.parseInt(process.env[name] || "", 10);
@@ -14,6 +15,7 @@ const limits = {
   sessionMinutes: intEnv("DEMO_SESSION_MINUTES", 60),
   maxMessages: intEnv("DEMO_MAX_MESSAGES", 30),
   maxSessionsPerIpDay: intEnv("DEMO_MAX_SESSIONS_PER_IP_DAY", 5),
+  maxTotalMessagesPerDay: intEnv("DEMO_MAX_TOTAL_MESSAGES_PER_DAY", 500),
   minMessageIntervalMs: intEnv("DEMO_MIN_MESSAGE_INTERVAL_MS", 900),
 };
 
@@ -30,6 +32,17 @@ function enforceSessionCreationLimit(ip) {
     throw err;
   }
   ipCreations.set(key, count + 1);
+}
+
+function enforceDailyMessageLimit() {
+  const key = dayKey();
+  const count = dailyMessageCounts.get(key) || 0;
+  if (count >= limits.maxTotalMessagesPerDay) {
+    const err = new Error("Today’s public demo message limit has been reached. Please try again later.");
+    err.statusCode = 429;
+    throw err;
+  }
+  dailyMessageCounts.set(key, count + 1);
 }
 
 function createSession({ channel = "whatsapp", ip = "unknown" } = {}) {
@@ -124,39 +137,59 @@ function detectInterests(text) {
 }
 
 function updateLead(session) {
-  const customerText = session.messages
-    .filter((message) => message.role === "user")
-    .map((message) => message.content)
-    .join(" \n");
+  const customerMessages = session.messages.filter((message) => message.role === "user");
+  const customerText = customerMessages.map((message) => message.content).join(" \n");
   const lower = customerText.toLowerCase();
+  const latestCustomer = customerMessages.at(-1)?.content || "";
 
   const interests = new Set(session.lead.interests);
   for (const interest of detectInterests(customerText)) interests.add(interest);
+
+  const bookingPattern = /book|booking|appointment|slot|available|come in|visit|this weekend|saturday|sunday|tomorrow/;
+  const negativeIntentPattern = /not interested|no longer interested|never ?mind|don['’]t want|do not want|not booking|cancel(?: it| that| my appointment)?|no thanks/;
+  const latestIntentMessage = [...customerMessages]
+    .reverse()
+    .find((message) => bookingPattern.test(message.content.toLowerCase()) || negativeIntentPattern.test(message.content.toLowerCase()));
+  const latestIntentLower = latestIntentMessage?.content.toLowerCase() || "";
+  const negativeIntentActive = negativeIntentPattern.test(latestIntentLower);
+  const bookingIntent = Boolean(latestIntentMessage) && bookingPattern.test(latestIntentLower) && !negativeIntentActive;
 
   let score = 0;
   if (interests.size) score += 2;
   if (/price|how much|cost|rm\s?\d|promo|package/.test(lower)) score += 2;
   if (/interested|want to|suitable|works? for me|result/.test(lower)) score += 2;
-  if (/book|booking|appointment|slot|available|come in|visit|this weekend|saturday|sunday|tomorrow/.test(lower)) score += 5;
+  if (bookingIntent) score += 5;
   if (/my number|call me|contact me/.test(lower)) score += 3;
+  if (negativeIntentActive) score = 0;
 
-  const bookingIntent = /book|booking|appointment|slot|available|come in|visit|this weekend|saturday|sunday|tomorrow/.test(lower);
   let preferredTiming = null;
-  if (/weekend|saturday|sunday/.test(lower)) preferredTiming = "Weekend";
-  else if (/weekday|monday|tuesday|wednesday|thursday|friday/.test(lower)) preferredTiming = "Weekday";
-  if (/morning/.test(lower)) preferredTiming = preferredTiming ? `${preferredTiming}, morning` : "Morning";
-  if (/afternoon/.test(lower)) preferredTiming = preferredTiming ? `${preferredTiming}, afternoon` : "Afternoon";
-  if (/evening|night/.test(lower)) preferredTiming = preferredTiming ? `${preferredTiming}, evening` : "Evening";
+  const latestTimingMessage = [...customerMessages]
+    .reverse()
+    .find((message) => /weekend|saturday|sunday|weekday|monday|tuesday|wednesday|thursday|friday|morning|afternoon|evening|night/i.test(message.content));
+  if (latestTimingMessage) {
+    const timingLower = latestTimingMessage.content.toLowerCase();
+    if (/weekend|saturday|sunday/.test(timingLower)) preferredTiming = "Weekend";
+    else if (/weekday|monday|tuesday|wednesday|thursday|friday/.test(timingLower)) preferredTiming = "Weekday";
+    if (/morning/.test(timingLower)) preferredTiming = preferredTiming ? `${preferredTiming}, morning` : "Morning";
+    if (/afternoon/.test(timingLower)) preferredTiming = preferredTiming ? `${preferredTiming}, afternoon` : "Afternoon";
+    if (/evening|night/.test(timingLower)) preferredTiming = preferredTiming ? `${preferredTiming}, evening` : "Evening";
+  }
 
   let preferredBranch = null;
-  if (/petaling jaya|\bpj\b/.test(lower)) preferredBranch = "Petaling Jaya";
-  else if (/kuala lumpur|\bkl\b|bukit bintang/.test(lower)) preferredBranch = "Kuala Lumpur";
+  const latestBranchMessage = [...customerMessages]
+    .reverse()
+    .find((message) => /petaling jaya|\bpj\b|kuala lumpur|\bkl\b|bukit bintang/i.test(message.content));
+  if (latestBranchMessage) {
+    const branchLower = latestBranchMessage.content.toLowerCase();
+    if (/petaling jaya|\bpj\b/.test(branchLower)) preferredBranch = "Petaling Jaya";
+    else if (/kuala lumpur|\bkl\b|bukit bintang/.test(branchLower)) preferredBranch = "Kuala Lumpur";
+  }
 
   const temperature = score >= 7 ? "hot" : score >= 3 ? "warm" : "cold";
   const interestText = interests.size ? Array.from(interests).join(", ") : "No specific treatment identified yet";
-  const latestCustomer = session.messages.filter((m) => m.role === "user").at(-1)?.content || "";
   const summaryParts = [interestText];
   if (bookingIntent) summaryParts.push("shows appointment intent");
+  else if (negativeIntentActive) summaryParts.push("latest intent indicates reduced interest");
   if (preferredBranch) summaryParts.push(`prefers ${preferredBranch}`);
   if (preferredTiming) summaryParts.push(`timing: ${preferredTiming}`);
   if (latestCustomer) summaryParts.push(`latest: “${latestCustomer.slice(0, 120)}${latestCustomer.length > 120 ? "…" : ""}”`);
@@ -180,6 +213,7 @@ function addCustomerMessage(session, rawText) {
     err.statusCode = 400;
     throw err;
   }
+  enforceDailyMessageLimit();
   session.customerMessageCount += 1;
   session.lastCustomerMessageAt = Date.now();
   const message = appendMessage(session, "user", text, "customer");
@@ -222,10 +256,10 @@ function setMode(session, mode) {
     throw err;
   }
   session.mode = mode;
-  if (mode === "human") {
-    session.needsAttention = false;
-    session.attentionReason = null;
-  }
+  // An explicit ownership change resolves the previous attention state.
+  // New customer activity or a future AI handoff can raise it again.
+  session.needsAttention = false;
+  session.attentionReason = null;
   session.updatedAt = Date.now();
 }
 
@@ -265,6 +299,9 @@ function cleanupExpiredSessions() {
   const today = dayKey();
   for (const key of ipCreations.keys()) {
     if (!key.endsWith(`:${today}`)) ipCreations.delete(key);
+  }
+  for (const key of dailyMessageCounts.keys()) {
+    if (key !== today) dailyMessageCounts.delete(key);
   }
 }
 
