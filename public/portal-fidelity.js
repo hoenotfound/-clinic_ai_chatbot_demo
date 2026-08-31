@@ -8,6 +8,7 @@
 
   const shell = document.querySelector('.portal-shell');
   const sampleData = window.PORTAL_DEMO_DATA?.SAMPLE_LEADS || [];
+  const langMessages = window.PORTAL_DEMO_DATA?.LANG_MESSAGES || {};
   if (!shell) return;
 
   const search = document.getElementById('portalInboxSearch');
@@ -163,6 +164,14 @@
     });
   }
 
+  function syncToolPreview(key) {
+    const label = { en: 'English', ms: 'Bahasa Malaysia', zh: '中文' }[key] || 'English';
+    const previewLabel = document.getElementById('toolPreviewLanguage');
+    const previewMessage = document.getElementById('toolPreviewMessage');
+    if (previewLabel) previewLabel.textContent = label;
+    if (previewMessage) previewMessage.textContent = langMessages[key] || langMessages.en || '';
+  }
+
   document.querySelectorAll('.portal-status-filters [data-inbox-filter]').forEach((button) => {
     button.addEventListener('click', () => {
       status = button.dataset.inboxFilter || 'all';
@@ -173,6 +182,9 @@
   search?.addEventListener('input', applyInboxFilters);
   channel?.addEventListener('change', applyInboxFilters);
   owner?.addEventListener('change', applyInboxFilters);
+  document.querySelectorAll('[data-lang]').forEach((button) => {
+    button.addEventListener('click', () => syncToolPreview(button.dataset.lang || 'en'));
+  });
 
   if (sampleList) {
     const listObserver = new MutationObserver(() => requestAnimationFrame(applyInboxFilters));
@@ -184,4 +196,5 @@
 
   refreshCounts();
   applyInboxFilters();
+  syncToolPreview('en');
 })();
