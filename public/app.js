@@ -1,9 +1,10 @@
 const state = {
   config: null,
   session: null,
-  promotionShownForSession: false,
   loading: false,
   activeView: "patient",
+  hasViewedDashboard: false,
+  hasTakenOver: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -51,13 +52,21 @@ const els = {
   pipelineNew: $("pipelineNew"),
   pipelineWarm: $("pipelineWarm"),
   pipelineHot: $("pipelineHot"),
+  tourStatus: $("tourStatus"),
+  tourProgress: $("tourProgress"),
+  tourStep1: $("tourStep1"),
+  tourStep2: $("tourStep2"),
+  tourStep3: $("tourStep3"),
+  tourStep4: $("tourStep4"),
+  salesCta: $("salesCta"),
+  salesCtaButton: $("salesCtaButton"),
   toast: $("toast"),
 };
 
 const channelMeta = {
-  whatsapp: { label: "WhatsApp", short: "W", theme: "whatsapp-theme", icon: "whatsapp-icon", status: "online", caption: "WhatsApp-style customer experience" },
-  instagram: { label: "Instagram", short: "◎", theme: "instagram-theme", icon: "instagram-icon", status: "Active now", caption: "Instagram-style customer experience" },
-  facebook: { label: "Messenger", short: "M", theme: "facebook-theme", icon: "facebook-icon", status: "Active now", caption: "Messenger-style customer experience" },
+  whatsapp: { label: "WhatsApp", short: "W", theme: "whatsapp-theme", icon: "whatsapp-icon", status: "online", caption: "WhatsApp customer experience" },
+  instagram: { label: "Instagram", short: "◎", theme: "instagram-theme", icon: "instagram-icon", status: "Active now", caption: "Instagram customer experience" },
+  facebook: { label: "Messenger", short: "M", theme: "facebook-theme", icon: "facebook-icon", status: "Active now", caption: "Messenger customer experience" },
 };
 
 function showToast(message) {
@@ -92,6 +101,7 @@ function formatRelative(timestamp) {
 
 function setActiveView(view) {
   state.activeView = view;
+  if (view === "dashboard") state.hasViewedDashboard = true;
   const patient = view === "patient";
   els.patientTab.classList.toggle("active", patient);
   els.dashboardTab.classList.toggle("active", !patient);
@@ -99,6 +109,7 @@ function setActiveView(view) {
   els.dashboardTab.setAttribute("aria-selected", String(!patient));
   els.patientView.classList.toggle("active", patient);
   els.dashboardView.classList.toggle("active", !patient);
+  renderTour();
 }
 
 function channelFromUi() {
@@ -168,8 +179,8 @@ function renderPatientMessages() {
   }
   for (const message of messages) {
     els.messages.appendChild(buildMessageBubble(message));
-    const firstAiMessage = message.source === "ai" && messages.find((m) => m.source === "ai")?.id === message.id;
-    if (firstAiMessage && state.promotionShownForSession) {
+    const promoAnchor = state.session?.promotionAfterMessageId;
+    if (promoAnchor && promoAnchor === message.id) {
       const promo = buildPromoCard();
       if (promo) els.messages.appendChild(promo);
     }
@@ -206,10 +217,10 @@ function renderStaffMessages() {
 }
 
 function renderLead() {
-  const lead = state.session?.lead || { temperature: "cold", score: 0, interests: [], bookingIntent: false, summary: "No conversation yet." };
+  const lead = state.session?.lead || { temperature: "cold", interests: [], bookingIntent: false, summary: "No conversation yet." };
   const temp = lead.temperature || "cold";
   els.leadTemperature.textContent = temp[0].toUpperCase() + temp.slice(1);
-  els.leadScore.textContent = `Score ${lead.score || 0}`;
+  els.leadScore.textContent = temp === "hot" ? "Strong booking intent" : temp === "warm" ? "Active interest" : "Early enquiry";
   els.temperatureBadge.className = `temperature-orb ${temp}`;
   els.temperatureBadge.textContent = temp === "hot" ? "●" : temp === "warm" ? "◐" : "○";
   const scale = document.querySelector(".temperature-scale");
@@ -257,6 +268,46 @@ function renderCounters() {
   els.messageCounter.textContent = `${count} / ${max} demo messages`;
 }
 
+function renderTour() {
+  if (!state.session || !els.tourStatus) return;
+  const asked = state.session.customerMessageCount > 0;
+  const booking = Boolean(state.session.lead?.bookingIntent);
+  const dashboard = state.hasViewedDashboard;
+  const takeover = state.hasTakenOver || state.session.mode === "human" || state.session.messages.some((m) => m.source === "staff");
+  const steps = [asked, booking, dashboard, takeover];
+  [els.tourStep1, els.tourStep2, els.tourStep3, els.tourStep4].forEach((el, index) => {
+    el?.classList.toggle("complete", steps[index]);
+    el?.classList.toggle("current", !steps[index] && steps.slice(0, index).every(Boolean));
+  });
+  const completed = steps.filter(Boolean).length;
+  els.tourProgress.textContent = `${completed} / 4`;
+  if (!asked) els.tourStatus.textContent = "Tap a sample question below";
+  else if (!booking) els.tourStatus.textContent = "Now try “Can I come Saturday?”";
+  else if (!dashboard) els.tourStatus.textContent = "Hot lead detected — open Clinic Dashboard";
+  else if (!takeover) els.tourStatus.textContent = "See the staff view, then try Take over";
+  else els.tourStatus.textContent = "Full customer journey completed ✓";
+
+  const shouldHighlightDashboard = booking && !dashboard && state.activeView === "patient";
+  els.dashboardTab.classList.toggle("guide-highlight", shouldHighlightDashboard);
+  els.takeoverButton.classList.toggle("guide-highlight", dashboard && !takeover && state.activeView === "dashboard");
+  els.salesCta?.classList.toggle("guide-highlight-soft", takeover);
+}
+
+function configureSalesCta() {
+  if (!els.salesCtaButton || !state.config?.salesCta) return;
+  els.salesCtaButton.textContent = state.config.salesCta.label || "Set up my clinic";
+  const url = state.config.salesCta.url || "";
+  if (url) {
+    els.salesCtaButton.href = url;
+    els.salesCtaButton.target = "_blank";
+    els.salesCtaButton.rel = "noopener noreferrer";
+    els.salesCtaButton.removeAttribute("data-cta-unconfigured");
+  } else {
+    els.salesCtaButton.href = "#";
+    els.salesCtaButton.dataset.ctaUnconfigured = "true";
+  }
+}
+
 function renderAll() {
   if (!state.session) return;
   renderChannel();
@@ -266,6 +317,7 @@ function renderAll() {
   renderModeAndAttention();
   renderConversationCard();
   renderCounters();
+  renderTour();
 }
 
 function setLoading(loading) {
@@ -282,7 +334,8 @@ async function createSession(channel = "whatsapp") {
     body: JSON.stringify({ channel }),
   });
   state.session = data.session;
-  state.promotionShownForSession = false;
+  state.hasViewedDashboard = false;
+  state.hasTakenOver = false;
   sessionStorage.setItem("clinicDemoSessionId", state.session.id);
   renderAll();
 }
@@ -293,7 +346,7 @@ async function restoreOrCreateSession() {
     try {
       const data = await api(`/api/demo/sessions/${encodeURIComponent(saved)}`);
       state.session = data.session;
-      state.promotionShownForSession = state.session.messages.some((m) => m.source === "ai");
+      state.hasTakenOver = state.session.mode === "human" || state.session.messages.some((m) => m.source === "staff");
       renderAll();
       return;
     } catch {
@@ -326,12 +379,13 @@ async function sendCustomerMessage(rawMessage) {
       body: JSON.stringify({ message }),
     });
     state.session = data.session;
-    if (data.promotion) state.promotionShownForSession = true;
     renderAll();
     if (data.degraded) {
       showToast("The live AI provider had a temporary issue. The conversation was kept so you can try again.");
     } else if (state.session.needsAttention) {
       showToast("The AI requested staff assistance. Open Clinic Dashboard to see the handoff.");
+    } else if (state.session.lead?.bookingIntent && !state.hasViewedDashboard) {
+      showToast("Hot lead detected. Open Clinic Dashboard to see what your team would see.");
     }
   } catch (error) {
     state.session.messages = state.session.messages.filter((m) => m.id !== optimistic.id);
@@ -366,8 +420,12 @@ async function toggleTakeover() {
       body: JSON.stringify({ mode: newMode }),
     });
     state.session = data.session;
+    if (newMode === "human") state.hasTakenOver = true;
     renderAll();
-    if (newMode === "human") els.staffInput.focus();
+    if (newMode === "human") {
+      els.staffInput.focus();
+      showToast("Human takeover is active. Try sending a staff reply to the patient.");
+    }
   } catch (error) {
     showToast(error.message);
   }
@@ -386,7 +444,7 @@ async function sendStaffMessage(rawMessage) {
     state.session = data.session;
     els.staffInput.value = "";
     renderAll();
-    showToast("Staff reply sent to the simulated customer chat.");
+    showToast("Staff reply sent. Full demo journey complete — see the setup option below.");
   } catch (error) {
     showToast(error.message);
   } finally {
@@ -423,10 +481,13 @@ function bindEvents() {
     button.addEventListener("click", () => changeChannel(button.dataset.channel));
   });
   document.querySelectorAll(".suggestion-chip").forEach((button) => {
-    button.addEventListener("click", () => {
-      els.customerInput.value = button.dataset.message;
-      els.customerInput.focus();
-    });
+    button.addEventListener("click", () => sendCustomerMessage(button.dataset.message || ""));
+  });
+  els.salesCtaButton?.addEventListener("click", (event) => {
+    if (els.salesCtaButton.dataset.ctaUnconfigured === "true") {
+      event.preventDefault();
+      showToast("Add SALES_CTA_URL in Render to connect this button to your WhatsApp or sales page.");
+    }
   });
   document.querySelectorAll("[data-demo-only]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -439,6 +500,7 @@ async function init() {
   bindEvents();
   try {
     state.config = await api("/api/demo/config");
+    configureSalesCta();
     await restoreOrCreateSession();
   } catch (error) {
     showToast(error.message);
