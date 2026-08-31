@@ -108,6 +108,10 @@ function publicConfig() {
     branches: clinic.branches,
     services: clinic.services.map(({ aliases, ...service }) => service),
     promotion: clinic.promotion,
+    salesCta: {
+      label: process.env.SALES_CTA_LABEL || "Set up my clinic",
+      url: process.env.SALES_CTA_URL || "",
+    },
     aiProvider: ai.provider,
     limits: state.limits,
   };
@@ -170,12 +174,14 @@ async function handleApi(req, res, url) {
       reply = "Sorry, I’m having a little trouble replying right now. Please try again in a moment 🙂";
     }
     if (isFirstMessage) reply = `${clinic.introMessage}\n\n${reply}`;
-    state.addAssistantMessage(session, reply);
+    const assistantMessage = state.addAssistantMessage(session, reply);
+    const showPromotion = !degraded && !session.needsAttention && state.shouldShowPromotion(session);
+    if (showPromotion) state.markPromotionShown(session, assistantMessage.id);
     return sendJson(res, 200, {
       session: state.publicSession(session),
       aiReplied: !degraded,
       degraded,
-      promotion: isFirstMessage ? clinic.promotion : null,
+      promotion: showPromotion ? clinic.promotion : null,
     });
   }
   return false;
