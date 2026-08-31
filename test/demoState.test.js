@@ -55,7 +55,7 @@ test("latest negative intent clears booking intent and downgrades the lead", asy
   state.addCustomerMessage(session, "Never mind, I am not interested anymore");
   assert.equal(session.lead.bookingIntent, false);
   assert.equal(session.lead.temperature, "cold");
-  assert.match(session.lead.summary, /reduced interest/);
+  assert.match(session.lead.summary, /no longer interested/);
   await new Promise((resolve) => setTimeout(resolve, 2));
   state.addCustomerMessage(session, "One more question");
   assert.equal(session.lead.bookingIntent, false);
@@ -70,4 +70,32 @@ test("returning ownership to AI clears stale attention state", async () => {
   state.setMode(session, "ai");
   assert.equal(session.needsAttention, false);
   assert.equal(session.attentionReason, null);
+});
+
+test("promotion appears only after HIFU interest and only once", async () => {
+  const session = state.createSession({ channel: "whatsapp", ip: "test-promo" });
+  state.addCustomerMessage(session, "I have pigmentation. What can I do?");
+  assert.equal(state.shouldShowPromotion(session), false);
+  await new Promise((resolve) => setTimeout(resolve, 2));
+  state.addCustomerMessage(session, "What about HIFU for my jawline?");
+  assert.equal(state.shouldShowPromotion(session), true);
+  const reply = state.addAssistantMessage(session, "HIFU may be relevant for that concern.");
+  state.markPromotionShown(session, reply.id);
+  assert.equal(state.shouldShowPromotion(session), false);
+  assert.equal(session.promotionAfterMessageId, reply.id);
+});
+
+test("conversation summary is customer-friendly rather than a raw signal dump", () => {
+  const session = state.createSession({ channel: "whatsapp", ip: "test-summary" });
+  state.addCustomerMessage(session, "I want HIFU and I want to book Saturday in KL");
+  assert.match(session.lead.summary, /Interested in HIFU Skin Lifting/);
+  assert.match(session.lead.summary, /Strong booking intent/);
+  assert.equal(session.lead.summary.includes("latest:"), false);
+});
+
+test("public session hides the internal numeric lead score", () => {
+  const session = state.createSession({ channel: "facebook", ip: "test-public-lead" });
+  state.addCustomerMessage(session, "How much is HIFU?");
+  const publicView = state.publicSession(session);
+  assert.equal(Object.hasOwn(publicView.lead, "score"), false);
 });
