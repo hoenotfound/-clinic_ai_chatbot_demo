@@ -92,7 +92,7 @@
                   <span>● ● ●</span>
                 </div>
                 <div class="chat-header">
-                  <button class="back-glyph" type="button" aria-label="Back">‹</button>
+                  <button class="back-glyph" type="button" aria-label="Back" data-demo-only="This is a simulated chat. Use the channel selector to switch experiences.">‹</button>
                   <div class="clinic-avatar">N</div>
                   <div class="chat-title">
                     <strong>Nova Aesthetic Clinic</strong>
@@ -115,7 +115,7 @@
                 </div>
 
                 <form id="customerForm" class="composer">
-                  <button class="composer-glyph" type="button" aria-label="Attachment demo">＋</button>
+                  <button class="composer-glyph" type="button" aria-label="Attachment demo" data-demo-only="Media attachments are not enabled in this minimal demo yet.">＋</button>
                   <input id="customerInput" type="text" maxlength="2000" autocomplete="off" placeholder="Type a message" aria-label="Customer message" />
                   <button id="customerSendButton" class="send-button" type="submit" aria-label="Send message">➤</button>
                 </form>
@@ -138,8 +138,8 @@
               </div>
               <nav class="dashboard-nav" aria-label="Demo dashboard sections">
                 <button class="dashboard-nav-item active" type="button"><span>▣</span> Inbox <b id="inboxBadge">1</b></button>
-                <button class="dashboard-nav-item" type="button"><span>◇</span> Pipeline</button>
-                <button class="dashboard-nav-item" type="button"><span>◫</span> Analytics <em>Demo</em></button>
+                <button class="dashboard-nav-item" type="button" data-demo-only="The full Pipeline page is not included in this minimal demo. Live lead status is shown in the right panel."><span>◇</span> Pipeline</button>
+                <button class="dashboard-nav-item" type="button" data-demo-only="Analytics is represented visually only in this minimal demo."><span>◫</span> Analytics <em>Demo</em></button>
               </nav>
               <div class="dashboard-sidebar-note">
                 <strong>Demo workspace</strong>
@@ -150,11 +150,11 @@
             <div class="inbox-column">
               <div class="inbox-heading">
                 <div><h2>Inbox</h2><p>1 demo conversation</p></div>
-                <button class="icon-button" type="button" aria-label="Filters">≡</button>
+                <button class="icon-button" type="button" aria-label="Filters" data-demo-only="Inbox filters are visual only because this demo contains one private conversation.">≡</button>
               </div>
               <div class="inbox-filters">
-                <button class="filter-chip active" type="button">All</button>
-                <button class="filter-chip" type="button">Needs attention</button>
+                <button class="filter-chip active" type="button" data-demo-only="This demo contains one private conversation, so there is nothing else to filter.">All</button>
+                <button class="filter-chip" type="button" data-demo-only="When the AI requests help, the attention banner and red dashboard dot appear automatically.">Needs attention</button>
               </div>
               <button class="conversation-card active" type="button">
                 <div id="dashboardChannelAvatar" class="conversation-avatar whatsapp-icon">W</div>
