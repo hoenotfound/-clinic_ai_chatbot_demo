@@ -168,7 +168,7 @@ function renderPatientMessages() {
   }
   for (const message of messages) {
     els.messages.appendChild(buildMessageBubble(message));
-    const firstAiMessage = message.role === "assistant" && messages.find((m) => m.role === "assistant")?.id === message.id;
+    const firstAiMessage = message.source === "ai" && messages.find((m) => m.source === "ai")?.id === message.id;
     if (firstAiMessage && state.promotionShownForSession) {
       const promo = buildPromoCard();
       if (promo) els.messages.appendChild(promo);
@@ -293,7 +293,7 @@ async function restoreOrCreateSession() {
     try {
       const data = await api(`/api/demo/sessions/${encodeURIComponent(saved)}`);
       state.session = data.session;
-      state.promotionShownForSession = state.session.messages.some((m) => m.role === "assistant");
+      state.promotionShownForSession = state.session.messages.some((m) => m.source === "ai");
       renderAll();
       return;
     } catch {
@@ -328,7 +328,11 @@ async function sendCustomerMessage(rawMessage) {
     state.session = data.session;
     if (data.promotion) state.promotionShownForSession = true;
     renderAll();
-    if (state.session.needsAttention) showToast("The AI requested staff assistance. Open Clinic Dashboard to see the handoff.");
+    if (data.degraded) {
+      showToast("The live AI provider had a temporary issue. The conversation was kept so you can try again.");
+    } else if (state.session.needsAttention) {
+      showToast("The AI requested staff assistance. Open Clinic Dashboard to see the handoff.");
+    }
   } catch (error) {
     state.session.messages = state.session.messages.filter((m) => m.id !== optimistic.id);
     renderAll();
@@ -422,6 +426,11 @@ function bindEvents() {
     button.addEventListener("click", () => {
       els.customerInput.value = button.dataset.message;
       els.customerInput.focus();
+    });
+  });
+  document.querySelectorAll("[data-demo-only]").forEach((button) => {
+    button.addEventListener("click", () => {
+      showToast(button.dataset.demoOnly || "This control is visual only in the minimal demo.");
     });
   });
 }
