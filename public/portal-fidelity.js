@@ -1,4 +1,11 @@
 (() => {
+  if (!document.querySelector('link[href="/portal-fidelity-extra.css"]')) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '/portal-fidelity-extra.css';
+    document.head.appendChild(link);
+  }
+
   const shell = document.querySelector('.portal-shell');
   const sampleData = window.PORTAL_DEMO_DATA?.SAMPLE_LEADS || [];
   if (!shell) return;
