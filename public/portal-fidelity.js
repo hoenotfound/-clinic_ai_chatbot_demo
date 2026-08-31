@@ -39,10 +39,24 @@
       shell.classList.add('thread-open');
     }
 
+    const pipelineLead = event.target.closest('[data-pipeline-lead]');
+    if (pipelineLead && window.matchMedia('(max-width: 767px)').matches) {
+      setTimeout(() => shell.classList.add('thread-open'), 0);
+    }
+
     if (event.target.closest('[data-portal-page]')) {
       shell.classList.remove('thread-open');
       closeDetails();
     }
+  });
+
+  document.getElementById('dashboardTab')?.addEventListener('click', () => {
+    shell.classList.remove('thread-open');
+    closeDetails();
+  });
+  document.getElementById('newDemoButton')?.addEventListener('click', () => {
+    shell.classList.remove('thread-open');
+    closeDetails();
   });
 
   document.addEventListener('keydown', (event) => {
