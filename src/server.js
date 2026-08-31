@@ -224,7 +224,7 @@ function buildEnhancedIndex(filePath) {
   }
 
   if (!html.includes('/portal-demo.css')) {
-    html = html.replace('</head>', '  <link rel="stylesheet" href="/portal-demo.css" />\n  <link rel="stylesheet" href="/portal-fidelity.css" />\n</head>');
+    html = html.replace('</head>', '  <link rel="stylesheet" href="/portal-demo.css" />\n  <link rel="stylesheet" href="/portal-fidelity.css" />\n  <link rel="stylesheet" href="/portal-fidelity-extra.css" />\n</head>');
   }
   if (!html.includes('/portal-data.js')) {
     html = html.replace(
