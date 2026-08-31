@@ -43,6 +43,9 @@ function securityHeaders(res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  if (process.env.NODE_ENV === "production") {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
   res.setHeader("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
 }
 
@@ -112,7 +115,11 @@ function publicConfig() {
 
 async function handleApi(req, res, url) {
   if (req.method === "GET" && url.pathname === "/health") {
-    return sendJson(res, 200, { ok: true, aiProvider: ai.provider });
+    return sendJson(res, ai.configured ? 200 : 503, {
+      ok: ai.configured,
+      aiProvider: ai.provider,
+      configured: ai.configured,
+    });
   }
   if (req.method === "GET" && url.pathname === "/api/demo/config") {
     return sendJson(res, 200, publicConfig());
@@ -153,12 +160,21 @@ async function handleApi(req, res, url) {
     }
     const history = session.messages.map((message) => ({ role: message.role, content: message.content }));
     const isFirstMessage = session.customerMessageCount === 1;
-    let reply = await ai.getReply(history, isFirstMessage);
+    let reply;
+    let degraded = false;
+    try {
+      reply = await ai.getReply(history, isFirstMessage);
+    } catch (aiError) {
+      degraded = true;
+      console.error("AI provider failed while handling a demo message:", aiError);
+      reply = "Sorry, I’m having a little trouble replying right now. Please try again in a moment 🙂";
+    }
     if (isFirstMessage) reply = `${clinic.introMessage}\n\n${reply}`;
     state.addAssistantMessage(session, reply);
     return sendJson(res, 200, {
       session: state.publicSession(session),
-      aiReplied: true,
+      aiReplied: !degraded,
+      degraded,
       promotion: isFirstMessage ? clinic.promotion : null,
     });
   }
@@ -200,6 +216,9 @@ const server = http.createServer(async (req, res) => {
   try {
     const handled = await handleApi(req, res, url);
     if (handled !== false) return;
+    if (url.pathname.startsWith("/api/")) {
+      return sendJson(res, 404, { error: "API route not found." });
+    }
     if (req.method === "GET" || req.method === "HEAD") return serveStatic(req, res, url.pathname);
     sendJson(res, 404, { error: "Not found." });
   } catch (err) {
