@@ -23,7 +23,7 @@ It intentionally **does not connect to Meta APIs**. WhatsApp, Instagram and Mess
 - Conversation summary
 - Simple pipeline view
 - First-message sample promotion graphic
-- Per-session message limits and per-IP demo-session limits
+- Per-session, per-IP and global daily demo limits
 - No database
 - No WhatsApp, Facebook or Instagram credentials
 - No production chatbot data
@@ -139,10 +139,11 @@ Defaults:
 DEMO_SESSION_MINUTES=60
 DEMO_MAX_MESSAGES=30
 DEMO_MAX_SESSIONS_PER_IP_DAY=5
+DEMO_MAX_TOTAL_MESSAGES_PER_DAY=500
 DEMO_MIN_MESSAGE_INTERVAL_MS=900
 ```
 
-These are intended to reduce casual abuse of a public AI endpoint. They can be adjusted in Render without changing code.
+These are intended to reduce casual abuse of a public AI endpoint. The global daily ceiling also limits total exposure if someone bypasses the per-IP session limit. They can be adjusted in Render without changing code.
 
 ## Session behavior
 
@@ -198,4 +199,4 @@ Run:
 npm test
 ```
 
-The included tests cover session isolation, hot-lead detection, hidden handoff markers and human takeover.
+The included tests cover session isolation, hot-lead detection, preference updates, reduced-interest handling, hidden handoff markers and human takeover.
