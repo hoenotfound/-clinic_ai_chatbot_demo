@@ -1,0 +1,109 @@
+const { buildSystemPrompt } = require("./systemPrompt");
+const clinic = require("./clinicConfig");
+
+const provider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
+
+function mockReply(messages) {
+  const latest = (messages.at(-1)?.content || "").toLowerCase();
+  if (/human|staff|doctor|consultant|complain|refund/.test(latest)) {
+    return "Of course. I’ll flag this for a clinic team member to step in and help you directly. [[HANDOFF]]";
+  }
+  if (/book|appointment|saturday|sunday|weekend|come in|slot/.test(latest)) {
+    return "Sure 😊 Which is more convenient for you, our Kuala Lumpur branch or Petaling Jaya branch? Once you choose, the team would confirm the actual available slot.";
+  }
+  if (/hifu|price|how much/.test(latest)) {
+    return "Our sample HIFU offer starts from RM 888 😊 It’s commonly used for lifting, tightening and jawline definition. Which area are you more concerned about, face, jawline or double chin?";
+  }
+  if (/pico|pigmentation|dark spot|acne/.test(latest)) {
+    return "Pico Laser starts from RM 388 in this demo. It’s commonly used for pigmentation, uneven tone and selected acne marks. What’s the main skin concern you’d like to improve?";
+  }
+  return `Thanks for asking 😊 ${clinic.consultation} is available. Tell me what you’d like to improve and I can point you to the most relevant option.`;
+}
+
+async function fetchJson(url, options, label) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30_000);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = data?.error?.message || data?.error?.type || `${response.status} ${response.statusText}`;
+      throw new Error(`${label} request failed: ${detail}`);
+    }
+    return data;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function getClaudeReply(messages, isFirstMessage) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured.");
+  const model = process.env.CLAUDE_MODEL || "claude-sonnet-5";
+  const data = await fetchJson(
+    "https://api.anthropic.com/v1/messages",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 650,
+        system: buildSystemPrompt({ isFirstMessage }),
+        messages,
+      }),
+    },
+    "Claude"
+  );
+  const block = data.content?.find((item) => item.type === "text");
+  return block?.text || "Sorry, I couldn't generate a reply. Please try again.";
+}
+
+async function getGeminiReply(messages, isFirstMessage) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
+  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const contents = messages.map((message) => ({
+    role: message.role === "assistant" ? "model" : "user",
+    parts: [{ text: message.content }],
+  }));
+  const data = await fetchJson(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: buildSystemPrompt({ isFirstMessage }) }],
+        },
+        contents,
+        generationConfig: {
+          maxOutputTokens: 650,
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      }),
+    },
+    "Gemini"
+  );
+  const text = data.candidates?.[0]?.content?.parts
+    ?.filter((part) => typeof part.text === "string")
+    .map((part) => part.text)
+    .join("")
+    .trim();
+  return text || "Sorry, I couldn't generate a reply. Please try again.";
+}
+
+async function getReply(messages, isFirstMessage = false) {
+  if (provider === "mock") return mockReply(messages);
+  if (provider === "claude") return getClaudeReply(messages, isFirstMessage);
+  if (provider === "gemini") return getGeminiReply(messages, isFirstMessage);
+  throw new Error(`Unknown AI_PROVIDER: ${provider}`);
+}
+
+module.exports = { getReply, provider };
