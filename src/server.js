@@ -173,6 +173,17 @@ async function handleApi(req, res, url) {
       console.error("AI provider failed while handling a demo message:", aiError);
       reply = "Sorry, I’m having a little trouble replying right now. Please try again in a moment 🙂";
     }
+
+    // Staff may take over while the model request is still in flight. In that
+    // case, discard the generated reply so human ownership is respected.
+    if (session.mode === "human") {
+      return sendJson(res, 200, {
+        session: state.publicSession(session),
+        aiReplied: false,
+        cancelledByTakeover: true,
+      });
+    }
+
     if (isFirstMessage) reply = `${clinic.introMessage}\n\n${reply}`;
     const assistantMessage = state.addAssistantMessage(session, reply);
     const showPromotion = !degraded && !session.needsAttention && state.shouldShowPromotion(session);
