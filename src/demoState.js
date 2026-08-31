@@ -14,7 +14,7 @@ function intEnv(name, fallback) {
 const limits = {
   sessionMinutes: intEnv("DEMO_SESSION_MINUTES", 60),
   maxMessages: intEnv("DEMO_MAX_MESSAGES", 30),
-  maxSessionsPerIpDay: intEnv("DEMO_MAX_SESSIONS_PER_IP_DAY", 5),
+  maxSessionsPerIpDay: intEnv("DEMO_MAX_SESSIONS_PER_IP_DAY", 20),
   maxTotalMessagesPerDay: intEnv("DEMO_MAX_TOTAL_MESSAGES_PER_DAY", 500),
   minMessageIntervalMs: intEnv("DEMO_MIN_MESSAGE_INTERVAL_MS", 900),
 };
@@ -61,11 +61,14 @@ function createSession({ channel = "whatsapp", ip = "unknown" } = {}) {
     lastCustomerMessageAt: 0,
     needsAttention: false,
     attentionReason: null,
+    promotionShown: false,
+    promotionAfterMessageId: null,
     lead: {
       temperature: "cold",
       score: 0,
       interests: [],
       bookingIntent: false,
+      reducedInterest: false,
       preferredTiming: null,
       preferredBranch: null,
       summary: "No conversation yet.",
@@ -136,11 +139,34 @@ function detectInterests(text) {
     .map((service) => service.name);
 }
 
+function buildNaturalSummary({ interests, bookingIntent, negativeIntentActive, preferredBranch, preferredTiming, askedPrice }) {
+  const treatmentText = interests.length ? interests.join(" and ") : null;
+  const branchText = preferredBranch ? ` at the ${preferredBranch} branch` : "";
+  const timingText = preferredTiming ? ` (${preferredTiming.toLowerCase()})` : "";
+  const visitText = `${branchText}${timingText}`;
+
+  if (negativeIntentActive) {
+    return treatmentText
+      ? `The visitor asked about ${treatmentText}, but their latest message indicates they are no longer interested in booking right now.`
+      : "The visitor’s latest message indicates they are no longer interested in booking right now.";
+  }
+  if (bookingIntent) {
+    return treatmentText
+      ? `Interested in ${treatmentText} and wants to arrange a visit${visitText}. Strong booking intent and ready for staff follow-up.`
+      : `Wants to arrange a clinic visit${visitText}. Strong booking intent and ready for staff follow-up.`;
+  }
+  if (treatmentText) {
+    return askedPrice
+      ? `Interested in ${treatmentText} and has asked about pricing. No appointment intent detected yet.`
+      : `Interested in ${treatmentText}. No appointment intent detected yet.`;
+  }
+  return "Early-stage enquiry. No specific treatment or appointment intent has been detected yet.";
+}
+
 function updateLead(session) {
   const customerMessages = session.messages.filter((message) => message.role === "user");
   const customerText = customerMessages.map((message) => message.content).join(" \n");
   const lower = customerText.toLowerCase();
-  const latestCustomer = customerMessages.at(-1)?.content || "";
 
   const interests = new Set(session.lead.interests);
   for (const interest of detectInterests(customerText)) interests.add(interest);
@@ -153,10 +179,11 @@ function updateLead(session) {
   const latestIntentLower = latestIntentMessage?.content.toLowerCase() || "";
   const negativeIntentActive = negativeIntentPattern.test(latestIntentLower);
   const bookingIntent = Boolean(latestIntentMessage) && bookingPattern.test(latestIntentLower) && !negativeIntentActive;
+  const askedPrice = /price|how much|cost|rm\s?\d|promo|package/.test(lower);
 
   let score = 0;
   if (interests.size) score += 2;
-  if (/price|how much|cost|rm\s?\d|promo|package/.test(lower)) score += 2;
+  if (askedPrice) score += 2;
   if (/interested|want to|suitable|works? for me|result/.test(lower)) score += 2;
   if (bookingIntent) score += 5;
   if (/my number|call me|contact me/.test(lower)) score += 3;
@@ -186,22 +213,24 @@ function updateLead(session) {
   }
 
   const temperature = score >= 7 ? "hot" : score >= 3 ? "warm" : "cold";
-  const interestText = interests.size ? Array.from(interests).join(", ") : "No specific treatment identified yet";
-  const summaryParts = [interestText];
-  if (bookingIntent) summaryParts.push("shows appointment intent");
-  else if (negativeIntentActive) summaryParts.push("latest intent indicates reduced interest");
-  if (preferredBranch) summaryParts.push(`prefers ${preferredBranch}`);
-  if (preferredTiming) summaryParts.push(`timing: ${preferredTiming}`);
-  if (latestCustomer) summaryParts.push(`latest: “${latestCustomer.slice(0, 120)}${latestCustomer.length > 120 ? "…" : ""}”`);
+  const interestList = Array.from(interests);
 
   session.lead = {
     temperature,
     score,
-    interests: Array.from(interests),
+    interests: interestList,
     bookingIntent,
+    reducedInterest: negativeIntentActive,
     preferredTiming,
     preferredBranch,
-    summary: summaryParts.join("; ") + ".",
+    summary: buildNaturalSummary({
+      interests: interestList,
+      bookingIntent,
+      negativeIntentActive,
+      preferredBranch,
+      preferredTiming,
+      askedPrice,
+    }),
   };
 }
 
@@ -236,6 +265,18 @@ function addAssistantMessage(session, rawText) {
   return appendMessage(session, "assistant", cleanText, "ai");
 }
 
+function shouldShowPromotion(session) {
+  return !session.promotionShown &&
+    !session.lead.reducedInterest &&
+    session.lead.interests.includes("HIFU Skin Lifting");
+}
+
+function markPromotionShown(session, messageId) {
+  session.promotionShown = true;
+  session.promotionAfterMessageId = messageId || null;
+  session.updatedAt = Date.now();
+}
+
 function addStaffMessage(session, rawText) {
   const text = sanitizeText(rawText);
   if (!text) {
@@ -256,8 +297,6 @@ function setMode(session, mode) {
     throw err;
   }
   session.mode = mode;
-  // An explicit ownership change resolves the previous attention state.
-  // New customer activity or a future AI handoff can raise it again.
   session.needsAttention = false;
   session.attentionReason = null;
   session.updatedAt = Date.now();
@@ -274,6 +313,7 @@ function setChannel(session, channel) {
 }
 
 function publicSession(session) {
+  const { score, reducedInterest, ...publicLead } = session.lead;
   return {
     id: session.id,
     channel: session.channel,
@@ -286,7 +326,9 @@ function publicSession(session) {
     maxMessages: limits.maxMessages,
     needsAttention: session.needsAttention,
     attentionReason: session.attentionReason,
-    lead: session.lead,
+    promotionShown: session.promotionShown,
+    promotionAfterMessageId: session.promotionAfterMessageId,
+    lead: publicLead,
   };
 }
 
@@ -318,4 +360,6 @@ module.exports = {
   publicSession,
   cleanupExpiredSessions,
   updateLead,
+  shouldShowPromotion,
+  markPromotionShown,
 };
