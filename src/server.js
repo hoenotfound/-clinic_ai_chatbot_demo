@@ -27,6 +27,9 @@ const ai = require("./aiService");
 
 const PORT = Number.parseInt(process.env.PORT || "3000", 10);
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
+const PORTAL_DASHBOARD_PARTS = [1, 2, 3, 4].map((number) =>
+  path.join(PUBLIC_DIR, `portal-dashboard-part${number}.html`)
+);
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -207,6 +210,31 @@ function safeStaticPath(pathname) {
   return fullPath.startsWith(PUBLIC_DIR) ? fullPath : null;
 }
 
+function buildEnhancedIndex(filePath) {
+  let html = fs.readFileSync(filePath, "utf8");
+  const dashboardStartToken = '        <div id="dashboardView" class="view-panel" role="tabpanel">';
+  const proofStartToken = '      <section class="proof-grid">';
+  const dashboardStart = html.indexOf(dashboardStartToken);
+  const proofStart = html.indexOf(proofStartToken, dashboardStart + dashboardStartToken.length);
+
+  if (dashboardStart >= 0 && proofStart > dashboardStart && PORTAL_DASHBOARD_PARTS.every((part) => fs.existsSync(part))) {
+    const portalDashboard = PORTAL_DASHBOARD_PARTS.map((part) => fs.readFileSync(part, "utf8")).join("");
+    const replacement = `${dashboardStartToken}\n${portalDashboard}\n        </div>\n      </section>\n\n`;
+    html = html.slice(0, dashboardStart) + replacement + html.slice(proofStart);
+  }
+
+  if (!html.includes('/portal-demo.css')) {
+    html = html.replace('</head>', '  <link rel="stylesheet" href="/portal-demo.css" />\n</head>');
+  }
+  if (!html.includes('/portal-data.js')) {
+    html = html.replace(
+      '  <script src="/app.js" defer></script>',
+      '  <script src="/portal-data.js" defer></script>\n  <script src="/app.js" defer></script>\n  <script src="/portal-demo.js" defer></script>'
+    );
+  }
+  return html;
+}
+
 function serveStatic(req, res, pathname) {
   let filePath = safeStaticPath(pathname);
   if (!filePath) return false;
@@ -214,11 +242,27 @@ function serveStatic(req, res, pathname) {
     filePath = path.join(PUBLIC_DIR, "index.html");
   }
   securityHeaders(res);
+
+  if (path.basename(filePath) === "index.html") {
+    const payload = Buffer.from(buildEnhancedIndex(filePath));
+    res.writeHead(200, {
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": payload.length,
+      "Cache-Control": "no-cache",
+    });
+    if (req.method === "HEAD") {
+      res.end();
+      return true;
+    }
+    res.end(payload);
+    return true;
+  }
+
   const stat = fs.statSync(filePath);
   res.writeHead(200, {
     "Content-Type": MIME[path.extname(filePath).toLowerCase()] || "application/octet-stream",
     "Content-Length": stat.size,
-    "Cache-Control": path.basename(filePath) === "index.html" ? "no-cache" : "public, max-age=3600",
+    "Cache-Control": "public, max-age=3600",
   });
   if (req.method === "HEAD") {
     res.end();
