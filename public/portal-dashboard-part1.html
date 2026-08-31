@@ -1,0 +1,54 @@
+          <div class="portal-shell">
+            <aside class="portal-sidebar">
+              <div class="portal-brand"><div class="portal-brand-logo">N</div><span>Nova Clinic</span></div>
+              <nav class="portal-nav" aria-label="Clinic dashboard">
+                <button type="button" class="portal-nav-item active" data-portal-page="inbox" aria-label="Inbox"><span class="portal-nav-icon">▣</span><span>Inbox</span></button>
+                <button type="button" class="portal-nav-item" data-demo-only="Contacts are represented by the sample conversation history in this public demo." aria-label="Contacts"><span class="portal-nav-icon">♙</span><span>Contacts</span></button>
+                <button type="button" class="portal-nav-item" data-portal-page="pipeline" aria-label="Pipeline"><span class="portal-nav-icon">▥</span><span>Pipeline</span></button>
+                <button type="button" class="portal-nav-item" data-portal-page="analytics" aria-label="Analytics"><span class="portal-nav-icon">⌁</span><span>Analytics</span></button>
+                <button type="button" class="portal-nav-item" data-portal-page="tools" aria-label="Tools"><span class="portal-nav-icon">⌘</span><span>Tools</span></button>
+                <button type="button" class="portal-nav-item portal-demo-only" data-demo-only="Settings are not editable in this public demo." aria-label="Settings"><span class="portal-nav-icon">⚙</span><span>Settings</span></button>
+                <button type="button" class="portal-nav-item portal-demo-only" data-demo-only="Team & Access is not editable in this public demo." aria-label="Team & Access"><span class="portal-nav-icon">♚</span><span>Team & Access</span></button>
+              </nav>
+              <div class="portal-user"><div class="portal-user-avatar">DA</div><div><strong>Demo Admin</strong><small>@demo · admin</small></div></div>
+            </aside>
+
+            <div class="portal-main">
+              <section id="portalPageInbox" class="portal-page active" data-page="inbox">
+                <div class="portal-inbox-shell">
+                  <aside class="portal-conversation-list">
+                    <div class="portal-list-header"><div><h2>Inbox</h2><p><span id="portalConversationCount">13</span> conversations</p></div><span class="sample-badge">Sample + Live</span></div>
+                    <div class="portal-list-filters"><button class="active" type="button">All</button><button type="button" data-inbox-filter="hot">Hot</button><button type="button" data-inbox-filter="attention">Attention</button></div>
+                    <div class="portal-conversation-scroll">
+                      <button id="liveConversationCard" class="portal-conversation-card active" type="button" data-conversation="live">
+                        <div id="dashboardChannelAvatar" class="conversation-avatar whatsapp-icon">W</div>
+                        <div class="portal-conversation-copy"><div><strong>Demo Patient</strong><time id="conversationTime">Now</time></div><p id="conversationPreview">No messages yet</p><div class="portal-tags"><span id="conversationChannelTag">WhatsApp</span><span id="conversationTempTag" class="temperature cold">Cold</span><span class="live-mini">LIVE</span></div></div>
+                      </button>
+                      <div class="sample-list-label">Sample conversation history</div>
+                      <div id="sampleConversationList"></div>
+                    </div>
+                  </aside>
+
+                  <div class="portal-thread-column">
+                    <section id="liveConversationPane" class="portal-live-pane">
+                      <header class="staff-conversation-header portal-thread-header">
+                        <div class="patient-identity"><div class="patient-avatar">DP</div><div><strong>Demo Patient</strong><span id="staffChannelLabel">WhatsApp · Demo visitor</span></div></div>
+                        <div class="staff-actions"><span id="modePill" class="mode-pill ai"><span></span> AI handling</span><button id="takeoverButton" class="button button-primary" type="button">Take over</button></div>
+                      </header>
+                      <div id="attentionBanner" class="attention-banner hidden"><span>!</span><div><strong>Human assistance requested</strong><p id="attentionReason">The AI flagged this conversation for staff review.</p></div></div>
+                      <div id="staffMessages" class="staff-messages portal-staff-messages"><div id="staffEmptyState" class="staff-empty-state"><span>💬</span><strong>No conversation yet</strong><p>Send a message from Patient View. It will appear here immediately.</p></div></div>
+                      <form id="staffForm" class="staff-composer"><div id="staffComposerNotice" class="staff-composer-notice">Take over the conversation to send a staff reply.</div><div class="staff-compose-row"><input id="staffInput" type="text" maxlength="2000" placeholder="Reply as clinic staff…" disabled aria-label="Staff reply" /><button id="staffSendButton" class="button button-primary" type="submit" disabled>Send</button></div></form>
+                    </section>
+                    <section id="sampleConversationPane" class="portal-sample-thread hidden" aria-label="Sample conversation"></section>
+                  </div>
+
+                  <aside id="liveLeadPanel" class="lead-panel portal-lead-panel">
+                    <div class="lead-panel-section"><p class="section-label">Lead temperature</p><div class="temperature-display"><div><strong id="leadTemperature">Cold</strong><span id="leadScore">Early enquiry</span></div><span id="temperatureBadge" class="temperature-orb cold">○</span></div><div class="temperature-scale"><span></span><span></span><span></span></div><p class="temperature-help">Updates from conversation signals such as service interest, pricing questions and appointment intent.</p></div>
+                    <div class="lead-panel-section"><p class="section-label">Conversation summary</p><p id="leadSummary" class="lead-summary">No conversation yet.</p></div>
+                    <div class="lead-panel-section"><p class="section-label">Detected intent</p><dl class="lead-facts"><div><dt>Treatment</dt><dd id="leadTreatment">Not detected</dd></div><div><dt>Appointment</dt><dd id="leadBooking">Not yet</dd></div><div><dt>Branch</dt><dd id="leadBranch">Not specified</dd></div><div><dt>Timing</dt><dd id="leadTiming">Not specified</dd></div></dl></div>
+                    <div class="lead-panel-section pipeline-section"><p class="section-label">Pipeline</p><div class="pipeline-track"><div id="pipelineNew" class="pipeline-step active"><span>1</span><div><strong>New lead</strong><small>Conversation started</small></div></div><div id="pipelineWarm" class="pipeline-step"><span>2</span><div><strong>Interested</strong><small>Service or pricing intent</small></div></div><div id="pipelineHot" class="pipeline-step"><span>3</span><div><strong>Booking intent</strong><small>Ready for staff follow-up</small></div></div></div></div>
+                  </aside>
+                  <aside id="sampleLeadPanel" class="portal-sample-insights hidden"></aside>
+                </div>
+              </section>
+
