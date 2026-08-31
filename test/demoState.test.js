@@ -25,10 +25,38 @@ test("booking language moves a lead to hot", () => {
   assert.match(session.lead.interests.join(" "), /HIFU/);
 });
 
+test("Bahasa Malaysia booking language is detected", () => {
+  const session = state.createSession({ channel: "whatsapp", ip: "test-bm" });
+  state.addCustomerMessage(session, "Berapa harga HIFU? Saya nak datang Sabtu di KL");
+  assert.equal(session.lead.temperature, "hot");
+  assert.equal(session.lead.bookingIntent, true);
+  assert.equal(session.lead.preferredTiming, "Weekend");
+  assert.equal(session.lead.preferredBranch, "Kuala Lumpur");
+  assert.match(session.lead.interests.join(" "), /HIFU/);
+});
+
+test("Chinese booking language and treatment aliases are detected", () => {
+  const session = state.createSession({ channel: "instagram", ip: "test-cn" });
+  state.addCustomerMessage(session, "我想做皮秒，可以预约星期六在PJ吗？");
+  assert.equal(session.lead.temperature, "hot");
+  assert.equal(session.lead.bookingIntent, true);
+  assert.equal(session.lead.preferredTiming, "Weekend");
+  assert.equal(session.lead.preferredBranch, "Petaling Jaya");
+  assert.match(session.lead.interests.join(" "), /Pico Laser/);
+});
+
 test("handoff marker is hidden and raises staff attention", () => {
   const session = state.createSession({ channel: "facebook", ip: "test-handoff" });
   state.addAssistantMessage(session, "I’ll get a team member to help. [[HANDOFF]]");
   assert.equal(session.needsAttention, true);
+  assert.equal(session.messages[0].content.includes("HANDOFF"), false);
+});
+
+test("handoff is still detected when the marker appears after the visible text limit", () => {
+  const session = state.createSession({ channel: "facebook", ip: "test-long-handoff" });
+  state.addAssistantMessage(session, `${"x".repeat(2300)} [[HANDOFF]]`);
+  assert.equal(session.needsAttention, true);
+  assert.equal(session.messages[0].content.length, 2000);
   assert.equal(session.messages[0].content.includes("HANDOFF"), false);
 });
 
@@ -60,6 +88,17 @@ test("latest negative intent clears booking intent and downgrades the lead", asy
   state.addCustomerMessage(session, "One more question");
   assert.equal(session.lead.bookingIntent, false);
   assert.equal(session.lead.temperature, "cold");
+});
+
+test("clear renewed interest after a negative intent reactivates the lead", async () => {
+  const session = state.createSession({ channel: "whatsapp", ip: "test-renewed" });
+  state.addCustomerMessage(session, "I want HIFU but never mind, I am not interested anymore");
+  assert.equal(session.lead.temperature, "cold");
+  await new Promise((resolve) => setTimeout(resolve, 2));
+  state.addCustomerMessage(session, "Actually how much is Pico?");
+  assert.equal(session.lead.temperature, "warm");
+  assert.equal(session.lead.bookingIntent, false);
+  assert.deepEqual(session.lead.interests, ["Pico Laser"]);
 });
 
 test("returning ownership to AI clears stale attention state", async () => {
@@ -98,4 +137,12 @@ test("public session hides the internal numeric lead score", () => {
   state.addCustomerMessage(session, "How much is HIFU?");
   const publicView = state.publicSession(session);
   assert.equal(Object.hasOwn(publicView.lead, "score"), false);
+});
+
+test("active conversation extends the session expiry window", async () => {
+  const session = state.createSession({ channel: "whatsapp", ip: "test-expiry" });
+  const originalExpiry = session.expiresAt;
+  await new Promise((resolve) => setTimeout(resolve, 2));
+  state.addCustomerMessage(session, "Hi");
+  assert.ok(session.expiresAt > originalExpiry);
 });
