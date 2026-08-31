@@ -224,12 +224,12 @@ function buildEnhancedIndex(filePath) {
   }
 
   if (!html.includes('/portal-demo.css')) {
-    html = html.replace('</head>', '  <link rel="stylesheet" href="/portal-demo.css" />\n</head>');
+    html = html.replace('</head>', '  <link rel="stylesheet" href="/portal-demo.css" />\n  <link rel="stylesheet" href="/portal-fidelity.css" />\n</head>');
   }
   if (!html.includes('/portal-data.js')) {
     html = html.replace(
       '  <script src="/app.js" defer></script>',
-      '  <script src="/portal-data.js" defer></script>\n  <script src="/app.js" defer></script>\n  <script src="/portal-demo.js" defer></script>'
+      '  <script src="/portal-data.js" defer></script>\n  <script src="/app.js" defer></script>\n  <script src="/portal-demo.js" defer></script>\n  <script src="/portal-fidelity.js" defer></script>'
     );
   }
   return html;
