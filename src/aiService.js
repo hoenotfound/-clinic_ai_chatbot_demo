@@ -56,7 +56,14 @@ async function fetchJson(url, options, label) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const detail = data?.error?.message || data?.error?.type || `${response.status} ${response.statusText}`;
-      throw new Error(`${label} request failed: ${detail}`);
+      const apiStatus = data?.error?.status ? ` ${data.error.status}` : "";
+      const details = Array.isArray(data?.error?.details) && data.error.details.length
+        ? ` | details: ${JSON.stringify(data.error.details).slice(0, 1200)}`
+        : "";
+      const error = new Error(`${label} request failed (${response.status}${apiStatus}): ${detail}${details}`);
+      error.statusCode = response.status;
+      error.apiStatus = data?.error?.status || null;
+      throw error;
     }
     return data;
   } finally {
@@ -94,35 +101,87 @@ async function getClaudeReply(messages, isFirstMessage) {
   return block?.text || "Sorry, I couldn't generate a reply. Please try again.";
 }
 
+function geminiThinkingConfig(model) {
+  const normalized = String(model || "").toLowerCase();
+
+  // GenerateContent uses a numeric thinking budget for the Gemini 2.5 family.
+  // 2.5 Flash and Flash-Lite support 0, which is ideal for this low-latency
+  // receptionist demo. 2.5 Pro cannot fully disable thinking, so leave it at
+  // the model default rather than sending an invalid zero budget.
+  if (/^gemini-2\.5-flash(?:-lite)?(?:-|$)/.test(normalized)) {
+    return { thinkingConfig: { thinkingBudget: 0 } };
+  }
+
+  // Gemini 3+ uses thinkingLevel instead of the legacy numeric budget. Flash
+  // models support minimal thinking; Pro-family models use low as the safest
+  // low-latency setting.
+  if (/^gemini-3(?:[.-]|$)/.test(normalized)) {
+    return {
+      thinkingConfig: {
+        thinkingLevel: normalized.includes("flash") ? "minimal" : "low",
+      },
+    };
+  }
+
+  // Unknown/older model families are safest without a thinking field.
+  return {};
+}
+
+function buildGeminiRequest(messages, isFirstMessage, model, { omitThinking = false } = {}) {
+  const contents = messages.map((message) => ({
+    role: message.role === "assistant" ? "model" : "user",
+    parts: [{ text: String(message.content || "") }],
+  }));
+  const generationConfig = {
+    // A fallback request without an explicit thinking control may spend part of
+    // this budget on hidden reasoning, so give it more headroom than the normal
+    // short receptionist response.
+    maxOutputTokens: omitThinking ? 2048 : 650,
+  };
+  if (!omitThinking) Object.assign(generationConfig, geminiThinkingConfig(model));
+
+  return {
+    systemInstruction: {
+      parts: [{ text: buildSystemPrompt({ isFirstMessage }) }],
+    },
+    contents,
+    generationConfig,
+  };
+}
+
 async function getGeminiReply(messages, isFirstMessage) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
   const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-  const contents = messages.map((message) => ({
-    role: message.role === "assistant" ? "model" : "user",
-    parts: [{ text: message.content }],
-  }));
-  const data = await fetchJson(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: buildSystemPrompt({ isFirstMessage }) }],
-        },
-        contents,
-        generationConfig: {
-          maxOutputTokens: 650,
-          thinkingConfig: { thinkingBudget: 0 },
-        },
-      }),
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  const requestOptions = (body) => ({
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-goog-api-key": apiKey,
     },
-    "Gemini"
-  );
+    body: JSON.stringify(body),
+  });
+
+  let data;
+  const primaryBody = buildGeminiRequest(messages, isFirstMessage, model);
+  try {
+    data = await fetchJson(url, requestOptions(primaryBody), "Gemini");
+  } catch (error) {
+    const hasThinkingConfig = Boolean(primaryBody.generationConfig?.thinkingConfig);
+    const isInvalidArgument = error.statusCode === 400 &&
+      (error.apiStatus === "INVALID_ARGUMENT" || /invalid argument/i.test(error.message));
+
+    // Some Gemini endpoints/model revisions reject thinking controls even when
+    // a closely related model accepts them. Retry once without thinkingConfig
+    // instead of dropping the whole customer conversation into degraded mode.
+    if (!hasThinkingConfig || !isInvalidArgument) throw error;
+
+    console.warn(`Gemini rejected thinkingConfig for model "${model}"; retrying once without it.`);
+    const fallbackBody = buildGeminiRequest(messages, isFirstMessage, model, { omitThinking: true });
+    data = await fetchJson(url, requestOptions(fallbackBody), "Gemini fallback");
+  }
+
   const text = data.candidates?.[0]?.content?.parts
     ?.filter((part) => typeof part.text === "string")
     .map((part) => part.text)
@@ -138,4 +197,9 @@ async function getReply(messages, isFirstMessage = false) {
   throw new Error(`Unknown AI_PROVIDER: ${provider}`);
 }
 
-module.exports = { getReply, provider, configured };
+module.exports = {
+  getReply,
+  provider,
+  configured,
+  _test: { geminiThinkingConfig, buildGeminiRequest },
+};
