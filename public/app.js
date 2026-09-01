@@ -65,6 +65,19 @@ function formatTime(timestamp) {
   return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function waitForPaint() {
+  if (typeof requestAnimationFrame !== "function") return Promise.resolve();
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  });
+}
+
+async function paintOutgoingMessageBeforeRequest() {
+  await waitForPaint();
+  if (els.messages) els.messages.scrollTop = els.messages.scrollHeight;
+  await waitForPaint();
+}
+
 function setActiveView(view) {
   state.activeView = view;
   if (view === "dashboard") state.hasViewedDashboard = true;
@@ -280,6 +293,7 @@ async function sendCustomerMessage(rawMessage) {
   if (els.customerInput) els.customerInput.value = "";
   renderAll();
   setLoading(state.session.mode === "ai");
+  await paintOutgoingMessageBeforeRequest();
 
   try {
     const data = await api(`/api/demo/sessions/${encodeURIComponent(state.session.id)}/message`, {
