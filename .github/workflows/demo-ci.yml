@@ -29,10 +29,12 @@ jobs:
           node --check src/aiService.js
           node --check src/sharedState.js
           node --check public/app.js
+          node --check public/subpath-bootstrap.js
           node --check playwright.config.js
           node --check e2e/demo.spec.js
           node --check e2e/dashboard-ux.spec.js
           node --check e2e/public-visual.spec.js
+          node --check e2e/subpath.spec.js
       - name: Run browser E2E tests
         run: npm run test:e2e
       - name: Upload public demo visual QA

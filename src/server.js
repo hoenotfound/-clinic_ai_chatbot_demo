@@ -29,6 +29,7 @@ const ai = require("./aiService");
 const PORT = Number.parseInt(process.env.PORT || "3000", 10);
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const DASHBOARD_DIST = path.join(__dirname, "..", "portal-react", "dist");
+const PUBLIC_MOUNT_PATH = "/ai-chatbot";
 const PORTAL_DASHBOARD_PARTS = [1, 2, 3, 4].map((number) =>
   path.join(PUBLIC_DIR, `portal-dashboard-part${number}.html`)
 );
@@ -49,6 +50,14 @@ const MIME = {
 function intEnv(name, fallback) {
   const value = Number.parseInt(process.env[name] || "", 10);
   return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function stripPublicMountPath(pathname) {
+  if (pathname === PUBLIC_MOUNT_PATH) return "/";
+  if (pathname.startsWith(`${PUBLIC_MOUNT_PATH}/`)) {
+    return pathname.slice(PUBLIC_MOUNT_PATH.length) || "/";
+  }
+  return pathname;
 }
 
 const MAX_CONCURRENT_AI_REQUESTS = intEnv("DEMO_MAX_CONCURRENT_AI_REQUESTS", 8);
@@ -337,7 +346,18 @@ function safeDashboardPath(pathname) {
   return fullPath.startsWith(DASHBOARD_DIST) ? fullPath : null;
 }
 
-function serveDashboard(req, res, pathname) {
+function buildDashboardIndex(filePath, mountPath = "") {
+  const baseHref = `${mountPath}/dashboard/`;
+  let html = fs.readFileSync(filePath, "utf8");
+  if (html.includes("<base ")) {
+    html = html.replace(/<base\s+href="[^"]*"\s*\/?>/, `<base href="${baseHref}" />`);
+  } else {
+    html = html.replace("<head>", `<head>\n    <base href="${baseHref}" />`);
+  }
+  return html;
+}
+
+function serveDashboard(req, res, pathname, mountPath = "") {
   if (!fs.existsSync(DASHBOARD_DIST)) {
     securityHeaders(res, { dashboard: true });
     const payload = Buffer.from("React dashboard has not been built yet. Run npm run build:dashboard.");
@@ -353,12 +373,25 @@ function serveDashboard(req, res, pathname) {
   const filePath = safeDashboardPath(pathname);
   if (!filePath || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return false;
   securityHeaders(res, { dashboard: true });
-  const stat = fs.statSync(filePath);
   const isIndex = path.basename(filePath) === "index.html";
+
+  if (isIndex) {
+    const payload = Buffer.from(buildDashboardIndex(filePath, mountPath));
+    res.writeHead(200, {
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": payload.length,
+      "Cache-Control": "no-cache, max-age=0, must-revalidate",
+    });
+    if (req.method === "HEAD") return res.end(), true;
+    res.end(payload);
+    return true;
+  }
+
+  const stat = fs.statSync(filePath);
   res.writeHead(200, {
     "Content-Type": MIME[path.extname(filePath).toLowerCase()] || "application/octet-stream",
     "Content-Length": stat.size,
-    "Cache-Control": isIndex ? "no-cache, max-age=0, must-revalidate" : "public, max-age=31536000, immutable",
+    "Cache-Control": "public, max-age=31536000, immutable",
   });
   if (req.method === "HEAD") return res.end(), true;
   fs.createReadStream(filePath).pipe(res);
@@ -398,10 +431,20 @@ function buildEnhancedIndex(filePath) {
   if (!html.includes('/portal-data.js')) {
     html = html.replace(
       '  <script src="/app.js" defer></script>',
-      '  <script src="/portal-data.js" defer></script>\n  <script src="/app.js" defer></script>\n  <script src="/portal-demo.js" defer></script>\n  <script src="/portal-fidelity.js" defer></script>'
+      '  <script src="/subpath-bootstrap.js" defer></script>\n  <script src="/portal-data.js" defer></script>\n  <script src="/app.js" defer></script>\n  <script src="/portal-demo.js" defer></script>\n  <script src="/portal-fidelity.js" defer></script>'
     );
   }
+
+  // Use document-relative local assets so the same HTML works at both `/` on
+  // Render and `/ai-chatbot/` when reverse-proxied through the company domain.
+  html = html.replace(/\b(href|src)="\/(?!\/)/g, '$1="./');
   return html;
+}
+
+function rewritePublicCss(css) {
+  return css
+    .replace(/url\((['"]?)\/(?!\/)/g, 'url($1./')
+    .replace(/@import\s+(['"])\/(?!\/)/g, '@import $1./');
 }
 
 function serveStatic(req, res, pathname) {
@@ -427,9 +470,25 @@ function serveStatic(req, res, pathname) {
     return true;
   }
 
+  const extension = path.extname(filePath).toLowerCase();
+  if (extension === ".css") {
+    const payload = Buffer.from(rewritePublicCss(fs.readFileSync(filePath, "utf8")));
+    res.writeHead(200, {
+      "Content-Type": MIME[extension],
+      "Content-Length": payload.length,
+      "Cache-Control": "no-cache, max-age=0, must-revalidate",
+    });
+    if (req.method === "HEAD") {
+      res.end();
+      return true;
+    }
+    res.end(payload);
+    return true;
+  }
+
   const stat = fs.statSync(filePath);
   res.writeHead(200, {
-    "Content-Type": MIME[path.extname(filePath).toLowerCase()] || "application/octet-stream",
+    "Content-Type": MIME[extension] || "application/octet-stream",
     "Content-Length": stat.size,
     "Cache-Control": "no-cache, max-age=0, must-revalidate",
   });
@@ -444,13 +503,26 @@ function serveStatic(req, res, pathname) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   try {
+    const mountedRequest = url.pathname === PUBLIC_MOUNT_PATH || url.pathname.startsWith(`${PUBLIC_MOUNT_PATH}/`);
+
+    if ((req.method === "GET" || req.method === "HEAD") && url.pathname === PUBLIC_MOUNT_PATH) {
+      securityHeaders(res);
+      res.writeHead(308, {
+        Location: `${PUBLIC_MOUNT_PATH}/`,
+        "Cache-Control": "no-cache, max-age=0, must-revalidate",
+      });
+      return res.end();
+    }
+
+    url.pathname = stripPublicMountPath(url.pathname);
+
     const handled = await handleApi(req, res, url);
     if (handled !== false) return;
     if (url.pathname.startsWith("/api/")) {
       return sendJson(res, 404, { error: "API route not found." });
     }
     if ((req.method === "GET" || req.method === "HEAD") && url.pathname.startsWith("/dashboard")) {
-      if (serveDashboard(req, res, url.pathname)) return;
+      if (serveDashboard(req, res, url.pathname, mountedRequest ? PUBLIC_MOUNT_PATH : "")) return;
     }
     if (req.method === "GET" || req.method === "HEAD") return serveStatic(req, res, url.pathname);
     sendJson(res, 404, { error: "Not found." });
