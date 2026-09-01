@@ -73,6 +73,8 @@ function createSession({ channel = "whatsapp", ip = "unknown" } = {}) {
     expiresAt: now + limits.sessionMinutes * 60_000,
     customerMessageCount: 0,
     lastCustomerMessageAt: 0,
+    staffMessageCount: 0,
+    lastStaffMessageAt: 0,
     needsAttention: false,
     attentionReason: null,
     promotionShown: false,
@@ -252,7 +254,7 @@ function updateLead(session) {
     else if (/kuala lumpur|\bkl\b|bukit bintang|吉隆坡/i.test(branch)) preferredBranch = "Kuala Lumpur";
   }
 
-  const temperature = score >= 7 ? "hot" : score >= 3 ? "warm" : "cold";
+  const temperature = bookingIntent || score >= 7 ? "hot" : score >= 3 ? "warm" : "cold";
 
   session.lead = {
     temperature,
@@ -351,6 +353,15 @@ function setChannel(session, channel) {
   touchSession(session);
 }
 
+function restoreSession(session) {
+  if (!session || typeof session.id !== "string") return null;
+  if (!Number.isFinite(session.expiresAt) || session.expiresAt <= Date.now()) return null;
+  if (!Number.isFinite(session.staffMessageCount)) session.staffMessageCount = 0;
+  if (!Number.isFinite(session.lastStaffMessageAt)) session.lastStaffMessageAt = 0;
+  sessions.set(session.id, session);
+  return session;
+}
+
 function publicSession(session) {
   const { score, reducedInterest, ...publicLead } = session.lead;
   return {
@@ -396,6 +407,7 @@ module.exports = {
   addStaffMessage,
   setMode,
   setChannel,
+  restoreSession,
   publicSession,
   cleanupExpiredSessions,
   updateLead,

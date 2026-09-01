@@ -126,8 +126,9 @@
     const flags = leadStatus(lead, index);
     if (status !== 'all' && !flags[status]) return false;
     if (channel?.value && channel.value !== 'all' && lead.channel !== channel.value) return false;
-    if (owner?.value === 'ai' && lead.owner !== 'AI') return false;
-    if (owner?.value === 'human' && lead.owner === 'AI') return false;
+    const hasStaffParticipation = Boolean(lead.messages?.some((row) => row?.[0] === 'staff'));
+    if (owner?.value === 'ai' && hasStaffParticipation) return false;
+    if (owner?.value === 'human' && !hasStaffParticipation) return false;
     const query = search?.value.trim().toLowerCase();
     if (query) {
       const haystack = [lead.name, lead.summary, lead.treatment, lead.branch, lead.source, ...(lead.messages || []).map((row) => row[1])]

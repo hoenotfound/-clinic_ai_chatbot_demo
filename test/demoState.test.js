@@ -25,6 +25,13 @@ test("booking language moves a lead to hot", () => {
   assert.match(session.lead.interests.join(" "), /HIFU/);
 });
 
+test("booking intent alone is treated as hot", () => {
+  const session = state.createSession({ channel: "whatsapp", ip: "test-booking-only" });
+  state.addCustomerMessage(session, "Can I book tomorrow?");
+  assert.equal(session.lead.bookingIntent, true);
+  assert.equal(session.lead.temperature, "hot");
+});
+
 test("Bahasa Malaysia booking language is detected", () => {
   const session = state.createSession({ channel: "whatsapp", ip: "test-bm" });
   state.addCustomerMessage(session, "Berapa harga HIFU? Saya nak datang Sabtu di KL");

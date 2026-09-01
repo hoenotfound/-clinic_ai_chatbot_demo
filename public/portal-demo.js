@@ -173,12 +173,13 @@
   }
 
   function updatePipelineFilterCounts(all) {
+    const open = all.filter((lead) => lead.stage !== "won");
     const totals = {
       all: all.length,
-      hot: all.filter((lead) => lead.temperature === "hot").length,
-      warm: all.filter((lead) => lead.temperature === "warm").length,
-      cold: all.filter((lead) => lead.temperature === "cold").length,
-      attention: all.filter((lead) => lead.attention).length,
+      hot: open.filter((lead) => lead.temperature === "hot").length,
+      warm: open.filter((lead) => lead.temperature === "warm").length,
+      cold: open.filter((lead) => lead.temperature === "cold").length,
+      attention: open.filter((lead) => lead.attention).length,
     };
     document.querySelectorAll("[data-pipeline-category]").forEach((button) => {
       const count = button.querySelector("span");
@@ -195,6 +196,7 @@
     const search = (pipelineSearch?.value || "").trim().toLowerCase();
     const filtered = all.filter((lead) => {
       if (pipelineBranch !== "all" && lead.branch !== pipelineBranch) return false;
+      if (["hot", "warm", "cold", "attention"].includes(pipelineCategory) && lead.stage === "won") return false;
       if (pipelineCategory === "hot" && lead.temperature !== "hot") return false;
       if (pipelineCategory === "warm" && lead.temperature !== "warm") return false;
       if (pipelineCategory === "cold" && lead.temperature !== "cold") return false;

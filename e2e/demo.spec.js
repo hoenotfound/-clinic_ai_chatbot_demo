@@ -61,8 +61,7 @@ test("prospect can complete the live AI to staff journey without CSP errors", as
   await page.getByRole("tab", { name: /Patient view/i }).click();
   await expect(page.locator("#messages")).toContainText("I can help you from here");
 
-  const cspErrors = browserErrors.filter((message) => /content security policy|refused to apply inline style|refused to execute inline/i.test(message));
-  expect(cspErrors, `CSP/browser errors: ${cspErrors.join("\n")}`).toEqual([]);
+  expect(browserErrors, `Browser errors: ${browserErrors.join("\n")}`).toEqual([]);
 });
 
 test("mobile dashboard opens conversation threads and returns to the list", async ({ page }) => {
@@ -80,6 +79,5 @@ test("mobile dashboard opens conversation threads and returns to the list", asyn
   await page.locator("#sampleConversationPane .portal-mobile-back").click();
   await expect(shell).not.toHaveClass(/thread-open/);
 
-  const cspErrors = browserErrors.filter((message) => /content security policy|refused to apply inline style|refused to execute inline/i.test(message));
-  expect(cspErrors, `CSP/browser errors: ${cspErrors.join("\n")}`).toEqual([]);
+  expect(browserErrors, `Browser errors: ${browserErrors.join("\n")}`).toEqual([]);
 });

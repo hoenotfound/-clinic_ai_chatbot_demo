@@ -232,3 +232,9 @@ npm run test:e2e
 ```
 
 GitHub Actions runs both suites. Browser tests cover the live patient flow, Hot lead detection for the guided booking example, mixed-language history, Pipeline, Analytics, Tools, human takeover, staff reply, mobile thread navigation and CSP/browser console errors.
+
+## Shared state (recommended for public traffic)
+
+Set `REDIS_URL` to a same-region Render Key Value internal connection string to persist demo sessions and the major IP/day counters across web-service restarts. The app deliberately falls back to in-memory state when `REDIS_URL` is absent or temporarily unavailable, so local development remains simple.
+
+For a public deployment, use a paid Render Key Value instance with persistence enabled and keep external access blocked.

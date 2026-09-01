@@ -3,7 +3,7 @@ services:
     name: clinic-ai-chatbot-demo
     runtime: node
     plan: 0.5c-512mb
-    buildCommand: npm install --omit=dev
+    buildCommand: npm ci --omit=dev
     startCommand: npm start
     healthCheckPath: /health
     envVars:
@@ -15,6 +15,10 @@ services:
         sync: false
       - key: GEMINI_MODEL
         value: gemini-2.5-flash
+      - key: AI_REQUEST_TIMEOUT_MS
+        value: 15000
+      - key: REDIS_URL
+        sync: false
       - key: DEMO_SESSION_MINUTES
         value: 60
       - key: DEMO_MAX_MESSAGES

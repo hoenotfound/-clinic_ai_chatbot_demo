@@ -23,6 +23,7 @@ function loadDotEnv() {
 
 loadDotEnv();
 const state = require("./demoState");
+const shared = require("./sharedState");
 const ai = require("./aiService");
 
 const PORT = Number.parseInt(process.env.PORT || "3000", 10);
@@ -82,24 +83,27 @@ function enforceSessionMessageCapacity(session, additionalMessages = 1) {
 function enforceStaffMessageLimit(session) {
   enforceSessionMessageCapacity(session, 1);
   const now = Date.now();
-  const current = staffActivity.get(session) || { count: 0, lastAt: 0 };
-  if (current.count >= MAX_STAFF_MESSAGES_PER_SESSION) {
+  const count = Number.isFinite(session.staffMessageCount) ? session.staffMessageCount : 0;
+  const lastAt = Number.isFinite(session.lastStaffMessageAt) ? session.lastStaffMessageAt : 0;
+  if (count >= MAX_STAFF_MESSAGES_PER_SESSION) {
     const err = new Error(`This demo is limited to ${MAX_STAFF_MESSAGES_PER_SESSION} staff replies per session.`);
     err.statusCode = 429;
     throw err;
   }
-  if (current.lastAt && now - current.lastAt < MIN_STAFF_MESSAGE_INTERVAL_MS) {
+  if (lastAt && now - lastAt < MIN_STAFF_MESSAGE_INTERVAL_MS) {
     const err = new Error("Staff replies are being sent a little too quickly. Please try again in a moment.");
     err.statusCode = 429;
     throw err;
   }
-  staffActivity.set(session, { count: current.count + 1, lastAt: now });
+  session.staffMessageCount = count + 1;
+  session.lastStaffMessageAt = now;
 }
 
 function securityHeaders(res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive");
   if (process.env.NODE_ENV === "production") {
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   }
@@ -158,6 +162,19 @@ function clientIp(req) {
   return req.socket.remoteAddress || "unknown";
 }
 
+async function requireDemoSession(id) {
+  let session = state.getSession(id);
+  if (!session && shared.enabled) {
+    const stored = await shared.loadSession(id);
+    if (stored) session = state.restoreSession(stored);
+  }
+  return session || state.requireSession(id);
+}
+
+async function persistSession(session) {
+  await shared.saveSession(session);
+}
+
 function publicConfig() {
   return {
     clinicName: clinic.clinicName,
@@ -189,13 +206,16 @@ async function handleApi(req, res, url) {
   }
   if (req.method === "POST" && url.pathname === "/api/demo/sessions") {
     const body = await readJson(req);
-    const session = state.createSession({ channel: body.channel, ip: clientIp(req) });
+    const ip = clientIp(req);
+    await shared.enforceSessionCreationLimit(ip, state.limits.maxSessionsPerIpDay);
+    const session = state.createSession({ channel: body.channel, ip });
+    await persistSession(session);
     return sendJson(res, 201, { session: state.publicSession(session) });
   }
 
   const match = url.pathname.match(/^\/api\/demo\/sessions\/([^/]+)(?:\/(channel|mode|staff-message|message))?$/);
   if (!match) return false;
-  const session = state.requireSession(decodeURIComponent(match[1]));
+  const session = await requireDemoSession(decodeURIComponent(match[1]));
   const action = match[2] || null;
 
   if (req.method === "GET" && !action) {
@@ -206,15 +226,18 @@ async function handleApi(req, res, url) {
 
   if (action === "channel") {
     state.setChannel(session, body.channel);
+    await persistSession(session);
     return sendJson(res, 200, { session: state.publicSession(session) });
   }
   if (action === "mode") {
     state.setMode(session, body.mode);
+    await persistSession(session);
     return sendJson(res, 200, { session: state.publicSession(session) });
   }
   if (action === "staff-message") {
     enforceStaffMessageLimit(session);
     state.addStaffMessage(session, body.message);
+    await persistSession(session);
     return sendJson(res, 200, { session: state.publicSession(session) });
   }
   if (action === "message") {
@@ -222,7 +245,9 @@ async function handleApi(req, res, url) {
     const releaseAiSlot = willUseAi ? acquireAiSlot() : null;
     try {
       enforceSessionMessageCapacity(session, willUseAi ? 2 : 1);
+      await shared.enforceDailyMessageLimit(state.limits.maxTotalMessagesPerDay);
       state.addCustomerMessage(session, body.message);
+      await persistSession(session);
       if (session.mode === "human") {
         return sendJson(res, 200, { session: state.publicSession(session), aiReplied: false });
       }
@@ -252,6 +277,7 @@ async function handleApi(req, res, url) {
       const assistantMessage = state.addAssistantMessage(session, reply);
       const showPromotion = !degraded && !session.needsAttention && state.shouldShowPromotion(session);
       if (showPromotion) state.markPromotionShown(session, assistantMessage.id);
+      await persistSession(session);
       return sendJson(res, 200, {
         session: state.publicSession(session),
         aiReplied: !degraded,

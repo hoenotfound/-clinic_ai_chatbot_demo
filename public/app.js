@@ -283,7 +283,7 @@ function renderTour() {
   els.tourProgress.textContent = `${completed} / 4`;
   if (!asked) els.tourStatus.textContent = "Tap a sample question below";
   else if (!booking) els.tourStatus.textContent = "Now try “Can I come Saturday?”";
-  else if (!dashboard) els.tourStatus.textContent = "Hot lead detected — open Clinic Dashboard";
+  else if (!dashboard) els.tourStatus.textContent = "Booking intent detected — open Clinic Dashboard";
   else if (!takeover) els.tourStatus.textContent = "See the staff view, then try Take over";
   else els.tourStatus.textContent = "Full customer journey completed ✓";
 
@@ -385,7 +385,7 @@ async function sendCustomerMessage(rawMessage) {
     } else if (state.session.needsAttention) {
       showToast("The AI requested staff assistance. Open Clinic Dashboard to see the handoff.");
     } else if (state.session.lead?.bookingIntent && !state.hasViewedDashboard) {
-      showToast("Hot lead detected. Open Clinic Dashboard to see what your team would see.");
+      showToast("Booking intent detected. Open Clinic Dashboard to see what your team would see.");
     }
   } catch (error) {
     state.session.messages = state.session.messages.filter((m) => m.id !== optimistic.id);
@@ -486,7 +486,7 @@ function bindEvents() {
   els.salesCtaButton?.addEventListener("click", (event) => {
     if (els.salesCtaButton.dataset.ctaUnconfigured === "true") {
       event.preventDefault();
-      showToast("Add SALES_CTA_URL in Render to connect this button to your WhatsApp or sales page.");
+      showToast("This demo setup button is not connected yet. Please contact us to continue.");
     }
   });
   document.querySelectorAll("[data-demo-only]").forEach((button) => {

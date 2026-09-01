@@ -11,6 +11,9 @@ const configured = provider === "mock" ||
   (provider === "claude" && Boolean(process.env.ANTHROPIC_API_KEY)) ||
   (provider === "gemini" && Boolean(process.env.GEMINI_API_KEY));
 
+const parsedTimeout = Number.parseInt(process.env.AI_REQUEST_TIMEOUT_MS || "15000", 10);
+const AI_REQUEST_TIMEOUT_MS = Number.isFinite(parsedTimeout) && parsedTimeout > 0 ? parsedTimeout : 15000;
+
 function mockReply(messages) {
   const latest = (messages.at(-1)?.content || "").toLowerCase();
   const userMessages = messages.filter((message) => message.role === "user");
@@ -47,7 +50,7 @@ function mockReply(messages) {
 
 async function fetchJson(url, options, label) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30_000);
+  const timer = setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
   try {
     const response = await fetch(url, { ...options, signal: controller.signal });
     const data = await response.json().catch(() => ({}));
