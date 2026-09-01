@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - scripts/mount-react-dashboard.cjs
+      - scripts/fix-react-adapter.cjs
 
 permissions:
   contents: write
@@ -20,7 +21,9 @@ jobs:
         with:
           node-version: 20
       - name: Apply dashboard mount
-        run: node scripts/mount-react-dashboard.cjs
+        run: |
+          node scripts/mount-react-dashboard.cjs
+          node scripts/fix-react-adapter.cjs
       - name: Validate server syntax
         run: node --check src/server.js
       - name: Commit mounted dashboard
