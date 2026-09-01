@@ -2,9 +2,11 @@ import Sidebar from "./Sidebar";
 
 export default function Layout({ children }) {
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="relative flex h-[100dvh] overflow-hidden md:h-screen">
       <Sidebar />
-      <main className="flex-1 min-w-0 h-screen overflow-hidden">{children}</main>
+      <main className="h-[calc(100dvh-4.5rem)] min-w-0 flex-1 overflow-hidden md:h-screen">
+        {children}
+      </main>
     </div>
   );
 }
