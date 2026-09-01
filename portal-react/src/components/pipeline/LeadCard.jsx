@@ -41,13 +41,15 @@ export default function LeadCard({ lead, now, noReplyHours, onOpen, onDragStart 
         <Badge className={temperatureStyle(lead.temperature)}>{capitalize(lead.temperature)}</Badge>
         <Badge className="bg-[var(--color-primary-light)] text-[var(--color-primary)]">{lead.branch_name || "Unassigned"}</Badge>
         {noReply && <Badge className="bg-slate-100 text-slate-600">No reply</Badge>}
+        {lead.appointment_status === "requested" && <Badge className="bg-sky-50 text-sky-700">Appointment requested</Badge>}
+        {lead.appointment_status === "confirmed" && <Badge className="bg-emerald-50 text-emerald-700">Appointment confirmed</Badge>}
         {lead.appointment_status === "reschedule" && <Badge className="bg-[var(--color-accent-light)] text-[#8a641f]">Reschedule</Badge>}
         {lead.appointment_status === "cancelled" && <Badge className="bg-[var(--color-danger-light)] text-[var(--color-danger)]">Cancelled</Badge>}
         {lead.needs_attention && <Badge className="bg-[var(--color-danger-light)] text-[var(--color-danger)]">Attention</Badge>}
       </div>
 
       {live && (
-        <div key={`${lead.temperature}-${lead.stage_type}-${lead.treatment_interest}-${lead.branch_name}`} className="mt-3 grid grid-cols-2 gap-1.5 rounded-xl border border-[var(--color-primary)]/15 bg-[var(--color-bg)] p-2.5">
+        <div key={`${lead.temperature}-${lead.stage_type}-${lead.treatment_interest}-${lead.branch_name}`} className="mt-3 grid animate-[pulse_650ms_ease-out_1] grid-cols-2 gap-1.5 rounded-xl border border-[var(--color-primary)]/15 bg-[var(--color-bg)] p-2.5">
           <LiveField label="Lead" value={capitalize(lead.temperature) || "Cold"} />
           <LiveField label="Stage" value={liveStage} />
           <LiveField label="Treatment" value={lead.treatment_interest || "Detecting…"} />
