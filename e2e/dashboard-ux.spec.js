@@ -86,7 +86,7 @@ test('React Pipeline filters are usable and Analytics remains scrollable', async
   await frame.getByRole('link', { name: 'Analytics' }).click();
   await expect(frame.getByRole('heading', { name: 'Analytics' })).toBeVisible();
   await expect(frame.getByText('Conversion Funnel')).toBeVisible();
-  await expect(frame.getByText('System Status')).toBeVisible();
+  await expect(frame.getByText('System Health')).toBeVisible();
 
   expect(browserErrors, `Browser errors: ${browserErrors.join('\n')}`).toEqual([]);
 });
