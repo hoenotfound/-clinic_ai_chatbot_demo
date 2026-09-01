@@ -297,6 +297,15 @@ b {
 .page-shell .sales-cta-button {
   background: linear-gradient(135deg, #2563eb 0%, #4f46e5 68%, #7c3aed 100%);
   box-shadow: 0 16px 30px -18px rgba(79, 70, 229, .68);
+  font-size: 0;
+}
+
+/* Keep the commercial CTA wording consistent even when the demo config uses the older fallback label. */
+.page-shell .sales-cta-button::before {
+  content: "Book a consultation";
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
 .page-shell .sales-cta-button:hover {
@@ -306,6 +315,87 @@ b {
 
 .page-shell .sales-cta-actions small {
   color: var(--slate-500);
+}
+
+/* Use the unused desktop guide space to teach visitors what the dashboard will extract. */
+.page-shell #patientView .capture-preview {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid rgba(99, 102, 241, .12);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(124, 58, 237, .08), transparent 42%),
+    linear-gradient(145deg, #ffffff 0%, #f8faff 100%);
+  box-shadow: 0 16px 34px -30px rgba(79, 70, 229, .34);
+}
+
+.page-shell #patientView .capture-preview-kicker {
+  margin: 0;
+  color: #6d28d9;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+.page-shell #patientView .capture-preview-copy {
+  margin: 9px 0 0;
+  color: var(--slate-500);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.page-shell #patientView .capture-preview-grid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.page-shell #patientView .capture-preview-grid > span {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid rgba(37, 99, 235, .09);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .82);
+}
+
+.page-shell #patientView .capture-preview-grid small,
+.page-shell #patientView .capture-preview-grid strong {
+  display: block;
+}
+
+.page-shell #patientView .capture-preview-grid small {
+  color: var(--slate-400);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.page-shell #patientView .capture-preview-grid strong {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--brand-blue);
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-shell #patientView .capture-preview-note {
+  margin: 14px 0 0;
+  padding-top: 13px;
+  border-top: 1px solid var(--slate-100);
+  color: var(--slate-400);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  /* The educational context panel is desktop-only; mobile should stay focused on starting the conversation. */
+  .page-shell #patientView .capture-preview {
+    display: none;
+  }
 }
 
 @media (max-width: 600px) {
@@ -347,11 +437,40 @@ b {
     overflow: visible;
   }
 
+  /* Stack label + action copy vertically inside each card so 360px never truncates an action. */
   .page-shell #patientView .prompt-panel .suggestion-chip {
     width: 100%;
     min-width: 0;
-    min-height: 80px;
+    min-height: 86px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    grid-template-areas:
+      "label arrow"
+      "title arrow";
+    align-content: center;
+    gap: 4px 8px;
     padding: 12px;
+  }
+
+  .page-shell #patientView .suggestion-chip > span {
+    grid-area: label;
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
+  .page-shell #patientView .suggestion-chip > strong {
+    grid-area: title;
+    min-width: 0;
+    overflow: visible;
+    font-size: 12px;
+    line-height: 1.35;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .page-shell #patientView .suggestion-chip > b {
+    grid-area: arrow;
+    align-self: center;
   }
 
   .page-shell #patientView .channel-preview-note,
@@ -375,16 +494,6 @@ b {
 
   .page-shell #patientView #tourProgress {
     font-size: 10px;
-  }
-
-  .page-shell #patientView .suggestion-chip > span {
-    font-size: 10px;
-    line-height: 1.2;
-  }
-
-  .page-shell #patientView .suggestion-chip > strong {
-    font-size: 12px;
-    line-height: 1.35;
   }
 
   .page-shell #patientView .device-stage-heading {
