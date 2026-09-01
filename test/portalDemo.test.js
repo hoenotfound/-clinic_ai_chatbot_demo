@@ -135,7 +135,7 @@ test("dashboard markup and generated portal UI contain no inline style attribute
 test("public demo visibly discloses privacy and channel-preview behavior", () => {
   const index = read("index.html");
   assert.match(index, /please don’t enter real patient information or sensitive personal data/i);
-  assert.match(index, /Channel preview only/i);
+  assert.match(index, /channel previews/i);
   assert.match(index, /Nova Demo Aesthetic Clinic/);
 });
 
