@@ -5,11 +5,11 @@ function ensureDir() {
   fs.mkdirSync("visual-artifacts", { recursive: true });
 }
 
-async function forceChannel(phone, theme) {
-  await phone.evaluate((element, nextTheme) => {
-    element.classList.remove("whatsapp-theme", "instagram-theme", "facebook-theme");
-    element.classList.add(nextTheme);
-  }, theme);
+async function selectChannel(page, channel, experience) {
+  const button = page.locator(`.channel-button[data-channel="${channel}"]`);
+  await button.click();
+  await expect(button).toHaveClass(/active/);
+  await expect(page.locator("#phone")).toHaveAttribute("data-channel-experience", experience);
 }
 
 test("Patient View renders recognisable channel-specific messaging chrome", async ({ page }) => {
@@ -40,8 +40,7 @@ test("Patient View renders recognisable channel-specific messaging chrome", asyn
 
   await page.screenshot({ path: "visual-artifacts/channel-whatsapp-desktop.png", fullPage: false });
 
-  await forceChannel(phone, "instagram-theme");
-  await expect(phone).toHaveAttribute("data-channel-experience", "instagram");
+  await selectChannel(page, "instagram", "instagram");
   await expect(page.locator("#customerInput")).toHaveAttribute("placeholder", "Message...");
   await expect(phone.locator(".composer-inline-action")).toHaveCount(3);
   const instagramAccent = await phone.evaluate((element) => getComputedStyle(element).getPropertyValue("--channel-accent").trim());
@@ -49,8 +48,7 @@ test("Patient View renders recognisable channel-specific messaging chrome", asyn
 
   await page.screenshot({ path: "visual-artifacts/channel-instagram-desktop.png", fullPage: false });
 
-  await forceChannel(phone, "facebook-theme");
-  await expect(phone).toHaveAttribute("data-channel-experience", "facebook");
+  await selectChannel(page, "facebook", "facebook");
   await expect(page.locator("#customerInput")).toHaveAttribute("placeholder", "Aa");
   await expect(phone.locator(".composer-inline-action")).toHaveCount(2);
   const messengerAccent = await phone.evaluate((element) => getComputedStyle(element).getPropertyValue("--channel-accent").trim());
@@ -86,12 +84,10 @@ test("channel experience stays inside a narrow mobile viewport", async ({ page }
   expect(layout.phoneWidth).toBeLessThanOrEqual(layout.viewport);
   expect(layout.channelButtonsFit).toBeTruthy();
 
-  await forceChannel(phone, "instagram-theme");
-  await expect(phone).toHaveAttribute("data-channel-experience", "instagram");
+  await selectChannel(page, "instagram", "instagram");
   await expect(phone.locator(".channel-header-actions")).toBeVisible();
 
-  await forceChannel(phone, "facebook-theme");
-  await expect(phone).toHaveAttribute("data-channel-experience", "facebook");
+  await selectChannel(page, "facebook", "facebook");
   await expect(phone.locator(".composer-input-shell")).toBeVisible();
 
   await page.screenshot({ path: "visual-artifacts/channel-messenger-mobile.png", fullPage: true });
