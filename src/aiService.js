@@ -26,6 +26,10 @@ const parsedTimeout = Number.parseInt(process.env.AI_REQUEST_TIMEOUT_MS || "1500
 const AI_REQUEST_TIMEOUT_MS = Number.isFinite(parsedTimeout) && parsedTimeout > 0 ? parsedTimeout : 15000;
 const parsedRetryDelay = Number.parseInt(process.env.GEMINI_RETRY_DELAY_MS || "250", 10);
 const GEMINI_RETRY_DELAY_MS = Number.isFinite(parsedRetryDelay) && parsedRetryDelay >= 0 ? parsedRetryDelay : 250;
+const parsedFailoverBudget = Number.parseInt(process.env.GEMINI_FAILOVER_BUDGET_MS || "12000", 10);
+const GEMINI_FAILOVER_BUDGET_MS = Number.isFinite(parsedFailoverBudget) && parsedFailoverBudget > 0
+  ? parsedFailoverBudget
+  : 12000;
 
 function mockReply(messages) {
   const latest = (messages.at(-1)?.content || "").toLowerCase();
@@ -61,9 +65,36 @@ function mockReply(messages) {
   return `Thanks for asking 😊 ${clinic.consultation} is available. Tell me what you’d like to improve and I can point you to the most relevant option.`;
 }
 
-async function fetchJson(url, options, label) {
+function getFallbackReply(messages) {
+  return mockReply(messages);
+}
+
+function failoverBudgetError() {
+  const error = new Error("Gemini failover budget exhausted.");
+  error.code = "GEMINI_FAILOVER_BUDGET_EXHAUSTED";
+  error.statusCode = 408;
+  return error;
+}
+
+function isFailoverBudgetError(error) {
+  return error?.code === "GEMINI_FAILOVER_BUDGET_EXHAUSTED";
+}
+
+function remainingBudgetMs(deadline) {
+  if (!Number.isFinite(deadline)) return Number.POSITIVE_INFINITY;
+  return Math.max(0, deadline - Date.now());
+}
+
+function requestTimeoutMs(deadline) {
+  if (!Number.isFinite(deadline)) return AI_REQUEST_TIMEOUT_MS;
+  const remaining = remainingBudgetMs(deadline);
+  if (remaining <= 0) throw failoverBudgetError();
+  return Math.max(1, Math.min(AI_REQUEST_TIMEOUT_MS, remaining));
+}
+
+async function fetchJson(url, options, label, timeoutMs = AI_REQUEST_TIMEOUT_MS) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, { ...options, signal: controller.signal });
     const data = await response.json().catch(() => ({}));
@@ -79,6 +110,14 @@ async function fetchJson(url, options, label) {
       throw error;
     }
     return data;
+  } catch (error) {
+    if (controller.signal.aborted) {
+      const timeoutError = new Error(`${label} timed out after ${timeoutMs}ms.`);
+      timeoutError.statusCode = 408;
+      timeoutError.cause = error;
+      throw timeoutError;
+    }
+    throw error;
   } finally {
     clearTimeout(timer);
   }
@@ -108,7 +147,8 @@ async function getClaudeReply(messages, isFirstMessage) {
     "Claude"
   );
   const block = data.content?.find((item) => item.type === "text");
-  return block?.text || "Sorry, I couldn't generate a reply. Please try again.";
+  if (!block?.text) throw new Error("Claude returned an empty response.");
+  return block.text;
 }
 
 function geminiThinkingConfig(model) {
@@ -163,7 +203,7 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function requestGemini(messages, isFirstMessage, apiKey, model, label) {
+async function requestGemini(messages, isFirstMessage, apiKey, model, label, deadline = null) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const requestOptions = (body) => ({
     method: "POST",
@@ -177,8 +217,9 @@ async function requestGemini(messages, isFirstMessage, apiKey, model, label) {
   let data;
   const primaryBody = buildGeminiRequest(messages, isFirstMessage, model);
   try {
-    data = await fetchJson(url, requestOptions(primaryBody), label);
+    data = await fetchJson(url, requestOptions(primaryBody), label, requestTimeoutMs(deadline));
   } catch (error) {
+    if (Number.isFinite(deadline) && remainingBudgetMs(deadline) <= 0) throw failoverBudgetError();
     const hasThinkingConfig = Boolean(primaryBody.generationConfig?.thinkingConfig);
     const isInvalidArgument = error.statusCode === 400 &&
       (error.apiStatus === "INVALID_ARGUMENT" || /invalid argument/i.test(error.message));
@@ -186,7 +227,12 @@ async function requestGemini(messages, isFirstMessage, apiKey, model, label) {
 
     console.warn(`${label} rejected thinkingConfig for model "${model}"; retrying without it.`);
     const fallbackBody = buildGeminiRequest(messages, isFirstMessage, model, { omitThinking: true });
-    data = await fetchJson(url, requestOptions(fallbackBody), `${label} compatibility retry`);
+    data = await fetchJson(
+      url,
+      requestOptions(fallbackBody),
+      `${label} compatibility retry`,
+      requestTimeoutMs(deadline)
+    );
   }
 
   const text = extractGeminiText(data);
@@ -198,38 +244,50 @@ async function requestGemini(messages, isFirstMessage, apiKey, model, label) {
   return text;
 }
 
-async function tryPrimaryGeminiKeys(messages, isFirstMessage, keys, model) {
+async function tryPrimaryGeminiKeys(messages, isFirstMessage, keys, model, deadline = null) {
   let lastError = null;
   for (let keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
+    if (Number.isFinite(deadline) && remainingBudgetMs(deadline) <= 0) throw failoverBudgetError();
     const label = `Gemini key ${keyIndex + 1}`;
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
-        return await requestGemini(messages, isFirstMessage, keys[keyIndex], model, label);
+        return await requestGemini(messages, isFirstMessage, keys[keyIndex], model, label, deadline);
       } catch (error) {
         lastError = error;
+        if (isFailoverBudgetError(error) || (Number.isFinite(deadline) && remainingBudgetMs(deadline) <= 0)) {
+          throw failoverBudgetError();
+        }
         const retry = attempt === 1 && isRetryableGeminiError(error);
         console.warn(`${label} attempt ${attempt} failed: ${error.message}${retry ? "; retrying once" : ""}`);
         if (!retry) break;
-        await sleep(GEMINI_RETRY_DELAY_MS);
+        const delay = Number.isFinite(deadline)
+          ? Math.min(GEMINI_RETRY_DELAY_MS, remainingBudgetMs(deadline))
+          : GEMINI_RETRY_DELAY_MS;
+        await sleep(delay);
       }
     }
   }
   throw lastError || new Error("All Gemini primary-key attempts failed.");
 }
 
-async function tryFallbackGeminiModel(messages, isFirstMessage, keys, fallbackModel) {
+async function tryFallbackGeminiModel(messages, isFirstMessage, keys, fallbackModel, deadline = null) {
   let lastError = null;
   for (let keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
+    if (Number.isFinite(deadline) && remainingBudgetMs(deadline) <= 0) throw failoverBudgetError();
     try {
       return await requestGemini(
         messages,
         isFirstMessage,
         keys[keyIndex],
         fallbackModel,
-        `Gemini fallback model key ${keyIndex + 1}`
+        `Gemini fallback model key ${keyIndex + 1}`,
+        deadline
       );
     } catch (error) {
       lastError = error;
+      if (isFailoverBudgetError(error) || (Number.isFinite(deadline) && remainingBudgetMs(deadline) <= 0)) {
+        throw failoverBudgetError();
+      }
       console.warn(`Gemini fallback model key ${keyIndex + 1} failed: ${error.message}`);
     }
   }
@@ -240,32 +298,41 @@ async function getGeminiReply(messages, isFirstMessage) {
   const keys = getGeminiApiKeys();
   if (!keys.length) {
     console.warn("No Gemini API key is configured; using deterministic demo fallback.");
-    return mockReply(messages);
+    return getFallbackReply(messages);
   }
 
   const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
   const fallbackModel = String(process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash-lite").trim();
+  const deadline = Date.now() + GEMINI_FAILOVER_BUDGET_MS;
 
   try {
-    return await tryPrimaryGeminiKeys(messages, isFirstMessage, keys, model);
+    return await tryPrimaryGeminiKeys(messages, isFirstMessage, keys, model, deadline);
   } catch (primaryError) {
+    if (isFailoverBudgetError(primaryError) || remainingBudgetMs(deadline) <= 0) {
+      console.warn("Gemini failover budget exhausted; using deterministic demo fallback.");
+      return getFallbackReply(messages);
+    }
     console.warn(`All primary Gemini attempts failed: ${primaryError.message}`);
   }
 
-  if (fallbackModel && fallbackModel !== model) {
+  if (fallbackModel && fallbackModel !== model && remainingBudgetMs(deadline) > 0) {
     try {
-      return await tryFallbackGeminiModel(messages, isFirstMessage, keys, fallbackModel);
+      return await tryFallbackGeminiModel(messages, isFirstMessage, keys, fallbackModel, deadline);
     } catch (fallbackError) {
+      if (isFailoverBudgetError(fallbackError) || remainingBudgetMs(deadline) <= 0) {
+        console.warn("Gemini failover budget exhausted during fallback model; using deterministic demo fallback.");
+        return getFallbackReply(messages);
+      }
       console.warn(`Gemini fallback model exhausted: ${fallbackError.message}`);
     }
   }
 
   console.warn("Gemini unavailable after failover chain; using deterministic demo fallback.");
-  return mockReply(messages);
+  return getFallbackReply(messages);
 }
 
 async function getReply(messages, isFirstMessage = false) {
-  if (provider === "mock") return mockReply(messages);
+  if (provider === "mock") return getFallbackReply(messages);
   if (provider === "claude") return getClaudeReply(messages, isFirstMessage);
   if (provider === "gemini") return getGeminiReply(messages, isFirstMessage);
   throw new Error(`Unknown AI_PROVIDER: ${provider}`);
@@ -273,6 +340,7 @@ async function getReply(messages, isFirstMessage = false) {
 
 module.exports = {
   getReply,
+  getFallbackReply,
   provider,
   configured,
   _test: {
@@ -280,6 +348,9 @@ module.exports = {
     buildGeminiRequest,
     getGeminiApiKeys,
     isRetryableGeminiError,
+    isFailoverBudgetError,
+    remainingBudgetMs,
+    requestTimeoutMs,
     requestGemini,
     tryPrimaryGeminiKeys,
     tryFallbackGeminiModel,
