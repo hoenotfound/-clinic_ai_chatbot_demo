@@ -168,14 +168,30 @@
       { key: "Petaling Jaya", label: "Petaling Jaya", leads: leads.filter((lead) => lead.branch === "Petaling Jaya") },
       { key: "Unassigned", label: "Unassigned", leads: leads.filter((lead) => lead.branch === "Unassigned" || !lead.branch) },
     ];
-    branchStrip.innerHTML = branches.map((branch) => `<button class="branch-card${pipelineBranch === branch.key ? " active" : ""}" type="button" data-branch="${escapeHtml(branch.key)}"><div><strong>${escapeHtml(branch.label)}</strong><b>${branch.leads.length}</b></div><small>${branch.leads.filter((lead) => lead.temperature === "hot").length} hot · ${branch.leads.filter((lead) => lead.stage === "appointment").length} appointments</small></button>`).join("");
+    branchStrip.innerHTML = branches.map((branch) => `<button class="branch-card${pipelineBranch === branch.key ? " active" : ""}" type="button" data-branch="${escapeHtml(branch.key)}"><div><strong>${escapeHtml(branch.label)}</strong><b>${branch.leads.length}</b></div><small>${branch.leads.filter((lead) => lead.temperature === "hot" && lead.stage !== "won").length} hot · ${branch.leads.filter((lead) => lead.stage === "appointment").length} appointments</small></button>`).join("");
     branchStrip.querySelectorAll("[data-branch]").forEach((button) => button.addEventListener("click", () => { pipelineBranch = button.dataset.branch; renderPipeline(); }));
+  }
+
+  function updatePipelineFilterCounts(all) {
+    const totals = {
+      all: all.length,
+      hot: all.filter((lead) => lead.temperature === "hot").length,
+      warm: all.filter((lead) => lead.temperature === "warm").length,
+      cold: all.filter((lead) => lead.temperature === "cold").length,
+      attention: all.filter((lead) => lead.attention).length,
+    };
+    document.querySelectorAll("[data-pipeline-category]").forEach((button) => {
+      const count = button.querySelector("span");
+      if (count && Object.hasOwn(totals, button.dataset.pipelineCategory)) count.textContent = String(totals[button.dataset.pipelineCategory]);
+    });
   }
 
   function renderPipeline() {
     if (!pipelineBoard) return;
     const all = pipelineLeads();
+    const openLeads = all.filter((lead) => lead.stage !== "won");
     renderBranches(all);
+    updatePipelineFilterCounts(all);
     const search = (pipelineSearch?.value || "").trim().toLowerCase();
     const filtered = all.filter((lead) => {
       if (pipelineBranch !== "all" && lead.branch !== pipelineBranch) return false;
@@ -189,12 +205,14 @@
       }
       return true;
     });
-    document.getElementById("pipelineActiveCount").textContent = all.length;
-    document.getElementById("pipelineHotCount").textContent = all.filter((lead) => lead.temperature === "hot").length;
+    document.getElementById("pipelineActiveCount").textContent = String(openLeads.length);
+    document.getElementById("pipelineHotCount").textContent = String(openLeads.filter((lead) => lead.temperature === "hot").length);
+    const pipelineValue = document.getElementById("pipelineValue");
+    if (pipelineValue) pipelineValue.textContent = formatMoney(openLeads.reduce((sum, lead) => sum + (lead.value || 0), 0));
     pipelineBoard.innerHTML = STAGES.map((stage) => {
       const leads = filtered.filter((lead) => lead.stage === stage.key);
       const value = leads.reduce((sum, lead) => sum + (lead.value || 0), 0);
-      return `<section class="kanban-stage"><header class="kanban-stage-header"><div class="kanban-stage-title"><div><span class="stage-dot" style="background:${stage.color}"></span><h2>${stage.label}</h2></div><span class="kanban-stage-count">${leads.length}</span></div><p>${formatMoney(value)} estimated value</p></header><div class="kanban-cards">${leads.map(renderKanbanCard).join("") || '<div style="padding:18px;text-align:center;color:#7b847f;font-size:9px">No leads here</div>'}</div></section>`;
+      return `<section class="kanban-stage"><header class="kanban-stage-header"><div class="kanban-stage-title"><div><span class="stage-dot stage-${escapeHtml(stage.key)}"></span><h2>${escapeHtml(stage.label)}</h2></div><span class="kanban-stage-count">${leads.length}</span></div><p>${formatMoney(value)} estimated value</p></header><div class="kanban-cards">${leads.map(renderKanbanCard).join("") || '<div class="kanban-empty">No leads here</div>'}</div></section>`;
     }).join("");
     pipelineBoard.querySelectorAll("[data-pipeline-lead]").forEach((button) => button.addEventListener("click", () => {
       const id = button.dataset.pipelineLead;
@@ -205,19 +223,19 @@
 
   function renderKanbanCard(lead) {
     const icon = channelIcon(lead.channel);
-    return `<button class="kanban-card" type="button" data-pipeline-lead="${lead.id}"><div class="kanban-card-top"><div class="mini-avatar ${icon.className}">${icon.short}</div><div class="kanban-card-copy"><div><strong>${escapeHtml(lead.name)}</strong>${lead.value ? `<b>${formatMoney(lead.value)}</b>` : ""}</div><p>${escapeHtml(lead.treatment)}</p></div></div><div class="kanban-badges">${tempBadge(lead.temperature)}<span class="tag-branch">${escapeHtml(lead.branch || "Unassigned")}</span>${lead.attention ? '<span class="tag-attention">Attention</span>' : ""}${lead.language === "LIVE" ? '<span class="tag-branch">LIVE</span>' : `<span class="tag-branch">${escapeHtml(lead.language)}</span>`}</div><div class="kanban-card-meta"><span>${escapeHtml(lead.owner === "Unassigned" ? "No owner" : `Owner: ${lead.owner}`)}</span><span>${escapeHtml(lead.relative)}</span></div></button>`;
+    return `<button class="kanban-card" type="button" data-pipeline-lead="${escapeHtml(lead.id)}"><div class="kanban-card-top"><div class="mini-avatar ${icon.className}">${icon.short}</div><div class="kanban-card-copy"><div><strong>${escapeHtml(lead.name)}</strong>${lead.value ? `<b>${formatMoney(lead.value)}</b>` : ""}</div><p>${escapeHtml(lead.treatment)}</p></div></div><div class="kanban-badges">${tempBadge(lead.temperature)}<span class="tag-branch">${escapeHtml(lead.branch || "Unassigned")}</span>${lead.attention ? '<span class="tag-attention">Attention</span>' : ""}${lead.language === "LIVE" ? '<span class="tag-branch">LIVE</span>' : `<span class="tag-branch">${escapeHtml(lead.language)}</span>`}</div><div class="kanban-card-meta"><span>${escapeHtml(lead.owner === "Unassigned" ? "No owner" : `Owner: ${lead.owner}`)}</span><span>${escapeHtml(lead.relative)}</span></div></button>`;
   }
 
   function renderAnalyticsFunnel() {
     const target = document.getElementById("analyticsFunnel");
     if (!target) return;
     const rows = [
-      ["New Leads", 126, 100],
-      ["Appointments", 34, 27],
-      ["Clinic Visits", 25, 19.8],
-      ["Won", 17, 13.5],
+      ["New Leads", 126, "100.0%", "funnel-fill-100"],
+      ["Appointments", 34, "27.0%", "funnel-fill-27"],
+      ["Clinic Visits", 25, "19.8%", "funnel-fill-20"],
+      ["Won", 17, "13.5%", "funnel-fill-14"],
     ];
-    target.innerHTML = rows.map(([label, count, percent], index) => `<div class="funnel-row"><div class="funnel-label"><div><strong>${label}</strong>${index ? `<small style="display:block;color:#69736d;font-size:7px;margin-top:2px">${percent.toFixed(1)}% of leads</small>` : ""}</div><span>${count}</span></div><div class="funnel-track"><div class="funnel-fill" style="width:${Math.max(percent, 10)}%">${count}</div></div></div>`).join("");
+    target.innerHTML = rows.map(([label, count, percent, widthClass], index) => `<div class="funnel-row"><div class="funnel-label"><div><strong>${label}</strong>${index ? `<small class="funnel-subtext">${percent} of leads</small>` : ""}</div><span>${count}</span></div><div class="funnel-track"><div class="funnel-fill ${widthClass}">${count}</div></div></div>`).join("");
   }
 
   function initTools() {
