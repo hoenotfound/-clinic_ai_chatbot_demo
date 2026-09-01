@@ -101,11 +101,12 @@ test('embedded Clinic Dashboard is usable at a 360px mobile viewport', async ({ 
   expect(iframeBox.width).toBeGreaterThan(320);
   expect(iframeBox.width).toBeLessThanOrEqual(360);
 
-  const mobileNav = frame.getByRole('navigation');
+  const mobileNav = frame.getByRole('navigation', { name: 'Mobile dashboard navigation' });
   await expect(mobileNav).toBeVisible();
   const navBox = await mobileNav.boundingBox();
   expect(navBox.width).toBeGreaterThan(300);
   expect(navBox.height).toBeLessThanOrEqual(72);
+  await expect(mobileNav.getByRole('button', { name: 'More dashboard pages' })).toBeVisible();
 
   const inbox = frame.locator('aside[aria-label="Conversation inbox"]');
   const inboxBox = await inbox.boundingBox();
@@ -117,11 +118,20 @@ test('embedded Clinic Dashboard is usable at a 360px mobile viewport', async ({ 
   await frame.getByRole('button', { name: 'Back to conversations' }).click();
   await expect(inbox).toBeVisible();
 
-  await frame.getByRole('link', { name: 'Pipeline' }).click();
+  await mobileNav.getByRole('button', { name: 'More dashboard pages' }).click();
+  const moreMenu = frame.locator('#mobileMoreMenu');
+  await expect(moreMenu).toBeVisible();
+  await expect(moreMenu.getByRole('link', { name: 'Tools' })).toBeVisible();
+  await expect(moreMenu.getByRole('link', { name: 'Settings', exact: true })).toBeVisible();
+  await expect(moreMenu.getByRole('link', { name: 'Team & Access' })).toBeVisible();
+  await moreMenu.getByRole('link', { name: 'Team & Access' }).click();
+  await expect(frame.getByRole('heading', { name: 'Team & Access' })).toBeVisible();
+
+  await frame.getByRole('link', { name: 'Pipeline', exact: true }).click();
   await expect(frame.getByRole('heading', { name: 'Lead Pipeline' })).toBeVisible();
   await expect(frame.locator('main.md\\:hidden')).toBeVisible();
 
-  await frame.getByRole('link', { name: 'Analytics' }).click();
+  await frame.getByRole('link', { name: 'Analytics', exact: true }).click();
   await expect(frame.getByRole('heading', { name: 'Analytics' })).toBeVisible();
 
   const rootWidth = await frame.locator('html').evaluate((element) => ({
