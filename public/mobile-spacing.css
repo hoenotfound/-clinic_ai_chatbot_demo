@@ -205,14 +205,229 @@ b {
 /* One static CTA callback to the hero gradient; no extra animation competing for attention. */
 .page-shell .sales-cta-ai-accent {
   display: inline-block;
-  background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 38%, #8b5cf6 68%, #7c3aed 100%);
+  background: linear-gradient(135deg, #2563eb 0%, #6366f1 48%, #7c3aed 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  color: #a78bfa;
+  color: #6366f1;
+}
+
+/*
+  Light AI conversion panel.
+  This replaces the old dark block with a white / lavender / blue surface so the
+  ending feels like a continuation of the hero and Lead Intelligence language.
+*/
+.page-shell .sales-cta {
+  border: 1px solid rgba(99, 102, 241, .14);
+  background:
+    radial-gradient(circle at 12% 18%, rgba(124, 58, 237, .11), transparent 34%),
+    radial-gradient(circle at 88% 82%, rgba(37, 99, 235, .11), transparent 36%),
+    linear-gradient(135deg, #ffffff 0%, #fbfaff 48%, #f3f7ff 100%);
+  color: var(--brand-blue-2);
+  box-shadow:
+    0 32px 80px -48px rgba(79, 70, 229, .38),
+    0 14px 34px -24px rgba(15, 23, 42, .18);
+}
+
+.page-shell .sales-cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(125deg, rgba(37, 99, 235, .20), rgba(124, 58, 237, .18), rgba(255, 255, 255, .4));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.page-shell .sales-cta-glow {
+  width: 520px;
+  height: 520px;
+  right: -150px;
+  top: -270px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, .18), rgba(124, 58, 237, .15));
+  filter: blur(90px);
+  opacity: .72;
+}
+
+.page-shell .sales-kicker {
+  color: #6d28d9;
+}
+
+.page-shell .sales-cta h2 {
+  color: var(--brand-blue);
+}
+
+.page-shell .sales-cta-copy > p:not(.sales-kicker) {
+  color: var(--slate-500);
+}
+
+.page-shell .sales-cta-trust span {
+  border-color: rgba(99, 102, 241, .13);
+  background: rgba(255, 255, 255, .76);
+  color: var(--slate-600);
+  box-shadow: 0 8px 20px -18px rgba(79, 70, 229, .38);
+}
+
+.page-shell .sales-cta-actions {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(99, 102, 241, .14);
+  background: rgba(255, 255, 255, .86);
+  backdrop-filter: blur(14px);
+  box-shadow:
+    0 22px 50px -32px rgba(79, 70, 229, .34),
+    0 8px 24px -20px rgba(15, 23, 42, .16);
+}
+
+.page-shell .sales-cta-actions::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, #2563eb 0%, #6366f1 52%, #7c3aed 100%);
+}
+
+.page-shell .sales-response-label {
+  color: #6d28d9;
+}
+
+.page-shell .sales-cta-button {
+  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 68%, #7c3aed 100%);
+  box-shadow: 0 16px 30px -18px rgba(79, 70, 229, .68);
+  font-size: 0;
+}
+
+/* Keep the commercial CTA wording consistent even when the demo config uses the older fallback label. */
+.page-shell .sales-cta-button::before {
+  content: "Book a consultation";
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.page-shell .sales-cta-button:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #4338ca 68%, #6d28d9 100%);
+  box-shadow: 0 20px 34px -18px rgba(79, 70, 229, .72);
+}
+
+.page-shell .sales-cta-actions small {
+  color: var(--slate-500);
+}
+
+/* Use the unused desktop guide space to teach visitors what the dashboard will extract. */
+.page-shell #patientView .capture-preview {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid rgba(99, 102, 241, .12);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(124, 58, 237, .08), transparent 42%),
+    linear-gradient(145deg, #ffffff 0%, #f8faff 100%);
+  box-shadow: 0 16px 34px -30px rgba(79, 70, 229, .34);
+}
+
+.page-shell #patientView .capture-preview-kicker {
+  margin: 0;
+  color: #6d28d9;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+.page-shell #patientView .capture-preview-copy {
+  margin: 9px 0 0;
+  color: var(--slate-500);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.page-shell #patientView .capture-preview-grid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.page-shell #patientView .capture-preview-grid > span {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid rgba(37, 99, 235, .09);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .82);
+}
+
+.page-shell #patientView .capture-preview-grid small,
+.page-shell #patientView .capture-preview-grid strong {
+  display: block;
+}
+
+.page-shell #patientView .capture-preview-grid small {
+  color: var(--slate-400);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.page-shell #patientView .capture-preview-grid strong {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--brand-blue);
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-shell #patientView .capture-preview-note {
+  margin: 14px 0 0;
+  padding-top: 13px;
+  border-top: 1px solid var(--slate-100);
+  color: var(--slate-400);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  /* The educational context panel is desktop-only; mobile should stay focused on starting the conversation. */
+  .page-shell #patientView .capture-preview {
+    display: none;
+  }
 }
 
 @media (max-width: 600px) {
+  /*
+    Mobile readability pass.
+    Marketing labels stay compact, but meaningful UI text should not fall into the
+    8–9px range. !important is intentional here because subpage-polish.css loads
+    later and otherwise shrinks a few helper labels back down.
+  */
+  .page-shell .scaling-pill {
+    font-size: 9px !important;
+  }
+
+  .page-shell .hero-eyebrow,
+  .page-shell .section-eyebrow {
+    font-size: 10px !important;
+    line-height: 1.35;
+  }
+
+  .page-shell .demo-reset-button {
+    font-size: 10px !important;
+  }
+
+  .page-shell .experience-tab strong {
+    font-size: 11px !important;
+    line-height: 1.25;
+  }
+
+  .page-shell #patientView .channel-button strong {
+    font-size: 10px !important;
+  }
+
   /* A true 2 × 2 action grid: no clipped third card and no horizontal scrolling. */
   .page-shell #patientView .prompt-panel .suggestion-list {
     display: grid;
@@ -222,17 +437,45 @@ b {
     overflow: visible;
   }
 
+  /* Stack label + action copy vertically inside each card so 360px never truncates an action. */
   .page-shell #patientView .prompt-panel .suggestion-chip {
     width: 100%;
     min-width: 0;
-    min-height: 80px;
+    min-height: 86px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    grid-template-areas:
+      "label arrow"
+      "title arrow";
+    align-content: center;
+    gap: 4px 8px;
     padding: 12px;
   }
 
-  /* Raise the smallest supporting text one step without making the UI feel oversized. */
+  .page-shell #patientView .suggestion-chip > span {
+    grid-area: label;
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
+  .page-shell #patientView .suggestion-chip > strong {
+    grid-area: title;
+    min-width: 0;
+    overflow: visible;
+    font-size: 12px;
+    line-height: 1.35;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .page-shell #patientView .suggestion-chip > b {
+    grid-area: arrow;
+    align-self: center;
+  }
+
   .page-shell #patientView .channel-preview-note,
   .page-shell #patientView .prompt-helper {
-    font-size: 10.5px;
+    font-size: 11px !important;
     line-height: 1.55;
   }
 
@@ -242,30 +485,32 @@ b {
   }
 
   .page-shell #patientView .tour-heading div > span {
-    font-size: 8.5px;
+    font-size: 9.5px;
   }
 
   .page-shell #patientView .tour-heading div > strong {
-    font-size: 11.5px;
+    font-size: 12px;
   }
 
   .page-shell #patientView #tourProgress {
-    font-size: 9px;
+    font-size: 10px;
   }
 
-  .page-shell #patientView .suggestion-chip > span {
-    font-size: 9px;
-    line-height: 1.2;
+  .page-shell #patientView .device-stage-heading {
+    font-size: 9.5px;
   }
 
-  .page-shell #patientView .suggestion-chip > strong {
-    font-size: 11px;
-    line-height: 1.3;
+  .page-shell #patientView .device-stage-heading strong {
+    font-size: 10.5px;
+  }
+
+  .page-shell #patientView .privacy-note {
+    font-size: 10px;
   }
 
   .page-shell .journey-strip small {
-    font-size: 10.5px;
-    line-height: 1.45;
+    font-size: 11.5px;
+    line-height: 1.5;
   }
 
   .page-shell .capability-card > span {
@@ -277,12 +522,48 @@ b {
   }
 
   .page-shell .capability-card li {
-    font-size: 11.5px;
-    line-height: 1.45;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  /* Balance this headline so “bot.” does not become a visually weak orphan line. */
+  .page-shell #capabilitiesTitle {
+    text-wrap: balance;
+  }
+
+  .page-shell .sales-cta {
+    border-radius: 30px;
+    box-shadow: 0 24px 56px -38px rgba(79, 70, 229, .42);
+  }
+
+  .page-shell .sales-kicker {
+    font-size: 10px;
+    line-height: 1.4;
+  }
+
+  .page-shell .sales-cta h2 {
+    text-wrap: balance;
   }
 
   .page-shell .sales-cta-trust span {
     font-size: 11px;
+  }
+
+  .page-shell .sales-cta-actions {
+    border-radius: 20px;
+  }
+
+  .page-shell .sales-cta-actions small {
+    font-size: 10px;
+  }
+
+  .page-shell .subpage-footer p {
+    font-size: 10px !important;
+    line-height: 1.45;
+  }
+
+  .page-shell .subpage-footer-links a {
+    font-size: 10px !important;
   }
 
   .capabilities-section {
