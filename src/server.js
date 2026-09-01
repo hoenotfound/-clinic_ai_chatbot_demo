@@ -28,6 +28,7 @@ const ai = require("./aiService");
 
 const PORT = Number.parseInt(process.env.PORT || "3000", 10);
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
+const DASHBOARD_DIST = path.join(__dirname, "..", "portal-react", "dist");
 const PORTAL_DASHBOARD_PARTS = [1, 2, 3, 4].map((number) =>
   path.join(PUBLIC_DIR, `portal-dashboard-part${number}.html`)
 );
@@ -41,6 +42,8 @@ const MIME = {
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
   ".ico": "image/x-icon",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
 };
 
 function intEnv(name, fallback) {
@@ -127,7 +130,7 @@ function enforceStaffMessageLimit(session) {
   session.lastStaffMessageAt = now;
 }
 
-function securityHeaders(res) {
+function securityHeaders(res, { dashboard = false } = {}) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
@@ -135,7 +138,10 @@ function securityHeaders(res) {
   if (process.env.NODE_ENV === "production") {
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   }
-  res.setHeader("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
+  const stylePolicy = dashboard ? "style-src 'self' 'unsafe-inline'" : "style-src 'self'";
+  const framePolicy = dashboard ? "frame-ancestors 'self'" : "frame-ancestors 'none'";
+  const imagePolicy = dashboard ? "img-src 'self' data: blob:" : "img-src 'self' data:";
+  res.setHeader("Content-Security-Policy", `default-src 'self'; ${imagePolicy}; ${stylePolicy}; script-src 'self'; connect-src 'self'; base-uri 'self'; ${framePolicy}; form-action 'self'`);
 }
 
 function sendJson(res, status, body) {
@@ -321,6 +327,44 @@ async function handleApi(req, res, url) {
   return false;
 }
 
+function safeDashboardPath(pathname) {
+  let decoded;
+  try { decoded = decodeURIComponent(pathname); } catch { return null; }
+  const relative = decoded.replace(/^\/dashboard\/?/, "");
+  if (!relative || !path.extname(relative)) return path.join(DASHBOARD_DIST, "index.html");
+  const normalized = path.normalize(relative).replace(/^(\.\.[/\\])+/, "");
+  const fullPath = path.join(DASHBOARD_DIST, normalized);
+  return fullPath.startsWith(DASHBOARD_DIST) ? fullPath : null;
+}
+
+function serveDashboard(req, res, pathname) {
+  if (!fs.existsSync(DASHBOARD_DIST)) {
+    securityHeaders(res, { dashboard: true });
+    const payload = Buffer.from("React dashboard has not been built yet. Run npm run build:dashboard.");
+    res.writeHead(503, {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Content-Length": payload.length,
+      "Cache-Control": "no-store",
+    });
+    if (req.method === "HEAD") return res.end(), true;
+    res.end(payload);
+    return true;
+  }
+  const filePath = safeDashboardPath(pathname);
+  if (!filePath || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return false;
+  securityHeaders(res, { dashboard: true });
+  const stat = fs.statSync(filePath);
+  const isIndex = path.basename(filePath) === "index.html";
+  res.writeHead(200, {
+    "Content-Type": MIME[path.extname(filePath).toLowerCase()] || "application/octet-stream",
+    "Content-Length": stat.size,
+    "Cache-Control": isIndex ? "no-cache, max-age=0, must-revalidate" : "public, max-age=31536000, immutable",
+  });
+  if (req.method === "HEAD") return res.end(), true;
+  fs.createReadStream(filePath).pipe(res);
+  return true;
+}
+
 function safeStaticPath(pathname) {
   let decoded;
   try { decoded = decodeURIComponent(pathname); } catch { return null; }
@@ -339,7 +383,7 @@ function buildEnhancedIndex(filePath) {
 
   if (dashboardStart >= 0 && proofStart > dashboardStart && PORTAL_DASHBOARD_PARTS.every((part) => fs.existsSync(part))) {
     const portalDashboard = PORTAL_DASHBOARD_PARTS.map((part) => fs.readFileSync(part, "utf8")).join("");
-    const replacement = `${dashboardStartToken}\n${portalDashboard}\n        </div>\n      </section>\n\n`;
+    const replacement = `${dashboardStartToken}\n          <iframe id="reactDashboardFrame" class="react-dashboard-frame" src="/dashboard/inbox" title="Nova Demo Clinic staff portal"></iframe>\n          <div class="legacy-dashboard-hooks" aria-hidden="true">\n${portalDashboard}\n          </div>\n        </div>\n      </section>\n\n`;
     html = html.slice(0, dashboardStart) + replacement + html.slice(proofStart);
   }
 
@@ -404,6 +448,9 @@ const server = http.createServer(async (req, res) => {
     if (handled !== false) return;
     if (url.pathname.startsWith("/api/")) {
       return sendJson(res, 404, { error: "API route not found." });
+    }
+    if ((req.method === "GET" || req.method === "HEAD") && url.pathname.startsWith("/dashboard")) {
+      if (serveDashboard(req, res, url.pathname)) return;
     }
     if (req.method === "GET" || req.method === "HEAD") return serveStatic(req, res, url.pathname);
     sendJson(res, 404, { error: "Not found." });

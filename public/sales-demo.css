@@ -40,3 +40,9 @@
   .sales-cta-button { width: 100%; text-align: center; }
   .channel-preview-note, .privacy-note { font-size: 8.5px; }
 }
+
+/* React production portal mounted inside Clinic Dashboard. */
+.react-dashboard-frame { display: block; width: 100%; height: clamp(720px, 86vh, 920px); min-height: 720px; border: 0; background: #faf9f6; }
+.legacy-dashboard-hooks { display: none !important; }
+#dashboardView.active { background: #faf9f6; }
+@media (max-width: 767px) { .react-dashboard-frame { height: 82dvh; min-height: 650px; } }
