@@ -67,6 +67,77 @@ test("capture and verify demo-first desktop layout", async ({ page }) => {
   await expect(page.locator('.site-nav a[aria-current="page"]')).toHaveText("AI Chatbot Demo");
   await expect(page.locator(".subpage-footer")).toBeVisible();
 
+  const brandTypography = await page.locator(".da-brand").evaluate((el) => {
+    const title = getComputedStyle(el, "::before");
+    const subtitle = getComputedStyle(el, "::after");
+    return {
+      titleFamily: title.fontFamily,
+      titleSize: title.fontSize,
+      titleWeight: title.fontWeight,
+      subtitleFamily: subtitle.fontFamily,
+      subtitleSize: subtitle.fontSize,
+      subtitleWeight: subtitle.fontWeight,
+      subtitleTracking: subtitle.letterSpacing,
+    };
+  });
+  expect(brandTypography.titleFamily).toContain("Plus Jakarta Sans");
+  expect(brandTypography.titleSize).toBe("20px");
+  expect(brandTypography.titleWeight).toBe("800");
+  expect(brandTypography.subtitleFamily).toContain("Plus Jakarta Sans");
+  expect(brandTypography.subtitleSize).toBe("9px");
+  expect(brandTypography.subtitleWeight).toBe("700");
+  expect(brandTypography.subtitleTracking).toBe("1.8px");
+
+  const footerBrandTypography = await page.locator(".subpage-footer-brand").evaluate((el) => ({
+    titleFamily: getComputedStyle(el, "::before").fontFamily,
+    titleWeight: getComputedStyle(el, "::before").fontWeight,
+    subtitleFamily: getComputedStyle(el, "::after").fontFamily,
+    subtitleWeight: getComputedStyle(el, "::after").fontWeight,
+  }));
+  expect(footerBrandTypography.titleFamily).toContain("Plus Jakarta Sans");
+  expect(footerBrandTypography.titleWeight).toBe("800");
+  expect(footerBrandTypography.subtitleFamily).toContain("Plus Jakarta Sans");
+  expect(footerBrandTypography.subtitleWeight).toBe("700");
+
+  const patientTypography = await page.locator("#patientView").evaluate((root) => {
+    const read = (selector) => {
+      const style = getComputedStyle(root.querySelector(selector));
+      return { family: style.fontFamily, weight: style.fontWeight };
+    };
+    return {
+      guide: read(".guide-label strong"),
+      channelTitle: read(".channel-button strong"),
+      channelDetail: read(".channel-button small"),
+      tourTitle: read(".tour-heading div > span"),
+      phoneTitle: read(".chat-title strong"),
+      promptTitle: read(".suggestion-chip > strong"),
+    };
+  });
+  for (const sample of Object.values(patientTypography)) {
+    expect(sample.family).toContain("Plus Jakarta Sans");
+  }
+  expect(patientTypography.guide.weight).toBe("700");
+  expect(patientTypography.channelTitle.weight).toBe("700");
+  expect(patientTypography.channelDetail.weight).toBe("400");
+  expect(patientTypography.tourTitle.weight).toBe("800");
+  expect(patientTypography.phoneTitle.weight).toBe("700");
+  expect(patientTypography.promptTitle.weight).toBe("700");
+
+  const trustTypography = await page.locator(".sales-cta-trust span").first().evaluate((el) => {
+    const style = getComputedStyle(el);
+    return { family: style.fontFamily, weight: style.fontWeight, size: style.fontSize };
+  });
+  expect(trustTypography.family).toContain("Plus Jakarta Sans");
+  expect(trustTypography.weight).toBe("700");
+  expect(trustTypography.size).toBe("10px");
+
+  const capabilityMasks = await page.locator(".capability-icon").evaluateAll((icons) => icons.map((el) => {
+    const style = getComputedStyle(el, "::before");
+    return style.maskImage || style.webkitMaskImage;
+  }));
+  expect(capabilityMasks).toHaveLength(3);
+  capabilityMasks.forEach((mask) => expect(mask).not.toBe("none"));
+
   await page.screenshot({ path: "visual-artifacts/public-demo-desktop.png", fullPage: true });
 });
 
@@ -84,6 +155,13 @@ test("capture and verify streamlined mobile demo order", async ({ page }) => {
   expect(channels.y).toBeLessThan(prompts.y);
   expect(prompts.y).toBeLessThan(phone.y);
   await expect(page.locator(".floating-enquiry")).toBeHidden();
+
+  const mobileBrand = await page.locator(".da-brand").evaluate((el) => ({
+    titleSize: getComputedStyle(el, "::before").fontSize,
+    subtitleSize: getComputedStyle(el, "::after").fontSize,
+  }));
+  expect(mobileBrand.titleSize).toBe("14px");
+  expect(mobileBrand.subtitleSize).toBe("6.3px");
 
   await page.screenshot({ path: "visual-artifacts/public-demo-mobile.png", fullPage: true });
 });
