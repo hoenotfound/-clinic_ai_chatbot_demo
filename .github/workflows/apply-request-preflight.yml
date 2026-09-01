@@ -1,0 +1,30 @@
+name: Apply Request Preflight
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .apply-request-preflight
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+      - run: node scripts/apply-request-preflight.js
+      - run: npm ci
+      - run: npm test
+      - run: node --check src/server.js
+      - name: Commit server preflight fix
+        run: |
+          git config user.name "hoenotfound"
+          git config user.email "91048208+hoenotfound@users.noreply.github.com"
+          git add src/server.js
+          git commit -m "Validate demo requests before shared counters"
+          git push origin main
