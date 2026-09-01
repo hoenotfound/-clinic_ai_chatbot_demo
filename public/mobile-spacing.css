@@ -1,0 +1,42 @@
+/* Mobile vertical rhythm refinement only.
+   Scope: public marketing shell + Patient View. Clinic Dashboard iframe is untouched. */
+
+@media (max-width: 600px) {
+  /* Give the hero room to finish before the product demo begins. */
+  .homepage-hero {
+    padding-bottom: 68px;
+  }
+
+  /* Main section rhythm: deliberately more generous on a real phone. */
+  .demo-section {
+    margin-bottom: 94px;
+  }
+
+  .demo-section .section-heading {
+    margin-bottom: 30px;
+  }
+
+  /* Keep the interactive controls compact, but let the whole demo breathe. */
+  .prompt-panel {
+    padding-bottom: 24px;
+  }
+
+  .capabilities-section {
+    margin-top: 18px;
+    margin-bottom: 96px;
+  }
+
+  .capabilities-section .section-heading {
+    margin-bottom: 32px;
+  }
+
+  .capability-grid {
+    gap: 16px;
+  }
+
+  /* Separate the conversion CTA clearly from the feature section. */
+  .sales-cta {
+    margin-top: 0;
+    margin-bottom: 82px;
+  }
+}
