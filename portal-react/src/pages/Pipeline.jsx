@@ -40,8 +40,18 @@ function mapLead(lead) {
     estimated_value: lead.value,
     source: lead.source,
     campaign_name: lead.source === "Meta Ads" ? "Demo Clinic Campaign" : null,
-    appointment_status: lead.cancelled ? "cancelled" : lead.reschedule ? "reschedule" : lead.stage === "visited" ? "visited" : lead.stage === "appointment" ? "set" : "none",
-    appointment_at: lead.stage === "appointment" ? new Date(Date.now() + 86_400_000).toISOString() : null,
+    appointment_status: lead.cancelled
+      ? "cancelled"
+      : lead.reschedule
+        ? "reschedule"
+        : lead.stage === "visited"
+          ? "visited"
+          : lead.stage === "confirmed"
+            ? "confirmed"
+            : lead.stage === "appointment"
+              ? "requested"
+              : "none",
+    appointment_at: lead.stage === "confirmed" ? new Date(Date.now() + 86_400_000).toISOString() : null,
     next_follow_up_at: lead.overdue ? new Date(Date.now() - 3_600_000).toISOString() : lead.followUp ? new Date(Date.now() + 7_200_000).toISOString() : null,
     needs_attention: lead.attention,
     last_message_role: lead.noReply ? "assistant" : last?.[0] === "user" ? "user" : "assistant",
@@ -120,8 +130,8 @@ export default function Pipeline() {
       estimated_value: lead.bookingIntent ? 1800 : 0,
       source: "Live demo",
       campaign_name: null,
-      appointment_status: lead.bookingIntent ? "set" : "none",
-      appointment_at: lead.bookingIntent ? new Date(Date.now() + 86_400_000).toISOString() : null,
+      appointment_status: lead.bookingIntent ? "requested" : "none",
+      appointment_at: null,
       next_follow_up_at: null,
       needs_attention: Boolean(live.needsAttention),
       last_message_role: last?.source === "customer" ? "user" : "assistant",
@@ -202,7 +212,7 @@ export default function Pipeline() {
           {branchCards.map((card) => (
             <button key={card.key} onClick={() => setBranch(card.key)} className={`w-44 rounded-2xl border px-3.5 py-3 text-left transition ${branch === card.key ? "border-[var(--color-primary)] bg-[var(--color-primary-light)]" : "border-[var(--color-border)] bg-white hover:border-[var(--color-primary)]/30"}`}>
               <div className="flex justify-between gap-2"><strong className="truncate text-xs">{card.label}</strong><b className="text-sm">{card.items.length}</b></div>
-              <p className="mt-1 text-[9px] text-[var(--color-text-muted)]">{card.items.filter((lead) => lead.temperature === "hot").length} hot · {card.items.filter((lead) => lead.appointment_status === "set").length} appointments</p>
+              <p className="mt-1 text-[9px] text-[var(--color-text-muted)]">{card.items.filter((lead) => lead.temperature === "hot").length} hot · {card.items.filter((lead) => lead.appointment_status === "confirmed").length} confirmed</p>
             </button>
           ))}
         </div>
