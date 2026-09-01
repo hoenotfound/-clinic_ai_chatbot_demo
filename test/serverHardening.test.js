@@ -91,3 +91,47 @@ test("server hides provider details and rate-limits staff-message abuse", async 
   assert.equal(blocked.response.status, 429);
   assert.match(blocked.data.error, /staff replies per session/i);
 });
+
+test("provider failure returns a clinic-aware fallback instead of an AI outage message", async (t) => {
+  const port = 33000 + (process.pid % 1000);
+  const base = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, ["src/server.js"], {
+    cwd: ROOT,
+    env: {
+      ...process.env,
+      PORT: String(port),
+      NODE_ENV: "production",
+      AI_PROVIDER: "claude",
+      ANTHROPIC_API_KEY: "",
+      DEMO_MAX_SESSIONS_PER_IP_DAY: "99",
+      DEMO_MAX_TOTAL_MESSAGES_PER_DAY: "99",
+      DEMO_MIN_MESSAGE_INTERVAL_MS: "1",
+      DEMO_MAX_TOTAL_MESSAGES_PER_SESSION: "10",
+      DEMO_MAX_CONCURRENT_AI_REQUESTS: "1",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  t.after(() => child.kill("SIGTERM"));
+
+  // /health is intentionally 503 because Claude has no key in this test.
+  // The public config endpoint proves the server itself is listening.
+  await waitForServer(`${base}/api/demo/config`);
+
+  const created = await json(`${base}/api/demo/sessions`, {
+    method: "POST",
+    body: JSON.stringify({ channel: "whatsapp" }),
+  });
+  assert.equal(created.response.status, 201);
+  const id = created.data.session.id;
+
+  const sent = await json(`${base}/api/demo/sessions/${encodeURIComponent(id)}/message`, {
+    method: "POST",
+    body: JSON.stringify({ message: "How much is HIFU?" }),
+  });
+
+  assert.equal(sent.response.status, 200);
+  const assistant = sent.data.session.messages.filter((message) => message.role === "assistant").at(-1);
+  assert.ok(assistant);
+  assert.match(assistant.content, /RM 888/);
+  assert.doesNotMatch(assistant.content, /trouble replying|try again in a moment|couldn't generate/i);
+});
