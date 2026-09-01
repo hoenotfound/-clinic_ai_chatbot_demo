@@ -45,9 +45,10 @@ test("prospect can complete the live AI to staff journey without CSP errors", as
   await expect(page.locator("#analyticsFunnel .funnel-fill")).toHaveCount(4);
 
   await page.locator('[data-portal-page="tools"]').click();
-  await expect(page.locator("#portalPageTools")).toHaveClass(/active/);
-  await expect(page.getByText("Automated follow-up").first()).toBeVisible();
-  await expect(page.getByText("Automatic Lead Temperature").first()).toBeVisible();
+  const toolsPage = page.locator("#portalPageTools");
+  await expect(toolsPage).toHaveClass(/active/);
+  await expect(toolsPage.getByText("Automated follow-up", { exact: true }).first()).toBeVisible();
+  await expect(toolsPage.getByText("Automatic Lead Temperature", { exact: true }).first()).toBeVisible();
 
   await page.locator('[data-portal-page="inbox"]').click();
   await page.locator("#liveConversationCard").click();
