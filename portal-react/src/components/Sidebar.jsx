@@ -1,4 +1,5 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { branding } from "../config/branding";
 
@@ -8,17 +9,22 @@ const NAV_ITEMS = [
   { to: "/contacts", label: "Contacts", mobileLabel: "Contacts", icon: ContactsIcon, capabilities: LEAD_VIEW },
   { to: "/pipeline", label: "Pipeline", mobileLabel: "Pipeline", icon: PipelineIcon, capabilities: LEAD_VIEW },
   { to: "/analytics", label: "Analytics", mobileLabel: "Analytics", icon: AnalyticsIcon, capabilities: ["view_analytics"] },
-  { to: "/tools", label: "Tools", mobileLabel: "Tools", icon: ToolsIcon, capabilities: ["manage_tools"] },
-  { to: "/settings", label: "Settings", mobileLabel: "Settings", icon: SettingsIcon, capabilities: ["manage_settings"] },
-  { to: "/settings/team", label: "Team & Access", mobileLabel: "Team", icon: TeamIcon, capabilities: ["manage_users"], secondaryMobile: true },
+  { to: "/tools", label: "Tools", mobileLabel: "Tools", icon: ToolsIcon, capabilities: ["manage_tools"], mobileMore: true },
+  { to: "/settings", label: "Settings", mobileLabel: "Settings", icon: SettingsIcon, capabilities: ["manage_settings"], mobileMore: true },
+  { to: "/settings/team", label: "Team & Access", mobileLabel: "Team & Access", icon: TeamIcon, capabilities: ["manage_users"], mobileMore: true },
 ];
 
 export default function Sidebar() {
   const { user, username, permissions, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [moreOpen, setMoreOpen] = useState(false);
   const visibleItems = NAV_ITEMS.filter((item) =>
     item.capabilities.some((capability) => permissions[capability] === true)
   );
+  const primaryMobileItems = visibleItems.filter((item) => !item.mobileMore);
+  const moreMobileItems = visibleItems.filter((item) => item.mobileMore);
+  const moreActive = moreMobileItems.some((item) => location.pathname === item.to);
 
   async function handleLogout() {
     await logout();
@@ -38,7 +44,80 @@ export default function Sidebar() {
         </span>
       </div>
 
-      <nav className="flex min-w-0 flex-1 items-stretch overflow-x-auto px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:block md:space-y-1 md:overflow-y-auto md:px-2 md:py-2 lg:px-3">
+      {moreOpen && moreMobileItems.length > 0 && (
+        <div
+          id="mobileMoreMenu"
+          className="absolute bottom-full left-3 right-3 mb-2 overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white p-2 text-[var(--color-text)] shadow-[0_18px_50px_rgba(15,23,42,0.22)] md:hidden"
+          aria-label="More dashboard pages"
+        >
+          <div className="px-2 pb-2 pt-1">
+            <strong className="font-display text-sm">More</strong>
+            <p className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">Tools, settings and team administration</p>
+          </div>
+          <div className="grid gap-1">
+            {moreMobileItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onClick={() => setMoreOpen(false)}
+                className={({ isActive }) =>
+                  `flex min-h-12 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
+                    isActive
+                      ? "bg-[var(--color-primary-light)] text-[var(--color-primary)]"
+                      : "text-[var(--color-text)] hover:bg-[var(--color-bg)]"
+                  }`
+                }
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-bg)] text-[var(--color-primary)]">
+                  <item.icon className="h-[18px] w-[18px]" />
+                </span>
+                <span>{item.label}</span>
+              </NavLink>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <nav aria-label="Mobile dashboard navigation" className="flex min-w-0 flex-1 items-stretch px-1.5 py-1.5 md:hidden">
+        {primaryMobileItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            title={item.label}
+            aria-label={item.label}
+            onClick={() => setMoreOpen(false)}
+            className={({ isActive }) =>
+              `flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[9px] font-semibold transition-colors ${
+                isActive
+                  ? "bg-[var(--color-primary)] text-white"
+                  : "text-[var(--color-sidebar-text)] hover:bg-[var(--color-sidebar-hover)]"
+              }`
+            }
+          >
+            <item.icon className="h-5 w-5 shrink-0" />
+            <span className="max-w-full truncate leading-none">{item.mobileLabel}</span>
+          </NavLink>
+        ))}
+        {moreMobileItems.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setMoreOpen((open) => !open)}
+            aria-label="More dashboard pages"
+            aria-expanded={moreOpen}
+            aria-controls="mobileMoreMenu"
+            className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[9px] font-semibold transition-colors ${
+              moreOpen || moreActive
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-[var(--color-sidebar-text)] hover:bg-[var(--color-sidebar-hover)]"
+            }`}
+          >
+            <MoreNavIcon className="h-5 w-5 shrink-0" />
+            <span className="leading-none">More</span>
+          </button>
+        )}
+      </nav>
+
+      <nav aria-label="Dashboard navigation" className="hidden flex-1 space-y-1 overflow-y-auto px-2 py-2 md:block lg:px-3">
         {visibleItems.map((item) => (
           <NavLink
             key={item.to}
@@ -46,15 +125,14 @@ export default function Sidebar() {
             title={item.label}
             aria-label={item.label}
             className={({ isActive }) =>
-              `${item.secondaryMobile ? "hidden md:flex" : "flex"} min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[9px] font-semibold transition-colors md:flex-row md:gap-3 md:px-2 md:py-2.5 md:text-sm md:font-medium lg:justify-start lg:px-3 ${
+              `flex items-center justify-center gap-3 rounded-xl px-2 py-2.5 text-sm font-medium transition-colors lg:justify-start lg:px-3 ${
                 isActive
                   ? "bg-[var(--color-primary)] text-white"
                   : "text-[var(--color-sidebar-text)] hover:bg-[var(--color-sidebar-hover)]"
               }`
             }
           >
-            <item.icon className="h-5 w-5 shrink-0 md:h-[18px] md:w-[18px]" />
-            <span className="max-w-full truncate leading-none md:hidden">{item.mobileLabel}</span>
+            <item.icon className="h-[18px] w-[18px] shrink-0" />
             <span className="hidden lg:inline">{item.label}</span>
           </NavLink>
         ))}
@@ -101,10 +179,13 @@ function ToolsIcon(props) {
   return <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14.7 6.3a4 4 0 0 0-5-5L12 3.6 8.4 7.2 6.1 4.9a4 4 0 0 0 5 5L4 17a2.1 2.1 0 0 0 3 3l7.1-7.1a4 4 0 0 0 5-5l-2.3 2.3-3.6-3.6 1.5-1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 function SettingsIcon(props) {
-  return <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15z" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  return <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06-.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15z" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 function TeamIcon(props) {
   return <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="8" r="3" /><path d="M3 20v-1a6 6 0 0 1 12 0v1" strokeLinecap="round" /><path d="M16 5a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 5v1" strokeLinecap="round" /></svg>;
+}
+function MoreNavIcon(props) {
+  return <svg {...props} viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>;
 }
 function LogoutIcon(props) {
   return <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 17l5-5-5-5M15 12H3" strokeLinecap="round" strokeLinejoin="round" /><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" strokeLinecap="round" /></svg>;
