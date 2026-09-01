@@ -1,5 +1,93 @@
-/* Mobile vertical rhythm refinement only.
-   Scope: public marketing shell + Patient View. Clinic Dashboard iframe is untouched. */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+/*
+  Typography + mobile vertical-rhythm refinement.
+  DA Smarketing's main website uses Plus Jakarta Sans at 300–800.
+  Keep all public-demo heavy text on real 700/800 faces instead of synthetic 850/900 weights.
+  Scope: public marketing shell + Patient View only. Clinic Dashboard iframe is untouched.
+*/
+
+html,
+body,
+button,
+input,
+textarea,
+select,
+a {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+body {
+  font-weight: 400;
+  font-synthesis: none;
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+strong,
+b {
+  font-weight: 700;
+}
+
+/* Main-site headline language: bold, but not artificially black/heavy. */
+.hero-main h1,
+.section-heading h2,
+.capability-card h3,
+.sales-cta h2,
+.hero-product-caption strong {
+  font-weight: 800;
+}
+
+/* DA-style UI labels and CTAs use the real 700/800 files. */
+.site-nav a,
+.header-audit-button,
+.scaling-pill,
+.section-eyebrow,
+.hero-eyebrow,
+.hero-primary-action,
+.hero-whatsapp-action small,
+.experience-status small,
+.demo-reset-button,
+.experience-tab > span:first-child,
+.guide-label > span,
+.tour-heading div > span,
+#tourProgress,
+.tour-steps li > span,
+.suggestion-chip > span,
+.journey-strip article > span,
+.hero-product-avatar,
+.hero-lead-icon,
+.hero-lead-card span,
+.hero-metric-card span,
+.hero-context-card span,
+.sales-kicker,
+.sales-response-label,
+.sales-cta-button {
+  font-weight: 800;
+}
+
+/* Supporting bold copy is intentionally one step softer, like the main website. */
+.hero-whatsapp-action strong,
+.hero-footnote,
+.hero-product-topbar strong,
+.hero-product-topbar span,
+.hero-lead-card strong,
+.experience-status strong,
+.experience-tab strong,
+.guide-label strong,
+.channel-button strong,
+.tour-heading div > strong,
+.tour-steps li strong,
+.suggestion-chip > strong,
+.device-stage-heading strong,
+.chat-title strong,
+.empty-chat strong,
+.capability-card > span,
+.journey-strip strong {
+  font-weight: 700;
+}
 
 @media (max-width: 600px) {
   /* Give the hero room to finish before the product demo begins. */
