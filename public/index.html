@@ -7,6 +7,7 @@
   <meta name="robots" content="noindex, nofollow, noarchive" />
   <title>AI Clinic Receptionist Demo | DA Smarketing</title>
   <link rel="stylesheet" href="/refinement.css" />
+  <link rel="stylesheet" href="/demo-first.css" />
 </head>
 <body>
   <div class="page-shell">
@@ -31,12 +32,11 @@
         <div class="hero-main hero-enter">
           <div class="scaling-pill">
             <span class="status-dot"></span>
-            LIVE AI RECEPTIONIST DEMO FOR AESTHETIC CLINICS
+            LIVE AI RECEPTIONIST DEMO
           </div>
 
-          <p class="hero-eyebrow">AI AUTOMATION FOR CLINIC ENQUIRIES</p>
           <h1>Turn every clinic enquiry into a <span class="text-gradient">qualified lead.</span></h1>
-          <p class="hero-copy">See how a clinic-trained AI can answer treatment questions, recognise booking intent and hand the conversation to your team with the full context intact.</p>
+          <p class="hero-copy">See how a clinic-trained AI answers treatment questions, recognises booking intent and hands the conversation to your team with the full context intact.</p>
 
           <div class="hero-actions">
             <a class="hero-primary-action" href="#live-demo">
@@ -92,35 +92,7 @@
               <strong>Reply. Qualify. Hand off.</strong>
             </div>
           </div>
-
-          <div class="hero-metric-card">
-            <strong>24/7</strong>
-            <span>INSTANT REPLIES</span>
-          </div>
-          <div class="hero-context-card">
-            <span>STAFF VIEW</span>
-            <strong>Context stays with the lead.</strong>
-          </div>
         </div>
-      </section>
-
-      <section id="how-it-works" class="journey-strip" aria-label="AI receptionist workflow">
-        <article>
-          <span>01</span>
-          <div><strong>Patient asks</strong><small>WhatsApp, Instagram or Messenger</small></div>
-        </article>
-        <article>
-          <span>02</span>
-          <div><strong>AI replies</strong><small>Using your clinic knowledge and rules</small></div>
-        </article>
-        <article>
-          <span>03</span>
-          <div><strong>Intent is captured</strong><small>Treatment, branch, timing and booking signals</small></div>
-        </article>
-        <article>
-          <span>04</span>
-          <div><strong>Staff steps in</strong><small>Human takeover with conversation context</small></div>
-        </article>
       </section>
 
       <section class="demo-section" aria-labelledby="demoSectionTitle">
@@ -129,7 +101,7 @@
             <p class="section-eyebrow">LIVE INTERACTIVE DEMO</p>
             <h2 id="demoSectionTitle">Experience the full customer journey.</h2>
           </div>
-          <p>Start as a patient. Ask a real clinic question. Then switch to the Clinic Dashboard to see exactly what the team receives.</p>
+          <p>Message the clinic as a patient, then switch to the Clinic Dashboard to see exactly what your team receives.</p>
         </div>
 
         <section id="live-demo" class="experience-card bento-card">
@@ -157,7 +129,7 @@
 
           <div id="patientView" class="view-panel active" role="tabpanel">
             <div class="patient-layout">
-              <aside class="patient-guide">
+              <aside class="patient-guide channel-panel">
                 <div class="guide-section">
                   <div class="guide-label"><span>1</span><strong>Choose a channel</strong></div>
                   <div class="channel-buttons" role="group" aria-label="Messaging channel experience">
@@ -176,16 +148,18 @@
                   </div>
                   <p class="channel-preview-note">For convenience, this public demo keeps one conversation while you switch channel previews.</p>
                 </div>
+              </aside>
 
-                <div id="tourCard" class="tour-card">
+              <div class="device-stage">
+                <div id="tourCard" class="tour-card" aria-label="Guided demo progress">
                   <div class="tour-heading">
                     <div>
-                      <span>60-SECOND GUIDED TEST</span>
+                      <span>GUIDED DEMO</span>
                       <strong id="tourStatus">Start with a patient question</strong>
                     </div>
                     <span id="tourProgress">0 / 4</span>
                   </div>
-                  <ol class="tour-steps">
+                  <ol class="tour-steps" aria-label="Demo progress steps">
                     <li id="tourStep1"><span>1</span><div><strong>Ask a question</strong><small>Try a price or treatment enquiry</small></div></li>
                     <li id="tourStep2"><span>2</span><div><strong>Show booking intent</strong><small>Ask for a day or branch</small></div></li>
                     <li id="tourStep3"><span>3</span><div><strong>Open Clinic Dashboard</strong><small>See the lead context</small></div></li>
@@ -193,18 +167,6 @@
                   </ol>
                 </div>
 
-                <div class="try-box">
-                  <div class="guide-label"><span>2</span><strong>Try a real enquiry</strong></div>
-                  <div class="suggestion-list">
-                    <button class="suggestion-chip" type="button" data-message="Hi, how much is HIFU?"><span>Price</span><strong>How much is HIFU?</strong><b>→</b></button>
-                    <button class="suggestion-chip" type="button" data-message="I have pigmentation and acne marks. What would you recommend?"><span>Treatment</span><strong>I have pigmentation</strong><b>→</b></button>
-                    <button class="suggestion-chip" type="button" data-message="I'm interested in HIFU. Can I come this Saturday in KL?"><span>Booking</span><strong>Can I come Saturday?</strong><b>→</b></button>
-                    <button class="suggestion-chip" type="button" data-message="Can I speak to a human consultant?"><span>Handoff</span><strong>Speak to a human</strong><b>→</b></button>
-                  </div>
-                </div>
-              </aside>
-
-              <div class="device-stage">
                 <div class="device-stage-heading">
                   <div><span class="status-dot"></span><strong id="channelCaption">WhatsApp customer experience</strong></div>
                   <span id="messageCounter">0 / 30 demo messages</span>
@@ -244,14 +206,46 @@
 
                 <p class="privacy-note">Demo only — please don’t enter real patient information or sensitive personal data.</p>
               </div>
+
+              <aside class="patient-guide prompt-panel">
+                <div class="try-box">
+                  <div class="guide-label"><span>2</span><strong>Try a real enquiry</strong></div>
+                  <div class="suggestion-list">
+                    <button class="suggestion-chip" type="button" data-message="Hi, how much is HIFU?"><span>Price</span><strong>How much is HIFU?</strong><b>→</b></button>
+                    <button class="suggestion-chip" type="button" data-message="I have pigmentation and acne marks. What would you recommend?"><span>Treatment</span><strong>I have pigmentation</strong><b>→</b></button>
+                    <button class="suggestion-chip" type="button" data-message="I'm interested in HIFU. Can I come this Saturday in KL?"><span>Booking</span><strong>Can I come Saturday?</strong><b>→</b></button>
+                    <button class="suggestion-chip" type="button" data-message="Can I speak to a human consultant?"><span>Handoff</span><strong>Speak to a human</strong><b>→</b></button>
+                  </div>
+                </div>
+              </aside>
             </div>
           </div>
 
-        <div id="dashboardView" class="view-panel" role="tabpanel">
-        </div>
+          <div id="dashboardView" class="view-panel" role="tabpanel">
+          </div>
+        </section>
       </section>
 
       <section class="proof-grid"></section>
+
+      <section id="how-it-works" class="journey-strip" aria-label="AI receptionist workflow">
+        <article>
+          <span>01</span>
+          <div><strong>Patient enquiry</strong><small>WhatsApp, Instagram or Messenger</small></div>
+        </article>
+        <article>
+          <span>02</span>
+          <div><strong>AI conversation</strong><small>Answers with your clinic knowledge and rules</small></div>
+        </article>
+        <article>
+          <span>03</span>
+          <div><strong>Qualified lead</strong><small>Treatment, branch, timing and booking intent</small></div>
+        </article>
+        <article>
+          <span>04</span>
+          <div><strong>Human takeover</strong><small>Staff continues with the same context</small></div>
+        </article>
+      </section>
 
       <section class="capabilities-section" aria-labelledby="capabilitiesTitle">
         <div class="section-heading centered">
@@ -259,7 +253,7 @@
             <p class="section-eyebrow">BUILT FOR THE MOMENT AFTER “HI”</p>
             <h2 id="capabilitiesTitle">More than an auto-reply bot.</h2>
           </div>
-          <p>The AI does the repetitive front-desk work while keeping the important sales context visible for your team.</p>
+          <p>The AI handles repetitive front-desk work while keeping the sales context your team actually needs.</p>
         </div>
 
         <div class="capability-grid">
@@ -267,24 +261,24 @@
             <div class="capability-icon blue">✦</div>
             <span>01 · INSTANT RESPONSE</span>
             <h3>Answer with your clinic knowledge.</h3>
-            <p>Treatments, pricing, promotions, branches, FAQs and conversation rules can all be configured around your business.</p>
-            <ul><li>Clinic-specific replies</li><li>Multilingual conversations</li><li>Consistent tone and SOP</li></ul>
+            <p>Treatments, prices, promotions and FAQs — using your clinic’s own rules.</p>
+            <ul><li>Multilingual conversations</li><li>Consistent clinic SOP</li></ul>
           </article>
 
           <article class="capability-card bento-card dark">
             <div class="capability-icon dark-icon">↗</div>
             <span>02 · LEAD INTELLIGENCE</span>
-            <h3>Know which enquiry is worth attention.</h3>
-            <p>The conversation is turned into useful lead context instead of disappearing inside a long message thread.</p>
-            <ul><li>Hot / warm / cold signals</li><li>Treatment and branch intent</li><li>Conversation summary</li></ul>
+            <h3>Know which enquiry needs attention.</h3>
+            <p>Turn each conversation into clear sales context and intent signals.</p>
+            <ul><li>Temperature and booking intent</li><li>Conversation summary</li></ul>
           </article>
 
           <article class="capability-card bento-card">
             <div class="capability-icon green">✓</div>
             <span>03 · HUMAN HANDOFF</span>
-            <h3>Let staff take over at the right moment.</h3>
-            <p>When the AI reaches a sensitive, complex or high-intent conversation, your team can continue with the same context.</p>
-            <ul><li>Human takeover</li><li>Attention alerts</li><li>Same conversation history</li></ul>
+            <h3>Let staff step in at the right moment.</h3>
+            <p>Take over when a conversation becomes sensitive, complex or high intent.</p>
+            <ul><li>Takeover with full context</li><li>Attention alerts</li></ul>
           </article>
         </div>
       </section>
@@ -294,7 +288,7 @@
         <div class="sales-cta-copy">
           <p class="sales-kicker"><span class="status-dot"></span> AI AUTOMATION FOR YOUR CLINIC</p>
           <h2>Ready to build your AI front desk?</h2>
-          <p>We’ll map your treatments, pricing, branches, FAQs, lead rules and human handoff flow before connecting any live messaging channel.</p>
+          <p>We’ll customise the AI around your treatments, pricing, branches, FAQs, lead rules and human handoff workflow.</p>
           <div class="sales-cta-trust">
             <span>Clinic-specific setup</span>
             <span>Human takeover</span>
