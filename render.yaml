@@ -11,10 +11,18 @@ services:
         value: production
       - key: AI_PROVIDER
         value: gemini
+      - key: GEMINI_API_KEY_1
+        sync: false
+      - key: GEMINI_API_KEY_2
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
         value: gemini-2.5-flash
+      - key: GEMINI_FALLBACK_MODEL
+        value: gemini-2.5-flash-lite
+      - key: GEMINI_RETRY_DELAY_MS
+        value: 250
       - key: AI_REQUEST_TIMEOUT_MS
         value: 15000
       - key: REDIS_URL

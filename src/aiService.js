@@ -7,12 +7,25 @@ if (!SUPPORTED_PROVIDERS.has(provider)) {
   throw new Error(`Unknown AI_PROVIDER: ${provider}`);
 }
 
+function getGeminiApiKeys() {
+  const newKeys = [process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY_2]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  const uniqueNewKeys = [...new Set(newKeys)];
+  if (uniqueNewKeys.length) return uniqueNewKeys;
+
+  const legacy = String(process.env.GEMINI_API_KEY || "").trim();
+  return legacy ? [legacy] : [];
+}
+
 const configured = provider === "mock" ||
   (provider === "claude" && Boolean(process.env.ANTHROPIC_API_KEY)) ||
-  (provider === "gemini" && Boolean(process.env.GEMINI_API_KEY));
+  (provider === "gemini" && getGeminiApiKeys().length > 0);
 
 const parsedTimeout = Number.parseInt(process.env.AI_REQUEST_TIMEOUT_MS || "15000", 10);
 const AI_REQUEST_TIMEOUT_MS = Number.isFinite(parsedTimeout) && parsedTimeout > 0 ? parsedTimeout : 15000;
+const parsedRetryDelay = Number.parseInt(process.env.GEMINI_RETRY_DELAY_MS || "250", 10);
+const GEMINI_RETRY_DELAY_MS = Number.isFinite(parsedRetryDelay) && parsedRetryDelay >= 0 ? parsedRetryDelay : 250;
 
 function mockReply(messages) {
   const latest = (messages.at(-1)?.content || "").toLowerCase();
@@ -87,9 +100,6 @@ async function getClaudeReply(messages, isFirstMessage) {
       body: JSON.stringify({
         model,
         max_tokens: 650,
-        // Sonnet 5 enables adaptive thinking by default. This receptionist
-        // demo does not need deep reasoning, so disabling it reduces latency
-        // and avoids spending the small output budget on hidden thinking.
         thinking: { type: "disabled" },
         system: buildSystemPrompt({ isFirstMessage }),
         messages,
@@ -103,18 +113,9 @@ async function getClaudeReply(messages, isFirstMessage) {
 
 function geminiThinkingConfig(model) {
   const normalized = String(model || "").toLowerCase();
-
-  // GenerateContent uses a numeric thinking budget for the Gemini 2.5 family.
-  // 2.5 Flash and Flash-Lite support 0, which is ideal for this low-latency
-  // receptionist demo. 2.5 Pro cannot fully disable thinking, so leave it at
-  // the model default rather than sending an invalid zero budget.
   if (/^gemini-2\.5-flash(?:-lite)?(?:-|$)/.test(normalized)) {
     return { thinkingConfig: { thinkingBudget: 0 } };
   }
-
-  // Gemini 3+ uses thinkingLevel instead of the legacy numeric budget. Flash
-  // models support minimal thinking; Pro-family models use low as the safest
-  // low-latency setting.
   if (/^gemini-3(?:[.-]|$)/.test(normalized)) {
     return {
       thinkingConfig: {
@@ -122,8 +123,6 @@ function geminiThinkingConfig(model) {
       },
     };
   }
-
-  // Unknown/older model families are safest without a thinking field.
   return {};
 }
 
@@ -133,9 +132,6 @@ function buildGeminiRequest(messages, isFirstMessage, model, { omitThinking = fa
     parts: [{ text: String(message.content || "") }],
   }));
   const generationConfig = {
-    // A fallback request without an explicit thinking control may spend part of
-    // this budget on hidden reasoning, so give it more headroom than the normal
-    // short receptionist response.
     maxOutputTokens: omitThinking ? 2048 : 650,
   };
   if (!omitThinking) Object.assign(generationConfig, geminiThinkingConfig(model));
@@ -149,10 +145,25 @@ function buildGeminiRequest(messages, isFirstMessage, model, { omitThinking = fa
   };
 }
 
-async function getGeminiReply(messages, isFirstMessage) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+function extractGeminiText(data) {
+  return data.candidates?.[0]?.content?.parts
+    ?.filter((part) => typeof part.text === "string")
+    .map((part) => part.text)
+    .join("")
+    .trim() || "";
+}
+
+function isRetryableGeminiError(error) {
+  if (!error?.statusCode) return true;
+  return error.statusCode === 408 || error.statusCode === 409 || error.statusCode === 429 || error.statusCode >= 500;
+}
+
+function sleep(ms) {
+  if (!ms) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function requestGemini(messages, isFirstMessage, apiKey, model, label) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const requestOptions = (body) => ({
     method: "POST",
@@ -166,28 +177,91 @@ async function getGeminiReply(messages, isFirstMessage) {
   let data;
   const primaryBody = buildGeminiRequest(messages, isFirstMessage, model);
   try {
-    data = await fetchJson(url, requestOptions(primaryBody), "Gemini");
+    data = await fetchJson(url, requestOptions(primaryBody), label);
   } catch (error) {
     const hasThinkingConfig = Boolean(primaryBody.generationConfig?.thinkingConfig);
     const isInvalidArgument = error.statusCode === 400 &&
       (error.apiStatus === "INVALID_ARGUMENT" || /invalid argument/i.test(error.message));
-
-    // Some Gemini endpoints/model revisions reject thinking controls even when
-    // a closely related model accepts them. Retry once without thinkingConfig
-    // instead of dropping the whole customer conversation into degraded mode.
     if (!hasThinkingConfig || !isInvalidArgument) throw error;
 
-    console.warn(`Gemini rejected thinkingConfig for model "${model}"; retrying once without it.`);
+    console.warn(`${label} rejected thinkingConfig for model "${model}"; retrying without it.`);
     const fallbackBody = buildGeminiRequest(messages, isFirstMessage, model, { omitThinking: true });
-    data = await fetchJson(url, requestOptions(fallbackBody), "Gemini fallback");
+    data = await fetchJson(url, requestOptions(fallbackBody), `${label} compatibility retry`);
   }
 
-  const text = data.candidates?.[0]?.content?.parts
-    ?.filter((part) => typeof part.text === "string")
-    .map((part) => part.text)
-    .join("")
-    .trim();
-  return text || "Sorry, I couldn't generate a reply. Please try again.";
+  const text = extractGeminiText(data);
+  if (!text) {
+    const error = new Error(`${label} returned an empty response.`);
+    error.statusCode = 502;
+    throw error;
+  }
+  return text;
+}
+
+async function tryPrimaryGeminiKeys(messages, isFirstMessage, keys, model) {
+  let lastError = null;
+  for (let keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
+    const label = `Gemini key ${keyIndex + 1}`;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        return await requestGemini(messages, isFirstMessage, keys[keyIndex], model, label);
+      } catch (error) {
+        lastError = error;
+        const retry = attempt === 1 && isRetryableGeminiError(error);
+        console.warn(`${label} attempt ${attempt} failed: ${error.message}${retry ? "; retrying once" : ""}`);
+        if (!retry) break;
+        await sleep(GEMINI_RETRY_DELAY_MS);
+      }
+    }
+  }
+  throw lastError || new Error("All Gemini primary-key attempts failed.");
+}
+
+async function tryFallbackGeminiModel(messages, isFirstMessage, keys, fallbackModel) {
+  let lastError = null;
+  for (let keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
+    try {
+      return await requestGemini(
+        messages,
+        isFirstMessage,
+        keys[keyIndex],
+        fallbackModel,
+        `Gemini fallback model key ${keyIndex + 1}`
+      );
+    } catch (error) {
+      lastError = error;
+      console.warn(`Gemini fallback model key ${keyIndex + 1} failed: ${error.message}`);
+    }
+  }
+  throw lastError || new Error("Gemini fallback model failed.");
+}
+
+async function getGeminiReply(messages, isFirstMessage) {
+  const keys = getGeminiApiKeys();
+  if (!keys.length) {
+    console.warn("No Gemini API key is configured; using deterministic demo fallback.");
+    return mockReply(messages);
+  }
+
+  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const fallbackModel = String(process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash-lite").trim();
+
+  try {
+    return await tryPrimaryGeminiKeys(messages, isFirstMessage, keys, model);
+  } catch (primaryError) {
+    console.warn(`All primary Gemini attempts failed: ${primaryError.message}`);
+  }
+
+  if (fallbackModel && fallbackModel !== model) {
+    try {
+      return await tryFallbackGeminiModel(messages, isFirstMessage, keys, fallbackModel);
+    } catch (fallbackError) {
+      console.warn(`Gemini fallback model exhausted: ${fallbackError.message}`);
+    }
+  }
+
+  console.warn("Gemini unavailable after failover chain; using deterministic demo fallback.");
+  return mockReply(messages);
 }
 
 async function getReply(messages, isFirstMessage = false) {
@@ -201,5 +275,13 @@ module.exports = {
   getReply,
   provider,
   configured,
-  _test: { geminiThinkingConfig, buildGeminiRequest },
+  _test: {
+    geminiThinkingConfig,
+    buildGeminiRequest,
+    getGeminiApiKeys,
+    isRetryableGeminiError,
+    requestGemini,
+    tryPrimaryGeminiKeys,
+    tryFallbackGeminiModel,
+  },
 };
