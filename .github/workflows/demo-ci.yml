@@ -14,10 +14,10 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 20
-      - name: Install dependencies
+      - name: Install dependencies and build React dashboard
         run: npm ci
-      - name: Build React dashboard
-        run: npm run build:dashboard
+      - name: Verify React dashboard build exists
+        run: test -f portal-react/dist/index.html
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Run regression tests
@@ -31,5 +31,6 @@ jobs:
           node --check public/app.js
           node --check playwright.config.js
           node --check e2e/demo.spec.js
+          node --check e2e/dashboard-ux.spec.js
       - name: Run browser E2E tests
         run: npm run test:e2e
