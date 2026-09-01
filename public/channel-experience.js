@@ -66,6 +66,7 @@
   };
 
   let decorating = false;
+  let appliedChannel = null;
 
   function currentChannel() {
     if (phone.classList.contains("instagram-theme")) return "instagram";
@@ -202,16 +203,19 @@
     badge.textContent = config.emptyBadge;
   }
 
-  function applyChannelExperience() {
+  function applyChannelExperience({ force = false } = {}) {
     const channel = currentChannel();
+    if (!force && appliedChannel === channel && phone.classList.contains("native-channel-ui")) return;
+
     const config = channelConfig[channel];
-    phone.classList.add("native-channel-ui");
+    if (!phone.classList.contains("native-channel-ui")) phone.classList.add("native-channel-ui");
     phone.dataset.channelExperience = channel;
     phone.setAttribute("aria-label", `${config.label} patient messaging preview`);
     ensureHeader(config);
     ensureComposer(config);
     ensureEmptyState(config);
     decorateMessages(channel);
+    appliedChannel = channel;
   }
 
   if (!input.dataset.channelExperienceBound) {
@@ -220,12 +224,16 @@
   }
 
   const phoneClassObserver = new MutationObserver((records) => {
-    if (records.some((record) => record.attributeName === "class")) applyChannelExperience();
+    if (!records.some((record) => record.attributeName === "class")) return;
+    const channel = currentChannel();
+    if (channel !== appliedChannel || !phone.classList.contains("native-channel-ui")) {
+      applyChannelExperience();
+    }
   });
   phoneClassObserver.observe(phone, { attributes: true, attributeFilter: ["class"] });
 
   const messagesObserver = new MutationObserver(() => decorateMessages(currentChannel()));
   messagesObserver.observe(messages, { childList: true });
 
-  applyChannelExperience();
+  applyChannelExperience({ force: true });
 })();
