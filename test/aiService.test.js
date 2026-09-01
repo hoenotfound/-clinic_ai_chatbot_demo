@@ -9,6 +9,7 @@ const previousEnv = {
   GEMINI_MODEL: process.env.GEMINI_MODEL,
   GEMINI_FALLBACK_MODEL: process.env.GEMINI_FALLBACK_MODEL,
   GEMINI_RETRY_DELAY_MS: process.env.GEMINI_RETRY_DELAY_MS,
+  GEMINI_FAILOVER_BUDGET_MS: process.env.GEMINI_FAILOVER_BUDGET_MS,
 };
 const previousFetch = global.fetch;
 
@@ -19,6 +20,7 @@ process.env.GEMINI_API_KEY_2 = "test-key-2";
 process.env.GEMINI_MODEL = "gemini-2.5-flash";
 process.env.GEMINI_FALLBACK_MODEL = "gemini-2.5-flash-lite";
 process.env.GEMINI_RETRY_DELAY_MS = "0";
+process.env.GEMINI_FAILOVER_BUDGET_MS = "80";
 delete require.cache[require.resolve("../src/aiService")];
 const aiService = require("../src/aiService");
 
@@ -153,4 +155,29 @@ test("Gemini exhausts both primary keys and fallback model before returning the 
   assert.deepEqual(calls.slice(0, 4).map((call) => call.key), ["test-key-1", "test-key-1", "test-key-2", "test-key-2"]);
   assert.ok(calls.slice(0, 4).every((call) => call.url.includes("gemini-2.5-flash:generateContent")));
   assert.ok(calls.slice(4).every((call) => call.url.includes("gemini-2.5-flash-lite:generateContent")));
+});
+
+test("Gemini shares one failover budget and aborts a hung request before using the mock reply", async () => {
+  let calls = 0;
+  global.fetch = async (_url, options) => {
+    calls += 1;
+    return new Promise((_resolve, reject) => {
+      options.signal.addEventListener("abort", () => {
+        const error = new Error("aborted by test timeout");
+        error.name = "AbortError";
+        reject(error);
+      }, { once: true });
+    });
+  };
+
+  const startedAt = Date.now();
+  const reply = await aiService.getReply(
+    [{ role: "user", content: "How much is HIFU?" }],
+    false
+  );
+  const elapsedMs = Date.now() - startedAt;
+
+  assert.match(reply, /RM 888/);
+  assert.equal(calls, 1, "the exhausted shared deadline should skip all remaining Gemini attempts");
+  assert.ok(elapsedMs < 500, `expected the 80ms test budget to fall back quickly, got ${elapsedMs}ms`);
 });
