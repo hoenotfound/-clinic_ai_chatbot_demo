@@ -59,3 +59,4 @@ fs.writeFileSync(serverPath, server);
 fs.writeFileSync(cssPath, css);
 fs.writeFileSync(renderPath, render);
 console.log('Mounted React dashboard in demo server.');
+// Triggered after the mount workflow was installed.
