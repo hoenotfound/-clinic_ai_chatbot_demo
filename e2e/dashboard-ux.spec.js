@@ -90,3 +90,45 @@ test('React Pipeline filters are usable and Analytics remains scrollable', async
 
   expect(browserErrors, `Browser errors: ${browserErrors.join('\n')}`).toEqual([]);
 });
+
+test('embedded Clinic Dashboard is usable at a 360px mobile viewport', async ({ page }) => {
+  const browserErrors = collectBrowserErrors(page);
+  await page.setViewportSize({ width: 360, height: 800 });
+  const frame = await openDashboard(page);
+
+  const iframeBox = await page.locator('#reactDashboardFrame').boundingBox();
+  expect(iframeBox).not.toBeNull();
+  expect(iframeBox.width).toBeGreaterThan(320);
+  expect(iframeBox.width).toBeLessThanOrEqual(360);
+
+  const mobileNav = frame.getByRole('navigation');
+  await expect(mobileNav).toBeVisible();
+  const navBox = await mobileNav.boundingBox();
+  expect(navBox.width).toBeGreaterThan(300);
+  expect(navBox.height).toBeLessThanOrEqual(72);
+
+  const inbox = frame.locator('aside[aria-label="Conversation inbox"]');
+  const inboxBox = await inbox.boundingBox();
+  expect(inboxBox.width).toBeGreaterThan(300);
+
+  await inbox.getByRole('button', { name: /Amanda Lee/ }).click();
+  await expect(inbox).toBeHidden();
+  await expect(frame.getByRole('button', { name: 'Back to conversations' })).toBeVisible();
+  await frame.getByRole('button', { name: 'Back to conversations' }).click();
+  await expect(inbox).toBeVisible();
+
+  await frame.getByRole('link', { name: 'Pipeline' }).click();
+  await expect(frame.getByRole('heading', { name: 'Lead Pipeline' })).toBeVisible();
+  await expect(frame.locator('main.md\\:hidden')).toBeVisible();
+
+  await frame.getByRole('link', { name: 'Analytics' }).click();
+  await expect(frame.getByRole('heading', { name: 'Analytics' })).toBeVisible();
+
+  const rootWidth = await frame.locator('html').evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(rootWidth.scrollWidth).toBeLessThanOrEqual(rootWidth.clientWidth);
+
+  expect(browserErrors, `Browser errors: ${browserErrors.join('\n')}`).toEqual([]);
+});
