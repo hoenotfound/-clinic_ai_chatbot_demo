@@ -5,6 +5,7 @@ const state = {
   activeView: "patient",
   hasViewedDashboard: false,
   hasTakenOver: false,
+  syncTimer: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -25,33 +26,6 @@ const els = {
   channelCaption: $("channelCaption"),
   messageCounter: $("messageCounter"),
   attentionTabDot: $("attentionTabDot"),
-  dashboardChannelAvatar: $("dashboardChannelAvatar"),
-  conversationTime: $("conversationTime"),
-  conversationPreview: $("conversationPreview"),
-  conversationChannelTag: $("conversationChannelTag"),
-  conversationTempTag: $("conversationTempTag"),
-  staffChannelLabel: $("staffChannelLabel"),
-  modePill: $("modePill"),
-  takeoverButton: $("takeoverButton"),
-  attentionBanner: $("attentionBanner"),
-  attentionReason: $("attentionReason"),
-  staffMessages: $("staffMessages"),
-  staffEmptyState: $("staffEmptyState"),
-  staffForm: $("staffForm"),
-  staffInput: $("staffInput"),
-  staffSendButton: $("staffSendButton"),
-  staffComposerNotice: $("staffComposerNotice"),
-  leadTemperature: $("leadTemperature"),
-  leadScore: $("leadScore"),
-  temperatureBadge: $("temperatureBadge"),
-  leadSummary: $("leadSummary"),
-  leadTreatment: $("leadTreatment"),
-  leadBooking: $("leadBooking"),
-  leadBranch: $("leadBranch"),
-  leadTiming: $("leadTiming"),
-  pipelineNew: $("pipelineNew"),
-  pipelineWarm: $("pipelineWarm"),
-  pipelineHot: $("pipelineHot"),
   tourStatus: $("tourStatus"),
   tourProgress: $("tourProgress"),
   tourStep1: $("tourStep1"),
@@ -64,12 +38,13 @@ const els = {
 };
 
 const channelMeta = {
-  whatsapp: { label: "WhatsApp", short: "W", theme: "whatsapp-theme", icon: "whatsapp-icon", status: "online", caption: "WhatsApp customer experience" },
-  instagram: { label: "Instagram", short: "◎", theme: "instagram-theme", icon: "instagram-icon", status: "Active now", caption: "Instagram customer experience" },
-  facebook: { label: "Messenger", short: "M", theme: "facebook-theme", icon: "facebook-icon", status: "Active now", caption: "Messenger customer experience" },
+  whatsapp: { label: "WhatsApp", theme: "whatsapp-theme", status: "online", caption: "WhatsApp customer experience" },
+  instagram: { label: "Instagram", theme: "instagram-theme", status: "Active now", caption: "Instagram customer experience" },
+  facebook: { label: "Messenger", theme: "facebook-theme", status: "Active now", caption: "Messenger customer experience" },
 };
 
 function showToast(message) {
+  if (!els.toast) return;
   els.toast.textContent = message;
   els.toast.classList.remove("hidden");
   clearTimeout(showToast.timer);
@@ -90,25 +65,16 @@ function formatTime(timestamp) {
   return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-function formatRelative(timestamp) {
-  if (!timestamp) return "Now";
-  const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
-  if (seconds < 60) return "Now";
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  return formatTime(timestamp);
-}
-
 function setActiveView(view) {
   state.activeView = view;
   if (view === "dashboard") state.hasViewedDashboard = true;
   const patient = view === "patient";
-  els.patientTab.classList.toggle("active", patient);
-  els.dashboardTab.classList.toggle("active", !patient);
-  els.patientTab.setAttribute("aria-selected", String(patient));
-  els.dashboardTab.setAttribute("aria-selected", String(!patient));
-  els.patientView.classList.toggle("active", patient);
-  els.dashboardView.classList.toggle("active", !patient);
+  els.patientTab?.classList.toggle("active", patient);
+  els.dashboardTab?.classList.toggle("active", !patient);
+  els.patientTab?.setAttribute("aria-selected", String(patient));
+  els.dashboardTab?.setAttribute("aria-selected", String(!patient));
+  els.patientView?.classList.toggle("active", patient);
+  els.dashboardView?.classList.toggle("active", !patient);
   renderTour();
 }
 
@@ -118,18 +84,16 @@ function channelFromUi() {
 
 function renderChannel() {
   const channel = state.session?.channel || "whatsapp";
-  const meta = channelMeta[channel];
+  const meta = channelMeta[channel] || channelMeta.whatsapp;
   document.querySelectorAll(".channel-button").forEach((button) => {
     button.classList.toggle("active", button.dataset.channel === channel);
   });
-  els.phone.classList.remove("whatsapp-theme", "instagram-theme", "facebook-theme");
-  els.phone.classList.add(meta.theme);
-  els.channelStatusText.textContent = meta.status;
-  els.channelCaption.textContent = meta.caption;
-  els.dashboardChannelAvatar.className = `conversation-avatar ${meta.icon}`;
-  els.dashboardChannelAvatar.textContent = meta.short;
-  els.conversationChannelTag.textContent = meta.label;
-  els.staffChannelLabel.textContent = `${meta.label} · Demo visitor`;
+  if (els.phone) {
+    els.phone.classList.remove("whatsapp-theme", "instagram-theme", "facebook-theme");
+    els.phone.classList.add(meta.theme);
+  }
+  if (els.channelStatusText) els.channelStatusText.textContent = meta.status;
+  if (els.channelCaption) els.channelCaption.textContent = meta.caption;
 }
 
 function buildMessageBubble(message) {
@@ -170,11 +134,14 @@ function buildPromoCard() {
 }
 
 function renderPatientMessages() {
+  if (!els.messages) return;
   const messages = state.session?.messages || [];
   els.messages.innerHTML = "";
   if (!messages.length) {
-    els.messages.appendChild(els.emptyChat);
-    els.emptyChat.classList.remove("hidden");
+    if (els.emptyChat) {
+      els.messages.appendChild(els.emptyChat);
+      els.emptyChat.classList.remove("hidden");
+    }
     return;
   }
   for (const message of messages) {
@@ -188,84 +155,15 @@ function renderPatientMessages() {
   els.messages.scrollTop = els.messages.scrollHeight;
 }
 
-function buildStaffMessage(message) {
-  const row = document.createElement("div");
-  row.className = `staff-message-row ${message.role === "user" ? "customer" : "assistant"}`;
-  const bubble = document.createElement("div");
-  bubble.className = "staff-message-bubble";
-  const text = document.createElement("div");
-  text.textContent = message.content;
-  const meta = document.createElement("small");
-  meta.textContent = message.role === "user"
-    ? `Demo Patient · ${formatTime(message.createdAt)}`
-    : `${message.source === "staff" ? "Staff" : "AI"} · ${formatTime(message.createdAt)}`;
-  bubble.append(text, meta);
-  row.appendChild(bubble);
-  return row;
-}
-
-function renderStaffMessages() {
-  const messages = state.session?.messages || [];
-  els.staffMessages.innerHTML = "";
-  if (!messages.length) {
-    els.staffMessages.appendChild(els.staffEmptyState);
-    els.staffEmptyState.classList.remove("hidden");
-    return;
-  }
-  for (const message of messages) els.staffMessages.appendChild(buildStaffMessage(message));
-  els.staffMessages.scrollTop = els.staffMessages.scrollHeight;
-}
-
-function renderLead() {
-  const lead = state.session?.lead || { temperature: "cold", interests: [], bookingIntent: false, summary: "No conversation yet." };
-  const temp = lead.temperature || "cold";
-  els.leadTemperature.textContent = temp[0].toUpperCase() + temp.slice(1);
-  els.leadScore.textContent = temp === "hot" ? "Strong booking intent" : temp === "warm" ? "Active interest" : "Early enquiry";
-  els.temperatureBadge.className = `temperature-orb ${temp}`;
-  els.temperatureBadge.textContent = temp === "hot" ? "●" : temp === "warm" ? "◐" : "○";
-  const scale = document.querySelector(".temperature-scale");
-  scale.className = `temperature-scale ${temp}`;
-  els.leadSummary.textContent = lead.summary || "No conversation yet.";
-  els.leadTreatment.textContent = lead.interests?.length ? lead.interests.join(", ") : "Not detected";
-  els.leadBooking.textContent = lead.bookingIntent ? "Yes" : "Not yet";
-  els.leadBranch.textContent = lead.preferredBranch || "Not specified";
-  els.leadTiming.textContent = lead.preferredTiming || "Not specified";
-  els.conversationTempTag.textContent = temp[0].toUpperCase() + temp.slice(1);
-  els.conversationTempTag.className = `temperature ${temp}`;
-
-  els.pipelineNew.classList.add("active");
-  els.pipelineWarm.classList.toggle("active", temp === "warm" || temp === "hot");
-  els.pipelineHot.classList.toggle("active", temp === "hot" || lead.bookingIntent);
-}
-
-function renderModeAndAttention() {
-  const human = state.session?.mode === "human";
-  els.modePill.className = `mode-pill ${human ? "human" : "ai"}`;
-  els.modePill.innerHTML = `<span></span>${human ? "Human handling" : "AI handling"}`;
-  els.takeoverButton.textContent = human ? "Return to AI" : "Take over";
-  els.staffInput.disabled = !human;
-  els.staffSendButton.disabled = !human;
-  els.staffComposerNotice.textContent = human
-    ? "You are replying as clinic staff. Messages appear instantly in Patient View."
-    : "Take over the conversation to send a staff reply.";
-
-  const attention = Boolean(state.session?.needsAttention);
-  els.attentionBanner.classList.toggle("hidden", !attention);
-  els.attentionTabDot.classList.toggle("hidden", !attention);
-  els.attentionReason.textContent = state.session?.attentionReason || "The AI flagged this conversation for staff review.";
-}
-
-function renderConversationCard() {
-  const messages = state.session?.messages || [];
-  const latest = messages.at(-1);
-  els.conversationPreview.textContent = latest?.content || "No messages yet";
-  els.conversationTime.textContent = formatRelative(latest?.createdAt);
-}
-
 function renderCounters() {
   const count = state.session?.customerMessageCount || 0;
   const max = state.session?.maxMessages || state.config?.limits?.maxMessages || 30;
-  els.messageCounter.textContent = `${count} / ${max} demo messages`;
+  if (els.messageCounter) els.messageCounter.textContent = `${count} / ${max} demo messages`;
+}
+
+function renderAttention() {
+  const attention = Boolean(state.session?.needsAttention);
+  els.attentionTabDot?.classList.toggle("hidden", !attention);
 }
 
 function renderTour() {
@@ -273,23 +171,22 @@ function renderTour() {
   const asked = state.session.customerMessageCount > 0;
   const booking = Boolean(state.session.lead?.bookingIntent);
   const dashboard = state.hasViewedDashboard;
-  const takeover = state.hasTakenOver || state.session.mode === "human" || state.session.messages.some((m) => m.source === "staff");
+  const takeover = state.hasTakenOver || state.session.mode === "human" || state.session.messages.some((message) => message.source === "staff");
   const steps = [asked, booking, dashboard, takeover];
-  [els.tourStep1, els.tourStep2, els.tourStep3, els.tourStep4].forEach((el, index) => {
-    el?.classList.toggle("complete", steps[index]);
-    el?.classList.toggle("current", !steps[index] && steps.slice(0, index).every(Boolean));
+  [els.tourStep1, els.tourStep2, els.tourStep3, els.tourStep4].forEach((element, index) => {
+    element?.classList.toggle("complete", steps[index]);
+    element?.classList.toggle("current", !steps[index] && steps.slice(0, index).every(Boolean));
   });
   const completed = steps.filter(Boolean).length;
-  els.tourProgress.textContent = `${completed} / 4`;
+  if (els.tourProgress) els.tourProgress.textContent = `${completed} / 4`;
   if (!asked) els.tourStatus.textContent = "Tap a sample question below";
   else if (!booking) els.tourStatus.textContent = "Now try “Can I come Saturday?”";
   else if (!dashboard) els.tourStatus.textContent = "Booking intent detected — open Clinic Dashboard";
-  else if (!takeover) els.tourStatus.textContent = "See the staff view, then try Take over";
+  else if (!takeover) els.tourStatus.textContent = "Open the live conversation and try Take over";
   else els.tourStatus.textContent = "Full customer journey completed ✓";
 
   const shouldHighlightDashboard = booking && !dashboard && state.activeView === "patient";
-  els.dashboardTab.classList.toggle("guide-highlight", shouldHighlightDashboard);
-  els.takeoverButton.classList.toggle("guide-highlight", dashboard && !takeover && state.activeView === "dashboard");
+  els.dashboardTab?.classList.toggle("guide-highlight", shouldHighlightDashboard);
   els.salesCta?.classList.toggle("guide-highlight-soft", takeover);
 }
 
@@ -312,20 +209,17 @@ function renderAll() {
   if (!state.session) return;
   renderChannel();
   renderPatientMessages();
-  renderStaffMessages();
-  renderLead();
-  renderModeAndAttention();
-  renderConversationCard();
   renderCounters();
+  renderAttention();
   renderTour();
 }
 
 function setLoading(loading) {
   state.loading = loading;
-  els.customerInput.disabled = loading;
-  els.customerSendButton.disabled = loading;
-  els.typingIndicator.classList.toggle("hidden", !loading);
-  if (loading) setTimeout(() => { els.messages.scrollTop = els.messages.scrollHeight; }, 0);
+  if (els.customerInput) els.customerInput.disabled = loading;
+  if (els.customerSendButton) els.customerSendButton.disabled = loading;
+  els.typingIndicator?.classList.toggle("hidden", !loading);
+  if (loading && els.messages) setTimeout(() => { els.messages.scrollTop = els.messages.scrollHeight; }, 0);
 }
 
 async function createSession(channel = "whatsapp") {
@@ -346,7 +240,7 @@ async function restoreOrCreateSession() {
     try {
       const data = await api(`/api/demo/sessions/${encodeURIComponent(saved)}`);
       state.session = data.session;
-      state.hasTakenOver = state.session.mode === "human" || state.session.messages.some((m) => m.source === "staff");
+      state.hasTakenOver = state.session.mode === "human" || state.session.messages.some((message) => message.source === "staff");
       renderAll();
       return;
     } catch {
@@ -354,6 +248,20 @@ async function restoreOrCreateSession() {
     }
   }
   await createSession("whatsapp");
+}
+
+async function syncSession() {
+  if (state.loading || !state.session?.id) return;
+  try {
+    const data = await api(`/api/demo/sessions/${encodeURIComponent(state.session.id)}`);
+    state.session = data.session;
+    state.hasTakenOver = state.hasTakenOver || state.session.mode === "human" || state.session.messages.some((message) => message.source === "staff");
+    renderAll();
+  } catch (error) {
+    if (/expired/i.test(error.message)) {
+      sessionStorage.removeItem("clinicDemoSessionId");
+    }
+  }
 }
 
 async function sendCustomerMessage(rawMessage) {
@@ -369,7 +277,7 @@ async function sendCustomerMessage(rawMessage) {
     createdAt: Date.now(),
   };
   state.session.messages.push(optimistic);
-  els.customerInput.value = "";
+  if (els.customerInput) els.customerInput.value = "";
   renderAll();
   setLoading(state.session.mode === "ai");
 
@@ -388,7 +296,7 @@ async function sendCustomerMessage(rawMessage) {
       showToast("Booking intent detected. Open Clinic Dashboard to see what your team would see.");
     }
   } catch (error) {
-    state.session.messages = state.session.messages.filter((m) => m.id !== optimistic.id);
+    state.session.messages = state.session.messages.filter((item) => item.id !== optimistic.id);
     renderAll();
     showToast(error.message);
   } finally {
@@ -411,47 +319,6 @@ async function changeChannel(channel) {
   }
 }
 
-async function toggleTakeover() {
-  if (!state.session) return;
-  const newMode = state.session.mode === "human" ? "ai" : "human";
-  try {
-    const data = await api(`/api/demo/sessions/${encodeURIComponent(state.session.id)}/mode`, {
-      method: "POST",
-      body: JSON.stringify({ mode: newMode }),
-    });
-    state.session = data.session;
-    if (newMode === "human") state.hasTakenOver = true;
-    renderAll();
-    if (newMode === "human") {
-      els.staffInput.focus();
-      showToast("Human takeover is active. Try sending a staff reply to the patient.");
-    }
-  } catch (error) {
-    showToast(error.message);
-  }
-}
-
-async function sendStaffMessage(rawMessage) {
-  if (!state.session || state.session.mode !== "human") return;
-  const message = rawMessage.trim();
-  if (!message) return;
-  els.staffSendButton.disabled = true;
-  try {
-    const data = await api(`/api/demo/sessions/${encodeURIComponent(state.session.id)}/staff-message`, {
-      method: "POST",
-      body: JSON.stringify({ message }),
-    });
-    state.session = data.session;
-    els.staffInput.value = "";
-    renderAll();
-    showToast("Staff reply sent. Full demo journey complete — see the setup option below.");
-  } catch (error) {
-    showToast(error.message);
-  } finally {
-    els.staffSendButton.disabled = false;
-  }
-}
-
 async function startNewDemo() {
   if (state.loading) return;
   try {
@@ -465,18 +332,19 @@ async function startNewDemo() {
 }
 
 function bindEvents() {
-  els.patientTab.addEventListener("click", () => setActiveView("patient"));
-  els.dashboardTab.addEventListener("click", () => setActiveView("dashboard"));
-  els.newDemoButton.addEventListener("click", startNewDemo);
-  els.customerForm.addEventListener("submit", (event) => {
+  els.patientTab?.addEventListener("click", () => {
+    setActiveView("patient");
+    syncSession();
+  });
+  els.dashboardTab?.addEventListener("click", () => {
+    setActiveView("dashboard");
+    syncSession();
+  });
+  els.newDemoButton?.addEventListener("click", startNewDemo);
+  els.customerForm?.addEventListener("submit", (event) => {
     event.preventDefault();
     sendCustomerMessage(els.customerInput.value);
   });
-  els.staffForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    sendStaffMessage(els.staffInput.value);
-  });
-  els.takeoverButton.addEventListener("click", toggleTakeover);
   document.querySelectorAll(".channel-button").forEach((button) => {
     button.addEventListener("click", () => changeChannel(button.dataset.channel));
   });
@@ -490,10 +358,13 @@ function bindEvents() {
     }
   });
   document.querySelectorAll("[data-demo-only]").forEach((button) => {
-    button.addEventListener("click", () => {
-      showToast(button.dataset.demoOnly || "This control is visual only in the minimal demo.");
-    });
+    button.addEventListener("click", () => showToast(button.dataset.demoOnly || "This control is visual only in the demo."));
   });
+  window.addEventListener("message", (event) => {
+    if (event.origin !== window.location.origin) return;
+    if (event.data?.type === "clinic-demo-session-updated") syncSession();
+  });
+  window.addEventListener("focus", syncSession);
 }
 
 async function init() {
@@ -502,6 +373,7 @@ async function init() {
     state.config = await api("/api/demo/config");
     configureSalesCta();
     await restoreOrCreateSession();
+    state.syncTimer = setInterval(syncSession, 1800);
   } catch (error) {
     showToast(error.message);
   }

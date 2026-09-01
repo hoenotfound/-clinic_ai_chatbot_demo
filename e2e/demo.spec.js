@@ -90,12 +90,13 @@ test("prospect completes the live journey through the React production-style por
   await frame.getByRole("link", { name: "Inbox" }).click();
   const liveInbox = frame.locator('aside[aria-label="Conversation inbox"]');
   await liveInbox.getByRole("button", { name: /Demo Patient/ }).click();
-  await frame.getByRole("button", { name: /Take over/i }).click();
-  await expect(frame.getByRole("button", { name: /Return to AI/i })).toBeVisible();
-  const reply = frame.getByPlaceholder("Reply to patient…");
+  const liveThread = frame.locator('section[aria-label="Conversation with Demo Patient"]');
+  await liveThread.getByRole("button", { name: /Take over/i }).click();
+  await expect(liveThread.getByRole("button", { name: /Return to AI/i })).toBeVisible();
+  const reply = liveThread.getByPlaceholder("Reply to patient…");
   await reply.fill("Hi, I’m from the clinic team. I can help you from here.");
   await reply.locator("xpath=..//button").click();
-  await expect(frame.getByText("I can help you from here.")).toBeVisible();
+  await expect(liveThread.getByText("Hi, I’m from the clinic team. I can help you from here.", { exact: true })).toBeVisible();
 
   await page.getByRole("tab", { name: /Patient view/i }).click();
   await expect(page.locator("#messages")).toContainText("I can help you from here.");
