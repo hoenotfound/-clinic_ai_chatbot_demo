@@ -20,24 +20,33 @@ test("capture and verify demo-first desktop layout", async ({ page }) => {
 
   const heroShowcase = page.locator(".hero-showcase");
   await expect(heroShowcase).toHaveCSS("opacity", "1");
-  const heroShowcaseState = await heroShowcase.evaluate((el) => {
+  await expect(heroShowcase).toBeVisible();
+  const heroShowcaseBox = await heroShowcase.boundingBox();
+  expect(heroShowcaseBox).not.toBeNull();
+  expect(heroShowcaseBox.width).toBeGreaterThan(300);
+  expect(heroShowcaseBox.height).toBeGreaterThan(400);
+
+  const heroProduct = page.locator(".hero-product-card");
+  await expect(heroProduct).toBeVisible();
+  const heroProductState = await heroProduct.evaluate((el) => {
     const style = getComputedStyle(el);
     const rect = el.getBoundingClientRect();
     return {
       display: style.display,
       visibility: style.visibility,
       opacity: style.opacity,
-      transform: style.transform,
+      backgroundColor: style.backgroundColor,
+      backgroundImage: style.backgroundImage,
       width: rect.width,
       height: rect.height,
       x: rect.x,
       y: rect.y,
     };
   });
-  console.log("PUBLIC_DEMO_HERO_SHOWCASE", JSON.stringify(heroShowcaseState));
-  await expect(heroShowcase).toBeVisible();
-  expect(heroShowcaseState.width).toBeGreaterThan(300);
-  expect(heroShowcaseState.height).toBeGreaterThan(400);
+  console.log("PUBLIC_DEMO_HERO_PRODUCT", JSON.stringify(heroProductState));
+  expect(heroProductState.width).toBeGreaterThan(300);
+  expect(heroProductState.height).toBeGreaterThan(400);
+  expect(heroProductState.backgroundImage).not.toBe("none");
 
   await expect(page.getByRole("link", { name: "Specialties" })).toHaveAttribute("href", "https://dasmarketingsolution.com/#specialties");
   await expect(page.getByRole("link", { name: "Clients" })).toHaveAttribute("href", "https://dasmarketingsolution.com/#portfolio");
