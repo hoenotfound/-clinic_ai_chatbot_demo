@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: 20
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Run regression tests
@@ -25,6 +25,7 @@ jobs:
           node --check src/server.js
           node --check src/demoState.js
           node --check src/aiService.js
+          node --check src/sharedState.js
           node --check public/app.js
           node --check public/portal-data.js
           node --check public/portal-demo.js
