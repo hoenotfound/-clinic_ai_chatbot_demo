@@ -298,6 +298,9 @@
   box-shadow: 0 30px 70px rgba(11,13,12,.22), 0 0 0 1px rgba(255,255,255,.08) inset;
 }
 
+/* The server still uses this empty legacy boundary to inject the React dashboard. */
+#live-demo + .proof-grid { display: none !important; }
+
 /* Capability section: explicitly framed as product experience, not social proof. */
 .capabilities-section { margin-top: clamp(54px, 7vw, 86px); }
 .section-intro {
@@ -330,8 +333,8 @@
   font-size: 13px;
   line-height: 1.7;
 }
-.proof-grid { margin-top: 0; }
-.proof-grid p { font-size: 12px; line-height: 1.7; }
+.capability-cards { margin-top: 0; }
+.capability-cards p { font-size: 12px; line-height: 1.7; }
 
 /* Final CTA becomes an outcome-oriented consultation block. */
 .sales-cta {
@@ -470,7 +473,7 @@ input:focus-visible {
   .section-intro { margin-inline: 18px; }
   .section-intro h2 { font-size: 36px; }
   .section-intro > p:last-child { font-size: 12px; }
-  .proof-grid p { font-size: 11.5px; }
+  .capability-cards p { font-size: 11.5px; }
 
   .sales-cta h2 { font-size: 34px; }
   .sales-cta p:not(.eyebrow) { font-size: 12px; }
