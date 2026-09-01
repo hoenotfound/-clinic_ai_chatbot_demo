@@ -16,6 +16,10 @@ async function openDashboard(page) {
   return frame;
 }
 
+function pipelineFilter(frame, label) {
+  return frame.getByRole("button", { name: new RegExp(`^${label} \\d+$`) });
+}
+
 test("prospect completes the live journey through the React production-style portal", async ({ page }) => {
   const browserErrors = collectBrowserErrors(page);
   await page.goto("/");
@@ -30,33 +34,31 @@ test("prospect completes the live journey through the React production-style por
 
   const frame = await openDashboard(page);
 
-  // Actual channel SVG badge from the production ContactAvatar component.
   await expect(frame.locator('[aria-label="WhatsApp"] svg').first()).toBeVisible();
 
-  // Inbox search + status/channel/owner filters are real React state, not demo toasts.
   const search = frame.getByPlaceholder("Search conversations");
   await search.fill("林美玲");
   await expect(frame.getByRole("button", { name: /林美玲 Mei Ling/ })).toBeVisible();
   await expect(frame.getByRole("button", { name: /Amanda Lee/ })).toHaveCount(0);
   await search.fill("");
 
-  await frame.getByRole("button", { name: /Needs attention/ }).click();
-  await expect(frame.getByRole("button", { name: /Daniel Wong/ })).toBeVisible();
-  await frame.getByRole("button", { name: /^All / }).click();
+  const inbox = frame.locator('aside[aria-label="Conversation inbox"]');
+  await inbox.getByRole("button", { name: /Needs attention/ }).click();
+  await expect(inbox.getByRole("button", { name: /Daniel Wong/ })).toBeVisible();
+  await inbox.getByRole("button", { name: /^All / }).click();
 
-  const inboxSelects = frame.locator('aside[aria-label="Conversation inbox"] select');
+  const inboxSelects = inbox.locator("select");
   await inboxSelects.nth(0).selectOption("instagram");
-  await expect(frame.getByRole("button", { name: /Amanda Lee/ })).toBeVisible();
-  await expect(frame.getByRole("button", { name: /Nur Aisyah/ })).toHaveCount(0);
+  await expect(inbox.getByRole("button", { name: /Amanda Lee/ })).toBeVisible();
+  await expect(inbox.getByRole("button", { name: /Nur Aisyah/ })).toHaveCount(0);
   await inboxSelects.nth(0).selectOption("all");
   await inboxSelects.nth(1).selectOption("human");
-  await expect(frame.getByRole("button", { name: /Daniel Wong/ })).toBeVisible();
+  await expect(inbox.getByRole("button", { name: /Daniel Wong/ })).toBeVisible();
   await inboxSelects.nth(1).selectOption("all");
 
-  const inboxScroll = frame.locator('aside[aria-label="Conversation inbox"] > div').last();
+  const inboxScroll = inbox.locator(':scope > div').last();
   expect(await inboxScroll.evaluate((el) => el.scrollHeight > el.clientHeight)).toBeTruthy();
 
-  // Pipeline uses the production Kanban/card geometry and every filter works.
   await frame.getByRole("link", { name: "Pipeline" }).click();
   await expect(frame.getByRole("heading", { name: "Lead Pipeline" })).toBeVisible();
   const checks = [
@@ -68,10 +70,10 @@ test("prospect completes the live journey through the React production-style por
     ["Needs attention", "Daniel Wong"],
   ];
   for (const [filter, lead] of checks) {
-    await frame.getByRole("button", { name: new RegExp(`^${filter}`) }).click();
-    await expect(frame.getByRole("button", { name: new RegExp(lead) })).toBeVisible();
+    await pipelineFilter(frame, filter).click();
+    await expect(frame.getByRole("button", { name: new RegExp(lead) }).first()).toBeVisible();
   }
-  await frame.getByRole("button", { name: /^All leads/ }).click();
+  await pipelineFilter(frame, "All leads").click();
   const desktopKanban = frame.locator("main.hidden.min-h-0.flex-1.overflow-x-auto");
   expect(await desktopKanban.evaluate((el) => el.scrollWidth > el.clientWidth)).toBeTruthy();
 
@@ -85,9 +87,9 @@ test("prospect completes the live journey through the React production-style por
   await frame.getByRole("button", { name: /Automatic Lead Temperature/ }).first().click();
   await expect(frame.getByRole("heading", { name: "Prioritise the enquiries most likely to book" })).toBeVisible();
 
-  // The React Inbox controls the same live browser session as Patient View.
   await frame.getByRole("link", { name: "Inbox" }).click();
-  await frame.getByRole("button", { name: /Demo Patient/ }).click();
+  const liveInbox = frame.locator('aside[aria-label="Conversation inbox"]');
+  await liveInbox.getByRole("button", { name: /Demo Patient/ }).click();
   await frame.getByRole("button", { name: /Take over/i }).click();
   await expect(frame.getByRole("button", { name: /Return to AI/i })).toBeVisible();
   const reply = frame.getByPlaceholder("Reply to patient…");
@@ -107,15 +109,19 @@ test("mobile React dashboard keeps production list-to-thread behavior", async ({
   await page.goto("/");
   const frame = await openDashboard(page);
 
-  await expect(frame.locator('aside[aria-label="Conversation inbox"]')).toBeVisible();
-  await frame.getByRole("button", { name: /Nur Aisyah/ }).click();
-  await expect(frame.getByRole("heading", { name: "Nur Aisyah" })).toBeVisible();
-  await frame.locator('section[aria-label="Conversation with Nur Aisyah"] button').first().click();
-  await expect(frame.locator('aside[aria-label="Conversation inbox"]')).toBeVisible();
+  const inbox = frame.locator('aside[aria-label="Conversation inbox"]');
+  await expect(inbox).toBeVisible();
+  await inbox.getByRole("button", { name: /Nur Aisyah/ }).click();
+
+  const thread = frame.locator('section[aria-label="Conversation with Nur Aisyah"]');
+  await expect(thread).toBeVisible();
+  await expect(thread.getByRole("heading", { name: "Nur Aisyah" })).toBeVisible();
+  await thread.getByRole("button").first().click();
+  await expect(inbox).toBeVisible();
 
   await frame.getByRole("link", { name: "Pipeline" }).click();
   await expect(frame.getByRole("heading", { name: "Lead Pipeline" })).toBeVisible();
-  await expect(frame.getByRole("button", { name: /New Enquiry/ })).toBeVisible();
+  await expect(frame.getByRole("button", { name: /New Enquiry/ }).first()).toBeVisible();
 
   expect(browserErrors, `Browser errors: ${browserErrors.join("\n")}`).toEqual([]);
 });
