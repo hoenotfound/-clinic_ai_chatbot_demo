@@ -95,6 +95,16 @@ html[data-can-reply-leads="false"] section[aria-label^="Conversation with "]::af
 }
 
 @media (max-width: 639px) {
+  /*
+    Mobile dashboard readability floor.
+    A few dense dashboard surfaces used 8–9px utility text, which reads like a
+    desktop UI scaled down when embedded in the demo. Keep compact metadata small,
+    but never smaller than 9px and make ordinary micro-labels at least 10px.
+  */
+  .text-\[8px\] { font-size: 9px !important; }
+  .text-\[9px\] { font-size: 10px !important; }
+  .text-\[10px\] { font-size: 10.5px !important; }
+
   div:has(> svg[aria-label$="over time"]) {
     overflow-x: auto;
     overscroll-behavior-x: contain;
