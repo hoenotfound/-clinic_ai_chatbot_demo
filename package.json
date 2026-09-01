@@ -12,6 +12,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "build:dashboard": "npm install --prefix portal-react --include=dev --no-audit --no-fund && npm --prefix portal-react run build",
+    "postinstall": "npm run build:dashboard",
     "test": "node --test",
     "test:e2e": "playwright test"
   },
