@@ -17,7 +17,8 @@ test("mobile CTA is centered and capability cards keep premium spacing", async (
       };
     });
 
-    expect(headerCta.display).toBe("inline-flex");
+    // An inline-flex element is blockified to `flex` when it is itself a flex item.
+    expect(["flex", "inline-flex"]).toContain(headerCta.display);
     expect(headerCta.alignItems).toBe("center");
     expect(headerCta.justifyContent).toBe("center");
     expect(headerCta.height).toBeGreaterThanOrEqual(43.5);
