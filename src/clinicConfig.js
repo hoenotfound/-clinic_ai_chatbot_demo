@@ -1,8 +1,8 @@
 module.exports = {
-  clinicName: "Nova Aesthetic Clinic",
+  clinicName: "Nova Demo Aesthetic Clinic",
   assistantName: "Avery",
   location: "Kuala Lumpur, Malaysia",
-  introMessage: "Hi, I'm Avery from Nova Aesthetic Clinic! 😊",
+  introMessage: "Hi, I'm Avery from Nova Demo Aesthetic Clinic! 😊",
   consultation: "Complimentary consultation with our clinic team",
   hours: "Monday to Saturday, 10:00 AM to 7:00 PM",
   branches: [
