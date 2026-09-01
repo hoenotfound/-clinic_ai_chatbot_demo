@@ -1,0 +1,574 @@
+/*
+  Demo-first UX refinement.
+  Scope: public marketing shell + Patient View only.
+  Clinic Dashboard remains isolated inside /dashboard iframe.
+*/
+
+/* Bring the product interaction forward. */
+.homepage-hero {
+  min-height: 760px;
+  padding-bottom: 58px;
+}
+
+.hero-showcase {
+  padding-right: 0;
+}
+
+.hero-product-card {
+  min-height: 570px;
+}
+
+.demo-section {
+  margin-top: 10px;
+  margin-bottom: 78px;
+}
+
+.demo-section .section-heading {
+  display: block;
+  max-width: 780px;
+  margin-bottom: 30px;
+}
+
+.demo-section .section-heading > p {
+  max-width: 720px;
+  margin: 15px 0 0;
+}
+
+/* The demo should feel like the page, not another dashboard nested inside it. */
+.experience-card {
+  border-radius: 30px;
+  box-shadow: 0 30px 80px -44px rgba(15, 23, 42, .3);
+}
+
+.experience-toolbar {
+  min-height: 78px;
+  padding: 17px 24px;
+}
+
+.experience-tabs {
+  background: #fff;
+}
+
+.experience-tab {
+  min-height: 82px;
+}
+
+.patient-layout {
+  min-height: 720px;
+  display: grid;
+  grid-template-columns: 370px minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "channels device"
+    "prompts device";
+  background: #fff;
+}
+
+.channel-panel {
+  grid-area: channels;
+  padding: 28px 30px 22px;
+  border-right: 1px solid var(--slate-100);
+  border-bottom: 1px solid var(--slate-100);
+  background: #fff;
+}
+
+.prompt-panel {
+  grid-area: prompts;
+  padding: 25px 30px 30px;
+  border-right: 1px solid var(--slate-100);
+  background: #fff;
+}
+
+.prompt-panel .try-box {
+  margin: 0;
+}
+
+.channel-preview-note {
+  margin-top: 9px;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.device-stage {
+  grid-area: device;
+  justify-content: flex-start;
+  padding: 28px 42px 38px;
+}
+
+/* Replace the large instruction card with one compact adaptive progress strip. */
+.tour-card {
+  width: min(430px, 100%);
+  margin: 0 auto 13px;
+  padding: 13px 15px 12px;
+  border-radius: 16px;
+  background: var(--brand-blue);
+  box-shadow: 0 16px 30px -24px rgba(15, 23, 42, .65);
+}
+
+.tour-heading {
+  align-items: center;
+}
+
+.tour-heading div > span {
+  color: #93c5fd;
+  font-size: 8px;
+  letter-spacing: .14em;
+}
+
+.tour-heading div > strong {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+#tourProgress {
+  padding: 5px 8px;
+  font-size: 8px;
+}
+
+.tour-steps {
+  margin: 11px 0 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.tour-steps li {
+  display: block;
+  opacity: 1;
+}
+
+.tour-steps li > span {
+  width: 100%;
+  height: 4px;
+  display: block;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255,255,255,.12);
+  color: transparent;
+  font-size: 0;
+}
+
+.tour-steps li div {
+  display: none;
+}
+
+.tour-steps li.current > span {
+  background: #3b82f6;
+}
+
+.tour-steps li.complete > span {
+  background: #34d399;
+}
+
+.device-stage-heading {
+  margin-bottom: 12px;
+}
+
+.suggestion-list {
+  gap: 7px;
+}
+
+.suggestion-chip {
+  min-height: 50px;
+  grid-template-columns: 54px 1fr auto;
+  border-radius: 13px;
+}
+
+/* The workflow now supports the demo instead of delaying it. */
+.journey-strip {
+  margin-top: 0;
+  margin-bottom: 104px;
+}
+
+.journey-strip article {
+  min-height: 104px;
+  padding: 22px 24px;
+}
+
+.journey-strip strong {
+  font-size: 14px;
+}
+
+.journey-strip small {
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+/* Shorter feature cards: enough evidence without extending the page unnecessarily. */
+.capabilities-section {
+  margin-bottom: 96px;
+}
+
+.capability-grid {
+  gap: 22px;
+}
+
+.capability-card {
+  min-height: 390px;
+  padding: 32px;
+}
+
+.capability-icon {
+  width: 50px;
+  height: 50px;
+  margin-bottom: 26px;
+  border-radius: 15px;
+  font-size: 19px;
+}
+
+.capability-card h3 {
+  font-size: 23px;
+}
+
+.capability-card p {
+  margin-top: 15px;
+  line-height: 1.65;
+}
+
+.capability-card ul {
+  margin-top: 23px;
+  padding-top: 20px;
+  gap: 10px;
+}
+
+/* Slightly leaner final conversion panel. */
+.sales-cta {
+  min-height: 390px;
+  padding-top: 62px;
+  padding-bottom: 62px;
+}
+
+@media (max-width: 1120px) {
+  .patient-layout {
+    grid-template-columns: 340px minmax(0, 1fr);
+  }
+
+  .channel-panel,
+  .prompt-panel {
+    padding-left: 26px;
+    padding-right: 26px;
+  }
+}
+
+@media (max-width: 900px) {
+  .homepage-hero {
+    padding-bottom: 50px;
+    gap: 48px;
+  }
+
+  .hero-product-card {
+    min-height: 560px;
+  }
+
+  .demo-section {
+    margin-bottom: 66px;
+  }
+
+  .patient-layout {
+    min-height: 0;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    grid-template-areas:
+      "channels"
+      "device"
+      "prompts";
+  }
+
+  .channel-panel,
+  .prompt-panel {
+    border-right: 0;
+  }
+
+  .channel-panel {
+    border-bottom: 1px solid var(--slate-100);
+  }
+
+  .prompt-panel {
+    border-top: 1px solid var(--slate-100);
+  }
+
+  .device-stage {
+    padding-top: 30px;
+    padding-bottom: 36px;
+  }
+
+  .journey-strip {
+    margin-bottom: 82px;
+  }
+
+  .capability-card {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .homepage-hero {
+    padding-top: 108px;
+    padding-bottom: 38px;
+    gap: 34px;
+  }
+
+  .scaling-pill {
+    margin-bottom: 20px;
+  }
+
+  .hero-main h1 {
+    font-size: clamp(41px, 12.3vw, 56px);
+  }
+
+  .hero-copy {
+    margin-top: 21px;
+  }
+
+  .hero-actions {
+    margin-top: 27px;
+    gap: 15px;
+  }
+
+  .hero-footnote {
+    margin-top: 22px;
+  }
+
+  .hero-product-card {
+    min-height: 475px;
+    padding: 22px;
+  }
+
+  .hero-chat-flow {
+    margin-top: 34px;
+  }
+
+  .hero-product-caption {
+    left: 22px;
+    right: 22px;
+    bottom: 21px;
+  }
+
+  .hero-product-caption strong {
+    font-size: 27px;
+  }
+
+  .demo-section {
+    margin-top: 0;
+    margin-bottom: 58px;
+  }
+
+  .demo-section .section-heading {
+    margin-bottom: 22px;
+  }
+
+  .demo-section .section-heading h2 {
+    font-size: 35px;
+  }
+
+  .experience-toolbar {
+    min-height: 66px;
+    padding: 13px 14px;
+  }
+
+  .experience-tab {
+    min-height: 70px;
+  }
+
+  .channel-panel {
+    padding: 18px 15px 16px;
+  }
+
+  .channel-preview-note {
+    margin: 8px 2px 0;
+    font-size: 9px;
+  }
+
+  .device-stage {
+    padding: 19px 8px 26px;
+  }
+
+  .tour-card {
+    width: calc(100% - 12px);
+    margin-bottom: 10px;
+    padding: 11px 12px 10px;
+    border-radius: 14px;
+  }
+
+  .tour-heading div > span {
+    font-size: 7px;
+  }
+
+  .tour-heading div > strong {
+    font-size: 10px;
+  }
+
+  .tour-steps {
+    margin-top: 9px;
+  }
+
+  .device-stage-heading {
+    width: calc(100% - 14px);
+    margin-bottom: 9px;
+  }
+
+  .phone {
+    height: 610px;
+  }
+
+  .privacy-note {
+    margin-top: 12px;
+  }
+
+  .prompt-panel {
+    padding: 19px 15px 20px;
+  }
+
+  .suggestion-list {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .suggestion-chip {
+    min-height: 72px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 5px;
+    padding: 11px;
+    border-radius: 13px;
+  }
+
+  .suggestion-chip > span {
+    font-size: 7px;
+  }
+
+  .suggestion-chip > strong {
+    font-size: 9px;
+  }
+
+  .suggestion-chip > b {
+    display: none;
+  }
+
+  /* Four workflow stages in two rows instead of four tall stacked cards. */
+  .journey-strip {
+    width: calc(100% - 28px);
+    margin-bottom: 66px;
+    grid-template-columns: 1fr 1fr;
+    border-radius: 20px;
+  }
+
+  .journey-strip article {
+    min-height: 108px;
+    display: block;
+    padding: 17px;
+  }
+
+  .journey-strip article + article {
+    border-left: 1px solid var(--slate-100);
+    border-top: 0;
+  }
+
+  .journey-strip article:nth-child(3) {
+    border-left: 0;
+    border-top: 1px solid var(--slate-100);
+  }
+
+  .journey-strip article:nth-child(4) {
+    border-top: 1px solid var(--slate-100);
+  }
+
+  .journey-strip article > span {
+    display: block;
+    margin-bottom: 9px;
+  }
+
+  .journey-strip strong {
+    font-size: 12px;
+  }
+
+  .journey-strip small {
+    margin-top: 4px;
+    font-size: 9px;
+  }
+
+  .capabilities-section {
+    margin-bottom: 64px;
+  }
+
+  .capabilities-section .section-heading {
+    margin-bottom: 26px;
+  }
+
+  .capability-grid {
+    gap: 12px;
+  }
+
+  .capability-card {
+    padding: 23px;
+    border-radius: 20px;
+  }
+
+  .capability-icon {
+    width: 43px;
+    height: 43px;
+    margin-bottom: 19px;
+    border-radius: 13px;
+  }
+
+  .capability-card h3 {
+    margin-top: 11px;
+    font-size: 20px;
+  }
+
+  .capability-card p {
+    margin-top: 11px;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .capability-card ul {
+    margin-top: 17px;
+    padding-top: 15px;
+    gap: 8px;
+  }
+
+  .capability-card li {
+    font-size: 10px;
+  }
+
+  .sales-cta {
+    margin-bottom: 58px;
+    padding: 32px 22px;
+    gap: 26px;
+  }
+
+  .sales-cta h2 {
+    font-size: 36px;
+  }
+
+  .sales-cta-trust {
+    margin-top: 22px;
+  }
+
+  /* Remove the card-within-card effect on small screens. */
+  .sales-cta-actions {
+    max-width: none;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  .sales-cta-button {
+    width: 100%;
+  }
+
+  .sales-cta-actions small {
+    color: #94a3b8;
+  }
+
+  /* Avoid covering the product on mobile. */
+  .floating-enquiry {
+    display: none;
+  }
+}
