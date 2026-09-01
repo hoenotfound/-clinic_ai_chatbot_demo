@@ -3,46 +3,81 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Try a live AI clinic receptionist across WhatsApp, Instagram and Messenger customer experiences." />
+  <meta name="description" content="Try DA Smarketing's live AI clinic receptionist demo across WhatsApp, Instagram and Messenger, from first enquiry to lead qualification and human takeover." />
   <meta name="robots" content="noindex, nofollow, noarchive" />
-  <title>AI Clinic Receptionist Demo</title>
+  <title>AI Clinic Receptionist Demo | DA Smarketing</title>
   <link rel="stylesheet" href="/styles.css" />
   <link rel="stylesheet" href="/mobile.css" />
   <link rel="stylesheet" href="/sales-demo.css" />
+  <link rel="stylesheet" href="/refinement.css" />
 </head>
 <body>
   <div class="page-shell">
     <header class="topbar">
-      <a class="brand" href="#" aria-label="AI Clinic Demo home">
-        <span class="brand-mark">AI</span>
-        <span>
-          <strong>Clinic AI Demo</strong>
-          <small>Interactive customer journey</small>
+      <a class="brand" href="#" aria-label="DA Smarketing AI Demo home">
+        <span class="brand-mark" aria-hidden="true">DA</span>
+        <span class="brand-copy">
+          <strong>DA SMARKETING</strong>
+          <small>AI Receptionist Demo</small>
         </span>
       </a>
       <div class="topbar-actions">
         <span class="live-pill"><span class="live-dot"></span> Live AI demo</span>
-        <button id="newDemoButton" class="button button-secondary" type="button">Start new demo</button>
+        <a class="button button-secondary header-sales-link" href="#salesCta">Talk to us</a>
       </div>
     </header>
 
     <main>
       <section class="hero">
-        <div>
-          <p class="eyebrow">TRY THE FULL EXPERIENCE</p>
-          <h1>See how an AI receptionist handles a clinic lead from first message to staff takeover.</h1>
-          <p class="hero-copy">Chat as the patient, then switch to the clinic dashboard to see the same conversation, lead temperature, booking intent and human handoff in real time.</p>
-        </div>
-        <div class="hero-note">
-          <span class="hero-note-icon">✦</span>
-          <div>
-            <strong>Interactive sample clinic</strong>
-            <p>Nova Demo Aesthetic Clinic is a fictional demo brand. A live deployment connects to your own clinic information and messaging channels.</p>
+        <div class="hero-main">
+          <p class="eyebrow">AI AUTOMATION FOR AESTHETIC CLINICS</p>
+          <h1>Turn clinic enquiries into qualified leads — automatically.</h1>
+          <p class="hero-copy">See the full customer journey: a patient messages your clinic, the AI answers using your configured knowledge, detects buying intent, updates the lead, and hands the conversation to staff when a human is needed.</p>
+          <div class="hero-actions">
+            <a class="button hero-primary-action" href="#live-demo">Try the live demo <span aria-hidden="true">↓</span></a>
+            <a class="hero-secondary-action" href="#salesCta">Talk to an AI automation expert <span aria-hidden="true">↗</span></a>
+          </div>
+          <div class="hero-capabilities" aria-label="Demo capabilities">
+            <span>WhatsApp</span>
+            <span>Instagram</span>
+            <span>Messenger</span>
+            <span>Lead qualification</span>
+            <span>Human takeover</span>
           </div>
         </div>
+        <aside class="hero-note" aria-label="What this demo includes">
+          <div class="hero-note-top">
+            <span class="hero-note-icon" aria-hidden="true">✦</span>
+            <span class="hero-note-kicker">LIVE PRODUCT DEMO</span>
+          </div>
+          <div class="hero-note-content">
+            <strong>Test both sides of the conversation.</strong>
+            <p>Chat as a patient, then open the Clinic Dashboard to see what your team sees in real time.</p>
+            <ul class="hero-note-list">
+              <li><span></span>Live AI replies</li>
+              <li><span></span>Intent + lead temperature</li>
+              <li><span></span>Staff takeover</li>
+            </ul>
+          </div>
+          <p class="hero-disclosure">Nova Demo Aesthetic Clinic is fictional. No real appointment or patient record is created.</p>
+        </aside>
       </section>
 
-      <section class="experience-card">
+      <section class="value-strip" aria-label="Demo overview">
+        <div><strong>01</strong><span>Reply instantly</span><small>Configured clinic knowledge</small></div>
+        <div><strong>02</strong><span>Identify intent</span><small>Service, pricing & booking signals</small></div>
+        <div><strong>03</strong><span>Keep context</span><small>Conversation summary & lead status</small></div>
+        <div><strong>04</strong><span>Escalate safely</span><small>Human takeover when needed</small></div>
+      </section>
+
+      <section id="live-demo" class="experience-card">
+        <div class="experience-toolbar">
+          <div class="experience-heading">
+            <span class="experience-kicker">LIVE PRODUCT DEMO</span>
+            <strong>Experience the customer journey</strong>
+          </div>
+          <button id="newDemoButton" class="demo-reset-button" type="button">↻ Restart demo</button>
+        </div>
         <div class="experience-tabs" role="tablist" aria-label="Demo view">
           <button id="patientTab" class="experience-tab active" type="button" role="tab" aria-selected="true">
             <span>01</span>
@@ -61,23 +96,23 @@
               <p class="section-label">Choose a channel</p>
               <div class="channel-buttons" role="group" aria-label="Messaging channel experience">
                 <button class="channel-button active" data-channel="whatsapp" type="button">
-                  <span class="channel-icon whatsapp-icon">W</span>
+                  <span class="channel-icon whatsapp-icon" aria-hidden="true">W</span>
                   <span><strong>WhatsApp</strong><small>Customer chat</small></span>
                 </button>
                 <button class="channel-button" data-channel="instagram" type="button">
-                  <span class="channel-icon instagram-icon">◎</span>
+                  <span class="channel-icon instagram-icon" aria-hidden="true">◎</span>
                   <span><strong>Instagram</strong><small>Customer DM</small></span>
                 </button>
                 <button class="channel-button" data-channel="facebook" type="button">
-                  <span class="channel-icon facebook-icon">M</span>
+                  <span class="channel-icon facebook-icon" aria-hidden="true">M</span>
                   <span><strong>Messenger</strong><small>Customer chat</small></span>
                 </button>
               </div>
-              <p class="channel-preview-note">Channel preview only — this demo keeps the same conversation when you switch channels for convenience. Live deployments keep real platform identities separate unless identity linking is configured.</p>
+              <p class="channel-preview-note">Channel preview only. The demo keeps one conversation when you switch channels for convenience; real deployments keep platform identities separate unless identity linking is configured.</p>
 
               <div id="tourCard" class="tour-card">
                 <div class="tour-heading">
-                  <div><span>60-second tour</span><strong id="tourStatus">Start with a patient question</strong></div>
+                  <div><span>60-second guided test</span><strong id="tourStatus">Start with a patient question</strong></div>
                   <span id="tourProgress">0 / 4</span>
                 </div>
                 <ol class="tour-steps">
@@ -97,8 +132,8 @@
               </div>
 
               <div class="demo-explainer">
-                <strong>How this demo works</strong>
-                <p>This interactive sample recreates the customer experience across three channels. A live clinic deployment connects directly to your real messaging accounts.</p>
+                <strong>Built for the real handoff</strong>
+                <p>The customer-facing AI is only half the experience. Switch to Clinic Dashboard to see the same conversation, lead context and staff controls.</p>
               </div>
             </aside>
 
@@ -261,17 +296,37 @@
       </section>
 
       <section class="proof-grid">
-        <article><span>01</span><h3>One AI, multiple channels</h3><p>The same reply engine can sit behind WhatsApp, Instagram and Messenger when the real client connections are configured.</p></article>
-        <article><span>02</span><h3>Lead context stays visible</h3><p>Staff can see what the patient wants, how strong the intent is and what the conversation has already covered.</p></article>
-        <article><span>03</span><h3>Human takeover when needed</h3><p>When the AI reaches a sensitive or staff-only situation, the dashboard can surface it and let a human continue the conversation.</p></article>
       </section>
-      <section id="salesCta" class="sales-cta">
-        <div>
-          <p class="eyebrow">READY FOR YOUR CLINIC?</p>
-          <h2>Want this trained with your treatments, prices, promotions and branches?</h2>
-          <p>We can configure the same AI receptionist around your clinic and connect it to your real customer messaging channels.</p>
+
+      <section class="capabilities-section" aria-labelledby="capabilitiesTitle">
+        <div class="section-intro">
+          <p class="eyebrow">WHAT YOU’LL EXPERIENCE</p>
+          <h2 id="capabilitiesTitle">More than an auto-reply bot.</h2>
+          <p>The demo is designed to show the workflow that matters after a customer sends the first message — context, qualification and the moment your team needs to step in.</p>
         </div>
-        <a id="salesCtaButton" class="button button-primary sales-cta-button" href="#">Set up my clinic</a>
+        <div class="proof-grid capability-cards">
+          <article><span>01</span><h3>One AI, multiple channels</h3><p>The same configured reply engine can power WhatsApp, Instagram and Messenger once your real business accounts are connected.</p></article>
+          <article><span>02</span><h3>Lead context stays visible</h3><p>Your team can see what the customer wants, the strength of their intent and what the conversation has already covered.</p></article>
+          <article><span>03</span><h3>Human takeover when it matters</h3><p>Sensitive, complex or high-intent conversations can be surfaced for staff so a human can continue from the same context.</p></article>
+        </div>
+      </section>
+
+      <section id="salesCta" class="sales-cta">
+        <div class="sales-cta-copy">
+          <p class="eyebrow">READY FOR YOUR CLINIC?</p>
+          <h2>Build an AI front desk around the way your clinic actually sells.</h2>
+          <p>Train it on your treatments, prices, promotions, branches and escalation rules — then connect it to the messaging channels your customers already use.</p>
+          <div class="sales-cta-trust" aria-label="Setup highlights">
+            <span>Clinic-specific knowledge</span>
+            <span>Human takeover</span>
+            <span>Lead qualification</span>
+          </div>
+        </div>
+        <div class="sales-cta-actions">
+          <span class="sales-response-label"><i></i> Direct consultation</span>
+          <a id="salesCtaButton" class="button button-primary sales-cta-button" href="#">Set up my clinic</a>
+          <small>We’ll map the workflow around your clinic before connecting any live channel.</small>
+        </div>
       </section>
     </main>
 

@@ -1,0 +1,492 @@
+/* Final public-demo refinement layer.
+   Scope: outer DA Smarketing demo shell + Patient View only.
+   The Clinic Dashboard is rendered in a separate iframe and is intentionally untouched. */
+
+/* Semantic brand lockup — neutralise the earlier CSS-generated replacement text. */
+.brand-mark {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: -.055em;
+}
+.brand-mark::before,
+.brand-mark::after,
+.brand strong::after { display: none !important; content: none !important; }
+.brand strong {
+  display: block;
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: .065em;
+  font-weight: 900;
+}
+.brand small {
+  display: block;
+  margin-top: 5px;
+  color: #6f7571;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: .025em;
+}
+.header-sales-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding-inline: 18px;
+  text-decoration: none;
+  background: #0b0d0c;
+  color: #fff;
+}
+.header-sales-link::after {
+  content: "↗";
+  margin-left: 9px;
+  font-size: 11px;
+}
+
+/* Stronger, more conversion-led hero. */
+.hero {
+  align-items: stretch;
+  padding-top: clamp(54px, 7vw, 88px);
+  padding-bottom: clamp(48px, 6vw, 70px);
+}
+.hero::before {
+  width: 30rem;
+  height: 30rem;
+  right: -10rem;
+  top: -13rem;
+  opacity: .72;
+}
+.hero::after {
+  opacity: .055;
+  background-size: 76px 76px;
+  mask-image: linear-gradient(to right, transparent 0, #000 58%, #000 100%);
+}
+.hero-main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.hero h1 {
+  max-width: 930px;
+  font-size: clamp(44px, 5.3vw, 78px);
+}
+.hero-copy {
+  max-width: 780px;
+  font-size: clamp(16px, 1.3vw, 18px);
+}
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+  margin-top: 30px;
+}
+.hero-primary-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 13px;
+  min-height: 48px;
+  padding: 13px 18px;
+  border: 1px solid var(--brand-accent);
+  border-radius: 6px;
+  background: var(--brand-accent);
+  color: var(--brand-ink);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 900;
+}
+.hero-primary-action:hover {
+  background: var(--brand-accent-strong);
+  border-color: var(--brand-accent-strong);
+  box-shadow: 0 10px 30px rgba(200,255,72,.14);
+}
+.hero-secondary-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  color: rgba(255,255,255,.84);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255,255,255,.32);
+  font-size: 12px;
+  font-weight: 750;
+}
+.hero-secondary-action:hover { color: #fff; border-color: var(--brand-accent); }
+.hero-capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 36px;
+}
+.hero-capabilities span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 29px;
+  padding: 6px 9px;
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 4px;
+  color: rgba(255,255,255,.64);
+  background: rgba(255,255,255,.035);
+  font-size: 10.5px;
+  line-height: 1;
+  font-weight: 650;
+}
+.hero-note {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  min-height: 100%;
+  padding: 24px;
+}
+.hero-note::before { display: none; }
+.hero-note-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.hero-note-kicker {
+  color: rgba(255,255,255,.5);
+  font-size: 10px;
+  letter-spacing: .14em;
+  font-weight: 850;
+}
+.hero-note-content { margin-top: auto; padding-top: 44px; }
+.hero-note-content strong {
+  display: block;
+  max-width: 270px;
+  font-size: 22px;
+  line-height: 1.05;
+  letter-spacing: -.035em;
+}
+.hero-note-content p {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.hero-note-list {
+  display: grid;
+  gap: 9px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  color: rgba(255,255,255,.76);
+  font-size: 11px;
+}
+.hero-note-list li { display: flex; align-items: center; gap: 9px; }
+.hero-note-list li > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--brand-accent);
+  box-shadow: 0 0 0 3px rgba(200,255,72,.08);
+}
+.hero-disclosure {
+  margin: 28px 0 0;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255,255,255,.1);
+  color: rgba(255,255,255,.44);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+/* Compact product-value strip — feature proof, not fabricated social proof. */
+.value-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 18px;
+  border: 1px solid rgba(11,13,12,.1);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #dfe2dc;
+  gap: 1px;
+}
+.value-strip > div {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 11px;
+  row-gap: 3px;
+  align-items: center;
+  padding: 17px 18px;
+  background: rgba(250,251,247,.96);
+}
+.value-strip strong {
+  grid-row: span 2;
+  color: #8b928d;
+  font-size: 10px;
+  letter-spacing: .04em;
+}
+.value-strip span {
+  color: #1c201d;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+.value-strip small {
+  color: #7b827d;
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+/* Demo toolbar keeps utility actions out of the global sales header. */
+.experience-card { scroll-margin-top: 96px; }
+.experience-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 20px;
+  border-bottom: 1px solid #e3e6e0;
+  background: #fff;
+}
+.experience-heading { display: grid; gap: 4px; }
+.experience-kicker {
+  color: #747b76;
+  font-size: 9.5px;
+  letter-spacing: .13em;
+  font-weight: 850;
+}
+.experience-heading strong {
+  color: #151815;
+  font-size: 14px;
+  letter-spacing: -.015em;
+}
+.demo-reset-button {
+  border: 1px solid #d8ddd6;
+  border-radius: 6px;
+  background: #f8f9f5;
+  color: #59605b;
+  min-height: 36px;
+  padding: 8px 11px;
+  font-size: 10.5px;
+  font-weight: 750;
+}
+.demo-reset-button:hover { background: #eef1eb; color: #151815; }
+
+/* Readability pass: premium interfaces should not rely on 8px copy. */
+.channel-button strong { font-size: 13px; }
+.channel-button small { font-size: 11px; }
+.channel-preview-note {
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+.tour-heading div > span { font-size: 9.5px; }
+.tour-heading strong { font-size: 12px; line-height: 1.4; }
+#tourProgress { font-size: 10px; }
+.tour-steps li { font-size: 10.5px; line-height: 1.4; }
+.suggestion-chip {
+  min-height: 39px;
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+.demo-explainer strong { font-size: 11.5px; }
+.demo-explainer p { font-size: 10.5px; line-height: 1.6; }
+.device-caption { font-size: 10.5px; }
+.privacy-note {
+  font-size: 10px;
+  line-height: 1.5;
+}
+.section-label { font-size: 10px; }
+
+/* Reduce decorative SaaS feel around the device; keep the product itself dominant. */
+.device-stage {
+  background:
+    radial-gradient(circle at 50% 26%, rgba(200,255,72,.12), transparent 22rem),
+    linear-gradient(180deg, #f3f5ef 0%, #eef1eb 100%);
+}
+.device-stage::after { opacity: .035; }
+.phone {
+  box-shadow: 0 30px 70px rgba(11,13,12,.22), 0 0 0 1px rgba(255,255,255,.08) inset;
+}
+
+/* The server still uses this empty legacy boundary to inject the React dashboard. */
+#live-demo + .proof-grid { display: none !important; }
+
+/* Capability section: explicitly framed as product experience, not social proof. */
+.capabilities-section { margin-top: clamp(54px, 7vw, 86px); }
+.section-intro {
+  display: grid;
+  grid-template-columns: minmax(0, .7fr) minmax(300px, 1.1fr);
+  column-gap: clamp(30px, 7vw, 100px);
+  row-gap: 10px;
+  align-items: end;
+  margin-bottom: 24px;
+}
+.section-intro .eyebrow {
+  grid-column: 1;
+  align-self: start;
+  margin-top: 5px;
+}
+.section-intro h2 {
+  grid-column: 2;
+  margin: 0;
+  max-width: 700px;
+  color: #111411;
+  font-size: clamp(32px, 4.2vw, 56px);
+  line-height: .98;
+  letter-spacing: -.052em;
+}
+.section-intro > p:last-child {
+  grid-column: 2;
+  max-width: 670px;
+  margin: 3px 0 0;
+  color: #6d746f;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.capability-cards { margin-top: 0; }
+.capability-cards p { font-size: 12px; line-height: 1.7; }
+
+/* Final CTA becomes an outcome-oriented consultation block. */
+.sales-cta {
+  align-items: stretch;
+  gap: clamp(30px, 5vw, 74px);
+}
+.sales-cta-copy { flex: 1 1 auto; }
+.sales-cta h2 { max-width: 820px; }
+.sales-cta p:not(.eyebrow) {
+  max-width: 760px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.sales-cta-trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+.sales-cta-trust span {
+  padding: 7px 9px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 4px;
+  color: rgba(255,255,255,.66);
+  font-size: 10.5px;
+}
+.sales-cta-actions {
+  width: min(100%, 300px);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+}
+.sales-response-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: rgba(255,255,255,.62);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.sales-response-label i {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #31c772;
+  box-shadow: 0 0 0 4px rgba(49,199,114,.1);
+}
+.sales-cta-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 50px;
+  padding: 13px 16px;
+  background: var(--brand-accent);
+  color: var(--brand-ink);
+}
+.sales-cta-button::after { content: "↗"; }
+.sales-cta-button:hover { background: var(--brand-accent-strong); }
+.sales-cta-actions small {
+  margin-top: 10px;
+  color: rgba(255,255,255,.42);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+/* Keyboard focus — especially important with the denser sales-demo controls. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid rgba(200,255,72,.72);
+  outline-offset: 3px;
+}
+.channel-button:focus-visible,
+.suggestion-chip:focus-visible,
+.demo-reset-button:focus-visible {
+  outline-color: rgba(24,63,45,.5);
+}
+
+@media (max-width: 1080px) {
+  .value-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hero-note-content { padding-top: 28px; }
+  .section-intro { grid-template-columns: 1fr; }
+  .section-intro .eyebrow,
+  .section-intro h2,
+  .section-intro > p:last-child { grid-column: 1; }
+}
+
+@media (max-width: 900px) {
+  .hero-actions { margin-top: 26px; }
+  .hero-capabilities { margin-top: 28px; }
+  .hero-note { min-height: 300px; }
+  .value-strip { margin-inline: 18px; }
+  .experience-toolbar { margin: 0; }
+  .sales-cta-actions { width: 100%; }
+}
+
+@media (max-width: 640px) {
+  .topbar-actions .live-pill { display: none; }
+  .header-sales-link { min-height: 38px; padding-inline: 13px; font-size: 11px; }
+  .brand strong { font-size: 11px; }
+  .brand small { font-size: 9.5px; }
+  .brand-mark { width: 38px; height: 38px; }
+
+  .hero { padding-top: 42px; padding-bottom: 38px; }
+  .hero h1 { font-size: clamp(39px, 12vw, 55px); line-height: .95; }
+  .hero-copy { font-size: 15px; }
+  .hero-actions { align-items: stretch; flex-direction: column; gap: 10px; }
+  .hero-primary-action { width: 100%; justify-content: space-between; min-height: 48px; }
+  .hero-secondary-action { width: fit-content; font-size: 11.5px; }
+  .hero-capabilities { gap: 6px; }
+  .hero-capabilities span { font-size: 10px; }
+  .hero-note { min-height: 280px; padding: 20px; }
+  .hero-note-content strong { font-size: 20px; }
+  .hero-note-content p { font-size: 11.5px; }
+  .hero-note-list { font-size: 10.5px; }
+  .hero-disclosure { font-size: 10px; }
+
+  .value-strip { grid-template-columns: 1fr 1fr; margin-inline: 12px; }
+  .value-strip > div { padding: 14px 13px; }
+  .value-strip span { font-size: 10.5px; }
+  .value-strip small { font-size: 9.8px; }
+
+  .experience-toolbar { padding: 15px 14px; }
+  .experience-heading strong { font-size: 12.5px; }
+  .experience-kicker { font-size: 8.8px; }
+  .demo-reset-button { padding-inline: 9px; font-size: 10px; }
+
+  .channel-preview-note { font-size: 10px; }
+  .tour-steps li { font-size: 10.5px; }
+  .suggestion-chip { font-size: 11px; }
+  .privacy-note { font-size: 9.8px; }
+
+  .capabilities-section { margin-top: 46px; }
+  .section-intro { margin-inline: 18px; }
+  .section-intro h2 { font-size: 36px; }
+  .section-intro > p:last-child { font-size: 12px; }
+  .capability-cards p { font-size: 11.5px; }
+
+  .sales-cta h2 { font-size: 34px; }
+  .sales-cta p:not(.eyebrow) { font-size: 12px; }
+}
+
+@media (max-width: 420px) {
+  .value-strip { grid-template-columns: 1fr; }
+  .value-strip > div { grid-template-columns: 30px 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-primary-action,
+  .hero-secondary-action,
+  .header-sales-link,
+  .demo-reset-button { transition: none !important; }
+}

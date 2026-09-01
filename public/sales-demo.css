@@ -1,48 +1,665 @@
-/* Guided sales-demo experience */
-.tour-card { margin-top: 22px; padding: 14px; border: 1px solid #ddd8fb; border-radius: 15px; background: #faf9ff; }
-.tour-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.tour-heading div > span { display: block; color: var(--primary); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
-.tour-heading strong { display: block; margin-top: 4px; font-size: 11px; line-height: 1.35; }
-#tourProgress { flex: 0 0 auto; padding: 4px 7px; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-size: 9px; font-weight: 800; }
-.tour-steps { display: grid; gap: 7px; margin: 12px 0 0; padding: 0; list-style: none; }
-.tour-steps li { display: flex; align-items: center; gap: 8px; color: #858a95; font-size: 10px; }
-.tour-steps li > span { width: 19px; height: 19px; display: grid; place-items: center; border-radius: 50%; background: #eceef2; color: #7d828d; font-size: 8px; font-weight: 800; }
-.tour-steps li.current { color: var(--text); font-weight: 700; }
-.tour-steps li.current > span { background: var(--primary); color: #fff; box-shadow: 0 0 0 4px rgba(107,75,230,.1); }
-.tour-steps li.complete { color: #4f866b; }
-.tour-steps li.complete > span { background: #def5e8; color: #16814d; }
-.guide-highlight { animation: guidePulse 1.4s ease-in-out infinite; position: relative; z-index: 2; }
-.guide-highlight-soft { box-shadow: 0 0 0 4px rgba(107,75,230,.09); }
-@keyframes guidePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(107,75,230,.32); } 50% { box-shadow: 0 0 0 7px rgba(107,75,230,0); } }
+/* DA Smarketing-inspired public demo shell.
+   IMPORTANT: this stylesheet intentionally does not style anything inside
+   the React Clinic Dashboard iframe. The dashboard remains the production UI. */
 
-.channel-preview-note { margin: 9px 2px 0; color: #7b818c; font-size: 9px; line-height: 1.45; }
-.privacy-note { margin: 9px auto 0; max-width: 420px; color: #747b86; font-size: 9px; line-height: 1.45; text-align: center; }
-
-.sales-cta { margin: 0 0 72px; padding: 32px; display: flex; align-items: center; justify-content: space-between; gap: 32px; border-radius: 24px; background: #191b21; color: #fff; }
-.sales-cta .eyebrow { color: #b9aaff; }
-.sales-cta h2 { max-width: 820px; margin: 0; font-size: clamp(25px, 3vw, 38px); line-height: 1.08; letter-spacing: -.035em; }
-.sales-cta p:not(.eyebrow) { max-width: 760px; margin: 12px 0 0; color: #b7bbc4; font-size: 13px; line-height: 1.6; }
-.sales-cta-button { flex: 0 0 auto; padding: 14px 20px; background: #fff; color: #17191f; text-decoration: none; }
-
-@media (max-width: 900px) {
-  .try-box { display: block; margin-top: 18px; overflow-x: auto; white-space: nowrap; padding-bottom: 4px; scrollbar-width: none; }
-  .try-box::-webkit-scrollbar { display: none; }
-  .try-box .section-label { position: sticky; left: 0; display: block; width: fit-content; padding-right: 8px; background: #fcfcfd; }
-  .suggestion-chip { display: inline-block; width: auto; margin: 0 6px 0 0; white-space: nowrap; }
-  .tour-card { margin-top: 18px; }
-  .sales-cta { margin: 0 18px 42px; flex-direction: column; align-items: flex-start; padding: 24px; }
+:root {
+  --brand-bg: #f3f4ef;
+  --brand-paper: #fafbf7;
+  --brand-ink: #0b0d0c;
+  --brand-ink-2: #171a18;
+  --brand-muted: #696f6b;
+  --brand-line: rgba(11, 13, 12, .12);
+  --brand-accent: #c8ff48;
+  --brand-accent-strong: #b7f52d;
+  --brand-accent-soft: #efffd0;
+  --brand-green: #183f2d;
+  --brand-shadow: 0 28px 80px rgba(10, 15, 12, .11);
+  --primary: #183f2d;
+  --primary-soft: #edf4ee;
+  --text: var(--brand-ink);
+  --muted: var(--brand-muted);
+  --line: #e1e4de;
+  --bg: var(--brand-bg);
 }
 
-@media (max-width: 640px) {
-  .tour-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .tour-steps li { align-items: flex-start; line-height: 1.3; }
-  .sales-cta { margin: 0 18px 36px; border-radius: 20px; }
-  .sales-cta-button { width: 100%; text-align: center; }
-  .channel-preview-note, .privacy-note { font-size: 8.5px; }
+html { background: var(--brand-bg); }
+body {
+  background:
+    radial-gradient(circle at 12% 4%, rgba(200, 255, 72, .13), transparent 26rem),
+    var(--brand-bg);
+  color: var(--brand-ink);
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-/* React production portal mounted inside Clinic Dashboard. */
-.react-dashboard-frame { display: block; width: 100%; height: clamp(720px, 86vh, 920px); min-height: 720px; border: 0; background: #faf9f6; }
+::selection { background: var(--brand-accent); color: var(--brand-ink); }
+
+.page-shell { overflow: clip; }
+
+/* Header */
+.topbar {
+  height: 82px;
+  padding: 0 max(28px, 4.5vw);
+  background: rgba(243, 244, 239, .88);
+  border-bottom: 1px solid rgba(11, 13, 12, .1);
+  backdrop-filter: blur(18px);
+}
+
+.brand { gap: 13px; }
+.brand-mark {
+  width: 43px;
+  height: 43px;
+  border-radius: 4px;
+  background: var(--brand-ink);
+  color: transparent;
+  position: relative;
+  overflow: hidden;
+}
+.brand-mark::before {
+  content: "DA";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: -.06em;
+}
+.brand-mark::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: var(--brand-accent);
+}
+.brand strong {
+  font-size: 0;
+  letter-spacing: -.025em;
+}
+.brand strong::after {
+  content: "DA SMARKETING · AI DEMO";
+  font-size: 13px;
+  font-weight: 850;
+  letter-spacing: .045em;
+}
+.brand small {
+  margin-top: 4px;
+  color: #747a76;
+  font-size: 10px;
+  letter-spacing: .03em;
+}
+.topbar-actions { gap: 14px; }
+.live-pill {
+  padding: 8px 11px;
+  border: 1px solid rgba(11, 13, 12, .1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .65);
+  color: #454b47;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+.live-dot {
+  width: 7px;
+  height: 7px;
+  background: #2eb56b;
+  box-shadow: 0 0 0 4px rgba(46, 181, 107, .12);
+}
+.button {
+  border-radius: 7px;
+  padding: 11px 16px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.button:hover { transform: translateY(-1px); }
+.button-secondary {
+  background: var(--brand-ink);
+  color: #fff;
+  border-color: var(--brand-ink);
+}
+.button-secondary:hover { background: #262b28; }
+.button-primary {
+  background: var(--brand-ink);
+  color: #fff;
+}
+.button-primary:hover { background: #252a27; }
+
+/* Page width + hero */
+main { width: min(1480px, 92vw); }
+.hero {
+  position: relative;
+  isolation: isolate;
+  grid-template-columns: minmax(0, 1.58fr) minmax(300px, .62fr);
+  gap: clamp(34px, 6vw, 96px);
+  align-items: end;
+  margin-top: 30px;
+  padding: clamp(52px, 7vw, 92px) clamp(30px, 5vw, 76px) clamp(44px, 6vw, 72px);
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--brand-ink);
+  color: #fff;
+}
+.hero::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  width: 38rem;
+  height: 38rem;
+  right: -12rem;
+  top: -15rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(200, 255, 72, .26) 0, rgba(200, 255, 72, .08) 35%, transparent 68%);
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  opacity: .16;
+  background-image:
+    linear-gradient(rgba(255,255,255,.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.12) 1px, transparent 1px);
+  background-size: 58px 58px;
+  mask-image: linear-gradient(to right, transparent 0, #000 38%, #000 100%);
+}
+.eyebrow,
+.section-label {
+  color: var(--brand-green);
+  font-size: 10px;
+  letter-spacing: .14em;
+  font-weight: 850;
+}
+.hero .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  color: var(--brand-accent);
+}
+.hero .eyebrow::before {
+  content: "";
+  width: 24px;
+  height: 1px;
+  background: currentColor;
+}
+.hero h1 {
+  max-width: 900px;
+  color: #fff;
+  font-size: clamp(44px, 5.4vw, 79px);
+  line-height: .94;
+  letter-spacing: -.064em;
+  font-weight: 760;
+  text-wrap: balance;
+}
+.hero-copy {
+  max-width: 760px;
+  margin-top: 25px;
+  color: rgba(255,255,255,.68);
+  font-size: clamp(15px, 1.4vw, 18px);
+  line-height: 1.65;
+}
+.hero-note {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: flex-end;
+  gap: 15px;
+  min-height: 190px;
+  padding: 22px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 8px;
+  background: rgba(255,255,255,.07);
+  box-shadow: none;
+  backdrop-filter: blur(9px);
+}
+.hero-note::before {
+  content: "LIVE PRODUCT DEMO";
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  color: rgba(255,255,255,.43);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .15em;
+}
+.hero-note-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 4px;
+  background: var(--brand-accent);
+  color: var(--brand-ink);
+}
+.hero-note strong { color: #fff; font-size: 13px; }
+.hero-note p { color: rgba(255,255,255,.58); font-size: 11px; line-height: 1.6; }
+
+/* Demo frame */
+.experience-card {
+  margin-top: clamp(28px, 4vw, 52px);
+  border: 1px solid rgba(11,13,12,.11);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: var(--brand-shadow);
+}
+.experience-tabs {
+  align-items: stretch;
+  padding: 8px;
+  gap: 7px;
+  border-bottom: 1px solid #e3e6e0;
+  background: #f4f5f1;
+}
+.experience-tab {
+  border-radius: 6px;
+  padding: 15px 22px;
+  color: #727874;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: .085em;
+  font-weight: 850;
+}
+.experience-tab span:first-child {
+  width: 25px;
+  height: 25px;
+  border-radius: 4px;
+  background: #e6e9e2;
+  color: #68706b;
+}
+.experience-tab.active {
+  background: var(--brand-ink);
+  color: #fff;
+  box-shadow: 0 7px 18px rgba(11,13,12,.11);
+}
+.experience-tab.active::after { display: none; }
+.experience-tab.active span:first-child {
+  background: var(--brand-accent);
+  color: var(--brand-ink);
+}
+.attention-tab-dot { background: #ff695f; box-shadow: 0 0 0 3px rgba(255,105,95,.12); }
+
+.patient-layout {
+  min-height: 760px;
+  grid-template-columns: minmax(285px, 330px) minmax(0, 1fr);
+}
+.patient-guide {
+  padding: 32px 28px;
+  border-right: 1px solid #e7e9e4;
+  background: #f8f9f5;
+}
+.patient-guide > .section-label:first-child::before {
+  content: "01  ";
+  color: #959c97;
+}
+.channel-buttons { gap: 8px; }
+.channel-button {
+  min-height: 64px;
+  gap: 13px;
+  padding: 11px 12px;
+  border: 1px solid #dfe3dc;
+  border-radius: 7px;
+  background: #fff;
+  transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+.channel-button:hover { transform: translateY(-1px); border-color: #bec5bd; }
+.channel-button.active {
+  border-color: var(--brand-ink);
+  box-shadow: 0 0 0 2px var(--brand-ink);
+}
+.channel-button strong { font-size: 12px; }
+.channel-button small { color: #888e8a; font-size: 10px; }
+.channel-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: 100% 100% !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  box-shadow: 0 4px 10px rgba(12,15,13,.08);
+}
+.channel-icon.whatsapp-icon { background-image: url('/whatsapp-brand.svg') !important; }
+.channel-icon.instagram-icon { background-image: url('/instagram-brand.svg') !important; }
+.channel-icon.facebook-icon { background-image: url('/messenger-brand.svg') !important; }
+.channel-preview-note {
+  margin: 10px 2px 0;
+  color: #8b918d;
+  font-size: 8.5px;
+  line-height: 1.5;
+}
+
+/* Guided tour */
+.tour-card {
+  margin-top: 24px;
+  padding: 17px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--brand-ink);
+  color: #fff;
+}
+.tour-heading div > span { color: var(--brand-accent); font-size: 8px; }
+.tour-heading strong { margin-top: 6px; color: #fff; font-size: 11px; }
+#tourProgress {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(200,255,72,.13);
+  color: var(--brand-accent);
+}
+.tour-steps { gap: 8px; margin-top: 14px; }
+.tour-steps li { color: #787f7b; font-size: 9.5px; }
+.tour-steps li > span {
+  width: 20px;
+  height: 20px;
+  background: #232824;
+  color: #969c98;
+}
+.tour-steps li.current { color: #fff; }
+.tour-steps li.current > span {
+  background: var(--brand-accent);
+  color: var(--brand-ink);
+  box-shadow: 0 0 0 4px rgba(200,255,72,.09);
+}
+.tour-steps li.complete { color: #b3d58a; }
+.tour-steps li.complete > span { background: #234b34; color: #d4f7aa; }
+.guide-highlight { animation: brandGuidePulse 1.4s ease-in-out infinite; }
+.guide-highlight-soft { box-shadow: 0 0 0 3px rgba(200,255,72,.2); }
+@keyframes brandGuidePulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(200,255,72,.35); }
+  50% { box-shadow: 0 0 0 8px rgba(200,255,72,0); }
+}
+
+.try-box { margin-top: 26px; }
+.try-box .section-label::before { content: "02  "; color: #959c97; }
+.suggestion-chip {
+  position: relative;
+  margin: 7px 0;
+  padding: 11px 31px 11px 12px;
+  border: 1px solid #dde1da;
+  border-radius: 6px;
+  background: #fff;
+  color: #454b47;
+  font-size: 10.5px;
+  transition: background .16s ease, border-color .16s ease, transform .16s ease;
+}
+.suggestion-chip::after {
+  content: "↗";
+  position: absolute;
+  right: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #8a918c;
+}
+.suggestion-chip:hover {
+  transform: translateX(2px);
+  background: var(--brand-accent-soft);
+  border-color: #cde99b;
+}
+.demo-explainer {
+  margin-top: 26px;
+  padding: 15px;
+  border: 1px solid #dce2d8;
+  border-radius: 7px;
+  background: transparent;
+}
+.demo-explainer strong { font-size: 10.5px; letter-spacing: .02em; }
+.demo-explainer p { color: #747b76; font-size: 9.5px; }
+
+/* Phone/product stage */
+.device-stage {
+  position: relative;
+  justify-content: center;
+  min-height: 760px;
+  padding: clamp(30px, 5vw, 56px);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 36%, rgba(200,255,72,.16), transparent 21rem),
+    #e9ece6;
+}
+.device-stage::before {
+  content: "PATIENT EXPERIENCE  /  LIVE SESSION";
+  position: absolute;
+  top: 22px;
+  left: 25px;
+  color: #89908b;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .14em;
+}
+.phone {
+  width: min(410px, 100%);
+  height: 664px;
+  border: 8px solid #111412;
+  border-radius: 34px;
+  box-shadow: 0 34px 75px rgba(20,26,22,.24), 0 0 0 1px rgba(255,255,255,.35);
+}
+.phone-statusbar { font-size: 9px; }
+.clinic-avatar { background: #e9f7c9; color: #24442d; }
+.empty-chat {
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: 13px;
+  box-shadow: 0 8px 24px rgba(24,30,26,.07);
+}
+.empty-logo { background: #eaf8cc; color: #23432d; }
+.device-caption {
+  margin-top: 16px;
+  color: #68706b;
+  font-size: 9px;
+  font-weight: 650;
+}
+.privacy-note {
+  max-width: 430px;
+  color: #828984;
+  font-size: 8.5px;
+}
+
+/* Product proof cards */
+.proof-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: clamp(42px, 6vw, 74px) 0 0;
+  overflow: hidden;
+  border: 1px solid rgba(11,13,12,.11);
+  border-radius: 9px;
+  background: #dfe2dc;
+}
+.proof-grid article {
+  min-height: 220px;
+  padding: 30px;
+  background: #f8f9f5;
+  border: 0;
+}
+.proof-grid article:nth-child(2) { background: #fff; }
+.proof-grid article span {
+  display: inline-flex;
+  width: auto;
+  min-width: 34px;
+  height: 24px;
+  padding: 0 7px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  background: var(--brand-ink);
+  color: var(--brand-accent);
+  font-size: 9px;
+  font-weight: 850;
+}
+.proof-grid h3 {
+  margin: 56px 0 10px;
+  max-width: 270px;
+  font-size: clamp(20px, 2vw, 27px);
+  line-height: 1.03;
+  letter-spacing: -.045em;
+}
+.proof-grid p {
+  max-width: 330px;
+  margin: 0;
+  color: #707772;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+/* Conversion section */
+.sales-cta {
+  position: relative;
+  isolation: isolate;
+  margin: clamp(32px, 5vw, 52px) 0 70px;
+  padding: clamp(34px, 5vw, 62px);
+  overflow: hidden;
+  border-radius: 9px;
+  background: var(--brand-ink);
+  color: #fff;
+}
+.sales-cta::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 24rem;
+  height: 24rem;
+  right: -6rem;
+  bottom: -12rem;
+  border-radius: 50%;
+  background: var(--brand-accent);
+  opacity: .15;
+  filter: blur(1px);
+}
+.sales-cta .eyebrow { color: var(--brand-accent); }
+.sales-cta h2 {
+  max-width: 840px;
+  font-size: clamp(30px, 4vw, 52px);
+  line-height: .98;
+  letter-spacing: -.052em;
+}
+.sales-cta p:not(.eyebrow) {
+  max-width: 700px;
+  color: rgba(255,255,255,.59);
+  font-size: 12px;
+}
+.sales-cta-button {
+  min-width: 164px;
+  padding: 15px 20px;
+  border-radius: 6px;
+  background: var(--brand-accent);
+  color: var(--brand-ink);
+  text-align: center;
+  text-decoration: none;
+  box-shadow: 0 0 0 1px rgba(200,255,72,.18), 0 15px 35px rgba(0,0,0,.18);
+}
+.sales-cta-button:hover { background: var(--brand-accent-strong); }
+
+.toast {
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 7px;
+  background: #111512;
+  color: #fff;
+  box-shadow: 0 20px 60px rgba(0,0,0,.23);
+}
+
+/* Keep the actual React Clinic Dashboard untouched. These rules only size the iframe. */
+.react-dashboard-frame {
+  display: block;
+  width: 100%;
+  height: clamp(720px, 86vh, 920px);
+  min-height: 720px;
+  border: 0;
+  background: #faf9f6;
+}
 .legacy-dashboard-hooks { display: none !important; }
 #dashboardView.active { background: #faf9f6; }
-@media (max-width: 767px) { .react-dashboard-frame { height: 82dvh; min-height: 650px; } }
+
+/* Tablet */
+@media (max-width: 1080px) {
+  .hero { grid-template-columns: 1fr; align-items: start; }
+  .hero-note { min-height: 140px; max-width: 560px; }
+  .patient-layout { grid-template-columns: 285px minmax(0, 1fr); }
+  .proof-grid article { padding: 25px; }
+}
+
+@media (max-width: 900px) {
+  main { width: min(100%, 100vw); }
+  .topbar { padding: 0 20px; }
+  .hero { margin: 18px; padding: 48px 28px; }
+  .experience-card { margin: 24px 18px 0; }
+  .patient-layout { grid-template-columns: 1fr; }
+  .patient-guide { border-right: 0; border-bottom: 1px solid #e5e7e2; padding: 24px; }
+  .channel-buttons { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .channel-button { min-height: 62px; }
+  .channel-button span:last-child small { display: none; }
+  .try-box {
+    display: block;
+    margin-top: 18px;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .try-box::-webkit-scrollbar { display: none; }
+  .try-box .section-label {
+    position: sticky;
+    left: 0;
+    display: block;
+    width: fit-content;
+    padding-right: 8px;
+    background: #f8f9f5;
+  }
+  .suggestion-chip { display: inline-block; width: auto; margin: 0 6px 0 0; white-space: nowrap; }
+  .tour-card { margin-top: 18px; }
+  .device-stage { min-height: auto; padding: 54px 24px 32px; }
+  .proof-grid { margin: 38px 18px 0; grid-template-columns: 1fr; }
+  .proof-grid article { min-height: 170px; }
+  .proof-grid h3 { margin-top: 35px; }
+  .sales-cta { margin: 24px 18px 42px; flex-direction: column; align-items: flex-start; padding: 36px 28px; }
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .topbar { height: 70px; padding: 0 16px; }
+  .brand-mark { width: 37px; height: 37px; }
+  .brand strong::after { font-size: 10.5px; }
+  .brand small { display: none; }
+  .live-pill { display: none; }
+  .topbar .button { padding: 9px 11px; font-size: 10px; }
+
+  .hero {
+    margin: 12px;
+    padding: 40px 22px 28px;
+    border-radius: 8px;
+  }
+  .hero h1 { font-size: clamp(38px, 12vw, 52px); }
+  .hero-copy { font-size: 14px; line-height: 1.58; }
+  .hero-note { min-height: 126px; padding: 20px; }
+  .hero-note::before { top: 15px; left: 18px; }
+
+  .experience-card { margin: 18px 12px 0; border-radius: 8px; }
+  .experience-tabs { padding: 6px; gap: 5px; }
+  .experience-tab { padding: 12px 8px; font-size: 8.5px; letter-spacing: .045em; }
+  .experience-tab span:first-child { width: 21px; height: 21px; margin-right: 4px; }
+
+  .patient-guide { padding: 20px 16px; }
+  .channel-buttons { grid-template-columns: 1fr; }
+  .channel-button { min-height: 58px; }
+  .channel-button span:last-child small { display: block; }
+  .channel-preview-note { font-size: 8px; }
+  .tour-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tour-steps li { align-items: flex-start; line-height: 1.3; }
+  .demo-explainer { display: none; }
+
+  .device-stage { padding: 48px 12px 24px; }
+  .device-stage::before { left: 16px; top: 18px; }
+  .phone { height: min(650px, 72dvh); min-height: 540px; border-width: 6px; border-radius: 29px; }
+  .device-caption { padding: 0 5px; }
+  .privacy-note { padding: 0 8px; font-size: 8px; }
+
+  .proof-grid { margin: 30px 12px 0; }
+  .proof-grid article { min-height: 150px; padding: 22px; }
+  .proof-grid h3 { margin-top: 28px; font-size: 22px; }
+
+  .sales-cta { margin: 18px 12px 34px; padding: 30px 22px; border-radius: 8px; }
+  .sales-cta-button { width: 100%; }
+  .react-dashboard-frame { height: 82dvh; min-height: 650px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
