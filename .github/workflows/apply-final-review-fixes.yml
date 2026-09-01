@@ -35,6 +35,8 @@ jobs:
           node --check public/portal-demo.js
           node --check public/portal-fidelity.js
           node --check e2e/demo.spec.js
+      - name: Keep CI workflow unchanged in automated commit
+        run: git checkout HEAD -- .github/workflows/demo-ci.yml
       - name: Commit generated fixes
         run: |
           git config user.name "hoenotfound"
