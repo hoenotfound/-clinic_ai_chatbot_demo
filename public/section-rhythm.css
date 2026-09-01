@@ -1,0 +1,104 @@
+/*
+  Public-page vertical rhythm.
+  Scope: DA Smarketing marketing shell only. The Clinic Dashboard iframe is untouched.
+
+  UX principle:
+  - Keep related content visually grouped (live demo + workflow).
+  - Use larger gaps when the page changes topic.
+  - Reduce the rhythm proportionally on smaller screens so mobile never feels sparse.
+*/
+
+.page-shell {
+  --section-gap-major: 124px;
+  --section-gap-related: 92px;
+  --section-gap-footer: 104px;
+}
+
+/* Hero -> live product: enough breathing room to signal a new section,
+   but still close enough that the primary CTA feels immediately connected. */
+.page-shell .demo-section {
+  margin-top: 34px;
+  margin-bottom: var(--section-gap-related);
+}
+
+/* The workflow explains the demo, so this transition is intentionally tighter
+   than the major storytelling breaks below it. */
+.page-shell .journey-strip {
+  margin-bottom: var(--section-gap-major);
+}
+
+/* Strong break before the proof / capability story, then another before conversion. */
+.page-shell .capabilities-section {
+  margin-bottom: 120px;
+}
+
+.page-shell .sales-cta {
+  margin-bottom: var(--section-gap-footer);
+}
+
+/* Give section headings a little more room before their main visual content. */
+.page-shell .demo-section .section-heading {
+  margin-bottom: 36px;
+}
+
+.page-shell .capabilities-section .section-heading {
+  margin-bottom: 38px;
+}
+
+@media (max-width: 900px) {
+  .page-shell {
+    --section-gap-major: 100px;
+    --section-gap-related: 84px;
+    --section-gap-footer: 82px;
+  }
+
+  .page-shell .demo-section {
+    margin-top: 26px;
+  }
+
+  .page-shell .capabilities-section {
+    margin-bottom: 96px;
+  }
+
+  .page-shell .demo-section .section-heading {
+    margin-bottom: 32px;
+  }
+
+  .page-shell .capabilities-section .section-heading {
+    margin-bottom: 34px;
+  }
+}
+
+@media (max-width: 600px) {
+  .page-shell {
+    --section-gap-major: 74px;
+    --section-gap-related: 66px;
+    --section-gap-footer: 66px;
+  }
+
+  /* Mobile needs breathing room, but oversized desktop gaps create needless scrolling. */
+  .page-shell .demo-section {
+    margin-top: 22px;
+    margin-bottom: var(--section-gap-related);
+  }
+
+  .page-shell .journey-strip {
+    margin-bottom: var(--section-gap-major);
+  }
+
+  .page-shell .capabilities-section {
+    margin-bottom: 74px;
+  }
+
+  .page-shell .sales-cta {
+    margin-bottom: var(--section-gap-footer);
+  }
+
+  .page-shell .demo-section .section-heading {
+    margin-bottom: 28px;
+  }
+
+  .page-shell .capabilities-section .section-heading {
+    margin-bottom: 30px;
+  }
+}
