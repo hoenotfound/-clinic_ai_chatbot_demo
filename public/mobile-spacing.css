@@ -128,3 +128,155 @@ b {
     margin-bottom: 82px;
   }
 }
+
+/*
+  Final UI/UX polish.
+  Keep platform colours inside the messaging preview and let the marketing page
+  return to a quieter DA blue / neutral system after the interactive demo.
+*/
+.capabilities-section {
+  position: relative;
+  isolation: isolate;
+  padding-top: 82px;
+  padding-bottom: 82px;
+}
+
+.capabilities-section::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 100vw;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+}
+
+.capabilities-section > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Lead Intelligence now belongs to the same light card family as the other capabilities. */
+.page-shell .capability-card.dark {
+  border-color: rgba(15, 23, 42, .06);
+  background: #ffffff;
+  color: var(--brand-blue-2);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, .01);
+}
+
+.page-shell .capability-card.dark > span {
+  color: var(--accent-blue);
+}
+
+.page-shell .capability-card.dark h3 {
+  color: var(--brand-blue);
+}
+
+.page-shell .capability-card.dark p,
+.page-shell .capability-card.dark li {
+  color: var(--slate-500);
+}
+
+.page-shell .capability-card.dark ul {
+  border-color: var(--slate-100);
+}
+
+/* Center all three line icons precisely inside their icon tiles. */
+.page-shell .capability-icon {
+  display: grid;
+  place-items: center;
+}
+
+.page-shell .capability-icon::before {
+  margin: auto;
+}
+
+/* Keep the second icon distinct without reintroducing a dark card or another loud colour block. */
+.page-shell .capability-card.dark .capability-icon.dark-icon {
+  border-color: #dbeafe;
+  background: #eff6ff;
+  color: #2563eb;
+  box-shadow: 0 10px 24px -18px rgba(37, 99, 235, .55);
+}
+
+@media (max-width: 600px) {
+  /* A true 2 × 2 action grid: no clipped third card and no horizontal scrolling. */
+  .page-shell #patientView .prompt-panel .suggestion-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    width: 100%;
+    overflow: visible;
+  }
+
+  .page-shell #patientView .prompt-panel .suggestion-chip {
+    width: 100%;
+    min-width: 0;
+    min-height: 80px;
+    padding: 12px;
+  }
+
+  /* Raise the smallest supporting text one step without making the UI feel oversized. */
+  .page-shell #patientView .channel-preview-note,
+  .page-shell #patientView .prompt-helper {
+    font-size: 10.5px;
+    line-height: 1.55;
+  }
+
+  .page-shell #patientView .channel-button small,
+  .page-shell #patientView .experience-tab small {
+    font-size: 10px;
+  }
+
+  .page-shell #patientView .tour-heading div > span {
+    font-size: 8.5px;
+  }
+
+  .page-shell #patientView .tour-heading div > strong {
+    font-size: 11.5px;
+  }
+
+  .page-shell #patientView #tourProgress {
+    font-size: 9px;
+  }
+
+  .page-shell #patientView .suggestion-chip > span {
+    font-size: 9px;
+    line-height: 1.2;
+  }
+
+  .page-shell #patientView .suggestion-chip > strong {
+    font-size: 11px;
+    line-height: 1.3;
+  }
+
+  .page-shell .journey-strip small {
+    font-size: 10.5px;
+    line-height: 1.45;
+  }
+
+  .page-shell .capability-card > span {
+    font-size: 10.5px;
+  }
+
+  .page-shell .capability-card p {
+    font-size: 13px;
+  }
+
+  .page-shell .capability-card li {
+    font-size: 11.5px;
+    line-height: 1.45;
+  }
+
+  .page-shell .sales-cta-trust span {
+    font-size: 11px;
+  }
+
+  .capabilities-section {
+    margin-top: 10px;
+    padding-top: 58px;
+    padding-bottom: 58px;
+  }
+}
