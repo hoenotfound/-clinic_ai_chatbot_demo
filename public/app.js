@@ -379,4 +379,23 @@ async function init() {
   }
 }
 
+function loadChannelExperienceLayer() {
+  if (!document.querySelector('link[data-channel-experience="styles"]')) {
+    const stylesheet = document.createElement("link");
+    stylesheet.rel = "stylesheet";
+    stylesheet.href = "/channel-experience.css";
+    stylesheet.dataset.channelExperience = "styles";
+    document.head.appendChild(stylesheet);
+  }
+
+  if (!document.querySelector('script[data-channel-experience="script"]')) {
+    const script = document.createElement("script");
+    script.src = "/channel-experience.js";
+    script.dataset.channelExperience = "script";
+    script.async = false;
+    document.head.appendChild(script);
+  }
+}
+
 init();
+loadChannelExperienceLayer();
