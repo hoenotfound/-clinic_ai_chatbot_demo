@@ -38,6 +38,10 @@ test("demo and React dashboard work under the /ai-chatbot mount path", async ({ 
   await expect(dashboardFrame.getByRole("heading", { name: "Lead Pipeline" })).toBeVisible();
   expect(new URL(frame.url()).pathname).toBe("/ai-chatbot/dashboard/pipeline");
 
+  await frame.goto("http://127.0.0.1:3100/ai-chatbot/dashboard/settings/team");
+  await expect(dashboardFrame.getByRole("heading", { name: "Team & Access" })).toBeVisible();
+  expect(new URL(frame.url()).pathname).toBe("/ai-chatbot/dashboard/settings/team");
+
   expect(failedLocalResponses, `Failed local responses: ${failedLocalResponses.join("\n")}`).toEqual([]);
   expect(browserErrors, `Browser errors: ${browserErrors.join("\n")}`).toEqual([]);
 });
