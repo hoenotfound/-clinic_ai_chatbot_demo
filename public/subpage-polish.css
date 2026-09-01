@@ -38,6 +38,13 @@
   max-width: 620px;
 }
 
+/* The product preview is important context, so don't leave it dependent on an entrance-animation paint layer. */
+.page-shell .hero-showcase {
+  opacity: 1;
+  transform: none;
+  animation: none;
+}
+
 .page-shell .hero-product-card {
   min-height: 540px;
 }
