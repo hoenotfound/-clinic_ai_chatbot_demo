@@ -31,6 +31,17 @@
     scrim?.classList.remove('hidden');
   }
 
+  function normalizeBookingCopy() {
+    const tourStatus = document.getElementById('tourStatus');
+    if (tourStatus?.textContent?.startsWith('Hot lead detected')) {
+      tourStatus.textContent = 'Booking intent detected — open Clinic Dashboard';
+    }
+    const toast = document.getElementById('toast');
+    if (toast?.textContent?.startsWith('Hot lead detected.')) {
+      toast.textContent = toast.textContent.replace('Hot lead detected.', 'Booking intent detected.');
+    }
+  }
+
   document.addEventListener('click', (event) => {
     if (event.target.closest('[data-lead-details]')) openDetails();
     if (event.target.closest('[data-close-details]')) closeDetails();
@@ -194,7 +205,14 @@
   const attentionObserver = document.getElementById('attentionBanner');
   if (attentionObserver) new MutationObserver(refreshCounts).observe(attentionObserver, { attributes: true, attributeFilter: ['class'] });
 
+  const copyObserver = new MutationObserver(normalizeBookingCopy);
+  const tourStatus = document.getElementById('tourStatus');
+  const toast = document.getElementById('toast');
+  if (tourStatus) copyObserver.observe(tourStatus, { childList: true, characterData: true, subtree: true });
+  if (toast) copyObserver.observe(toast, { childList: true, characterData: true, subtree: true });
+
   refreshCounts();
   applyInboxFilters();
   syncToolPreview('en');
+  normalizeBookingCopy();
 })();
