@@ -166,8 +166,9 @@ b {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, .01);
 }
 
+/* Purple is reserved for AI / intelligence semantics, echoing the hero's qualified-lead accent. */
 .page-shell .capability-card.dark > span {
-  color: var(--accent-blue);
+  color: #7c3aed;
 }
 
 .page-shell .capability-card.dark h3 {
@@ -193,12 +194,22 @@ b {
   margin: auto;
 }
 
-/* Keep the second icon distinct without reintroducing a dark card or another loud colour block. */
+/* AI / intelligence gets a restrained lavender tile, not another full-colour card. */
 .page-shell .capability-card.dark .capability-icon.dark-icon {
-  border-color: #dbeafe;
-  background: #eff6ff;
-  color: #2563eb;
-  box-shadow: 0 10px 24px -18px rgba(37, 99, 235, .55);
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+  color: #7c3aed;
+  box-shadow: 0 10px 24px -18px rgba(124, 58, 237, .5);
+}
+
+/* One static CTA callback to the hero gradient; no extra animation competing for attention. */
+.page-shell .sales-cta-ai-accent {
+  display: inline-block;
+  background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 38%, #8b5cf6 68%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: #a78bfa;
 }
 
 @media (max-width: 600px) {
