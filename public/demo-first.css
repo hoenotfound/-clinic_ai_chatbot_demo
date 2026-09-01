@@ -572,3 +572,459 @@
     display: none;
   }
 }
+
+/*
+  Mobile is a different composition, not a compressed desktop layout.
+  Remove secondary storytelling and keep the product interaction dominant.
+*/
+@media (max-width: 600px) {
+  body {
+    background-size: 24px 24px;
+  }
+
+  .topbar {
+    height: 64px;
+  }
+
+  .topbar-inner {
+    width: calc(100% - 20px);
+  }
+
+  .da-brand img {
+    width: 150px;
+    max-width: 52vw;
+    height: 40px;
+  }
+
+  .header-audit-button {
+    min-height: 38px;
+    padding: 0 14px;
+    font-size: 10px;
+  }
+
+  /* Mobile hero = one message and one action. */
+  .homepage-hero {
+    display: block;
+    width: calc(100% - 28px);
+    min-height: 0;
+    padding: 94px 0 38px;
+  }
+
+  .scaling-pill {
+    margin-bottom: 16px;
+    padding: 7px 11px;
+    font-size: 7px;
+  }
+
+  .hero-main h1 {
+    max-width: 350px;
+    font-size: clamp(38px, 11.8vw, 48px);
+    line-height: 1.01;
+    letter-spacing: -.05em;
+  }
+
+  .hero-copy {
+    max-width: 345px;
+    margin-top: 18px;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .hero-actions {
+    margin-top: 23px;
+  }
+
+  .hero-primary-action {
+    min-height: 54px;
+    border-radius: 14px;
+    font-size: 14px;
+  }
+
+  .hero-whatsapp-action,
+  .hero-footnote,
+  .hero-showcase {
+    display: none !important;
+  }
+
+  /* Live product immediately after hero. */
+  .demo-section {
+    width: 100%;
+    margin: 0 0 48px;
+  }
+
+  .demo-section .section-heading {
+    width: calc(100% - 28px);
+    margin: 0 auto 18px;
+  }
+
+  .demo-section .section-heading .section-eyebrow {
+    margin-bottom: 9px;
+    font-size: 8px;
+  }
+
+  .demo-section .section-heading h2 {
+    max-width: 340px;
+    font-size: 30px;
+    line-height: 1.04;
+  }
+
+  .demo-section .section-heading > p {
+    max-width: 340px;
+    margin-top: 10px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .experience-card {
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .experience-toolbar {
+    min-height: 56px;
+    padding: 10px 14px;
+  }
+
+  .experience-status small {
+    display: none;
+  }
+
+  .experience-status strong {
+    margin: 0;
+    font-size: 10px;
+  }
+
+  .demo-reset-button {
+    padding: 7px 9px;
+    border-radius: 9px;
+    font-size: 8px;
+  }
+
+  .experience-tab {
+    min-height: 58px;
+    grid-template-columns: 25px 1fr;
+    grid-template-rows: 1fr;
+    padding: 10px 12px;
+    column-gap: 8px;
+  }
+
+  .experience-tab > span:first-child {
+    grid-row: auto;
+    width: 25px;
+    height: 25px;
+    border-radius: 8px;
+    font-size: 8px;
+  }
+
+  .experience-tab strong {
+    font-size: 10px;
+  }
+
+  .experience-tab small {
+    display: none;
+  }
+
+  /* Channel selector is a single compact control row. */
+  .channel-panel {
+    padding: 14px 14px 12px;
+  }
+
+  .channel-panel .guide-label {
+    margin-bottom: 9px;
+  }
+
+  .guide-label > span {
+    display: none;
+  }
+
+  .guide-label strong {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--slate-500);
+  }
+
+  .channel-buttons {
+    gap: 6px;
+  }
+
+  .channel-button {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 7px;
+    border-radius: 12px;
+  }
+
+  .channel-icon {
+    width: 24px;
+    height: 24px;
+    margin: 0;
+  }
+
+  .channel-icon img {
+    width: 23px;
+    height: 23px;
+  }
+
+  .channel-button strong {
+    font-size: 8px;
+  }
+
+  .channel-button small,
+  .channel-preview-note {
+    display: none;
+  }
+
+  /* Phone becomes the main visual object. */
+  .device-stage {
+    padding: 12px 8px 17px;
+    background: #f8fafc;
+  }
+
+  .tour-card {
+    width: min(100% - 12px, 410px);
+    margin-bottom: 8px;
+    padding: 9px 11px 8px;
+    border-radius: 12px;
+  }
+
+  .tour-heading div > span {
+    display: none;
+  }
+
+  .tour-heading div > strong {
+    margin: 0;
+    font-size: 9px;
+    line-height: 1.25;
+  }
+
+  #tourProgress {
+    padding: 4px 7px;
+    font-size: 7px;
+  }
+
+  .tour-steps {
+    margin-top: 7px;
+    gap: 4px;
+  }
+
+  .tour-steps li > span {
+    height: 3px;
+  }
+
+  .device-stage-heading {
+    width: min(100% - 12px, 410px);
+    margin-bottom: 7px;
+  }
+
+  .device-stage-heading strong {
+    font-size: 8px;
+  }
+
+  .device-stage-heading > span {
+    font-size: 7px;
+  }
+
+  .phone {
+    width: min(100% - 4px, 390px);
+    height: 540px;
+    border-width: 6px;
+    border-radius: 30px;
+    box-shadow: 0 24px 48px -24px rgba(15,23,42,.42);
+  }
+
+  .phone-statusbar {
+    height: 25px;
+  }
+
+  .chat-header {
+    min-height: 53px;
+  }
+
+  .empty-chat {
+    max-width: 245px;
+    padding: 20px 16px;
+  }
+
+  .privacy-note {
+    width: min(100% - 24px, 390px);
+    margin-top: 9px;
+    font-size: 8px;
+  }
+
+  /* Suggested prompts are a swipe row, not another grid of cards. */
+  .prompt-panel {
+    padding: 14px 14px 18px;
+    overflow: hidden;
+  }
+
+  .prompt-panel .guide-label {
+    margin-bottom: 9px;
+  }
+
+  .suggestion-list {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 0 1px 4px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .suggestion-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .suggestion-chip {
+    flex: 0 0 auto;
+    width: 142px;
+    min-height: 48px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 3px;
+    padding: 9px 11px;
+    border-radius: 12px;
+    scroll-snap-align: start;
+  }
+
+  .suggestion-chip > span {
+    font-size: 6px;
+  }
+
+  .suggestion-chip > strong {
+    font-size: 9px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .suggestion-chip > b {
+    display: none;
+  }
+
+  /* This story is already demonstrated above; don't repeat it on a phone screen. */
+  .journey-strip {
+    display: none;
+  }
+
+  .capabilities-section {
+    width: calc(100% - 28px);
+    margin-bottom: 44px;
+  }
+
+  .capabilities-section .section-heading {
+    margin-bottom: 17px;
+  }
+
+  .capabilities-section .section-heading .section-eyebrow {
+    margin-bottom: 8px;
+  }
+
+  .capabilities-section .section-heading h2 {
+    font-size: 29px;
+  }
+
+  .capabilities-section .section-heading > p {
+    margin-top: 10px;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  .capability-grid {
+    gap: 9px;
+  }
+
+  .capability-card {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    column-gap: 12px;
+    padding: 16px;
+    border-radius: 16px;
+  }
+
+  .capability-icon {
+    grid-row: 1 / 5;
+    width: 36px;
+    height: 36px;
+    margin: 0;
+    border-radius: 11px;
+    font-size: 14px;
+  }
+
+  .capability-card > span {
+    font-size: 7px;
+  }
+
+  .capability-card h3 {
+    margin-top: 5px;
+    font-size: 16px;
+    line-height: 1.15;
+  }
+
+  .capability-card p {
+    margin-top: 7px;
+    font-size: 10px;
+    line-height: 1.45;
+  }
+
+  .capability-card ul {
+    display: none;
+  }
+
+  .sales-cta {
+    width: calc(100% - 28px);
+    min-height: 0;
+    margin-bottom: 44px;
+    padding: 26px 20px;
+    gap: 20px;
+    border-radius: 26px;
+  }
+
+  .sales-kicker {
+    margin-bottom: 13px;
+    font-size: 8px;
+  }
+
+  .sales-cta h2 {
+    max-width: 300px;
+    font-size: 31px;
+  }
+
+  .sales-cta-copy > p:not(.sales-kicker) {
+    margin-top: 14px;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  .sales-cta-trust,
+  .sales-response-label,
+  .sales-cta-actions small {
+    display: none;
+  }
+
+  .sales-cta-actions {
+    padding: 0;
+  }
+
+  .sales-cta-button {
+    min-height: 52px;
+    margin-top: 0;
+    border-radius: 13px;
+    font-size: 12px;
+  }
+
+  .floating-enquiry {
+    display: none !important;
+  }
+
+  #live-demo {
+    scroll-margin-top: 72px;
+  }
+}
