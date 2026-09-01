@@ -122,5 +122,36 @@ test("fidelity interaction layer includes drawer, filtering and mobile thread be
   assert.match(js, /portalInboxOwner/);
   assert.match(js, /portal-mobile-back/);
   assert.match(js, /thread-open/);
-  assert.match(js, /portal-fidelity-extra\.css/);
+  assert.match(js, /normalizeBookingCopy/);
+});
+
+test("dashboard markup and generated portal UI contain no inline style attributes", () => {
+  assert.doesNotMatch(dashboardMarkup(), /\sstyle=["']/i);
+  assert.doesNotMatch(read("portal-demo.js"), /\sstyle=[\\"']/i);
+  const server = fs.readFileSync(path.join(ROOT, "src", "server.js"), "utf8");
+  assert.match(server, /html\.replace\(\/\\sstyle=/);
+});
+
+test("public demo visibly discloses privacy and channel-preview behavior", () => {
+  const index = read("index.html");
+  assert.match(index, /please don’t enter real patient information or sensitive personal data/i);
+  assert.match(index, /Channel preview only/i);
+  assert.match(index, /Nova Demo Aesthetic Clinic/);
+});
+
+test("pipeline headline metrics are data-driven and exclude won leads from active value", () => {
+  const markup = dashboardMarkup();
+  const js = read("portal-demo.js");
+  assert.match(markup, /id="pipelineValue"/);
+  assert.match(js, /stage !== "won"/);
+  assert.match(js, /pipelineValue\.textContent = formatMoney/);
+  assert.match(js, /updatePipelineFilterCounts/);
+});
+
+test("public endpoints do not advertise the selected AI provider", () => {
+  const server = fs.readFileSync(path.join(ROOT, "src", "server.js"), "utf8");
+  const publicConfigBlock = server.slice(server.indexOf("function publicConfig"), server.indexOf("async function handleApi"));
+  assert.doesNotMatch(publicConfigBlock, /aiProvider/);
+  const healthBlock = server.slice(server.indexOf('url.pathname === "/health"'), server.indexOf('url.pathname === "/api/demo/config"'));
+  assert.doesNotMatch(healthBlock, /aiProvider/);
 });
