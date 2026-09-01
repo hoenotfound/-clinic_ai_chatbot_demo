@@ -1,78 +1,40 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { api } from "../api";
+import { createContext, useContext, useEffect, useMemo } from "react";
 
 const AuthContext = createContext(null);
-
-function normalizeUser(response) {
-  if (response?.user) return response.user;
-  if (response?.username) {
-    return {
-      username: response.username,
-      displayName: response.username,
-      role: "admin",
-      permissions: {},
-    };
-  }
-  return null;
-}
+const permissions = {
+  view_assigned_leads: true,
+  view_all_leads: true,
+  reply_to_assigned_leads: true,
+  manage_assigned_leads: true,
+  view_analytics: true,
+  manage_tools: true,
+  manage_settings: true,
+  manage_users: true,
+};
+const user = { username: "demo", displayName: "Demo Admin", role: "admin", permissions };
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(undefined);
-  const [error, setError] = useState(null);
-
-  const refreshUser = useCallback(async () => {
-    const res = await api.me();
-    const nextUser = normalizeUser(res);
-    setUser(nextUser);
-    return nextUser;
-  }, []);
-
-  useEffect(() => {
-    refreshUser().catch(() => setUser(null));
-  }, [refreshUser]);
-
   useEffect(() => {
     const root = document.documentElement;
-    const permissions = user?.permissions || {};
-    root.dataset.canReplyLeads = String(permissions.reply_to_assigned_leads === true);
-    root.dataset.canManageLeads = String(permissions.manage_assigned_leads === true);
+    root.dataset.canReplyLeads = "true";
+    root.dataset.canManageLeads = "true";
     return () => {
       delete root.dataset.canReplyLeads;
       delete root.dataset.canManageLeads;
     };
-  }, [user]);
-
-  const login = useCallback(async (u, p) => {
-    setError(null);
-    try {
-      const res = await api.login(u, p);
-      setUser(normalizeUser(res));
-      return true;
-    } catch (err) {
-      setError(err.message);
-      return false;
-    }
   }, []);
 
-  const logout = useCallback(async () => {
-    await api.logout().catch(() => {});
-    setUser(null);
-  }, []);
-
-  const value = useMemo(() => {
-    const permissions = user?.permissions || {};
-    return {
-      user,
-      username: user?.username || null,
-      permissions,
-      can: (capability) => permissions[capability] === true,
-      login,
-      logout,
-      refreshUser,
-      error,
-      loading: user === undefined,
-    };
-  }, [user, login, logout, refreshUser, error]);
+  const value = useMemo(() => ({
+    user,
+    username: user.username,
+    permissions,
+    can: (capability) => permissions[capability] === true,
+    login: async () => true,
+    logout: async () => {},
+    refreshUser: async () => user,
+    error: null,
+    loading: false,
+  }), []);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
