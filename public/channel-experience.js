@@ -153,12 +153,46 @@
     sendButton.setAttribute("aria-label", hasText ? "Send message" : `${config.label} quick action`);
   }
 
+  function ensureSeenRow(channel, latestUserRow) {
+    let seenRow = messages.querySelector(".channel-seen-row");
+    if (!latestUserRow || channel === "whatsapp") {
+      seenRow?.remove();
+      return;
+    }
+
+    if (!seenRow) {
+      seenRow = document.createElement("div");
+      seenRow.className = "message-row user channel-seen-row";
+    }
+
+    if (seenRow.dataset.channel !== channel) {
+      seenRow.replaceChildren();
+      if (channel === "instagram") {
+        const seen = document.createElement("span");
+        seen.className = "channel-seen";
+        seen.textContent = "Seen";
+        seenRow.appendChild(seen);
+      } else if (channel === "facebook") {
+        const seenAvatar = document.createElement("span");
+        seenAvatar.className = "channel-seen-avatar";
+        seenAvatar.textContent = "N";
+        seenAvatar.setAttribute("aria-label", "Seen");
+        seenRow.appendChild(seenAvatar);
+      }
+      seenRow.dataset.channel = channel;
+    }
+
+    if (latestUserRow.nextElementSibling !== seenRow) {
+      latestUserRow.insertAdjacentElement("afterend", seenRow);
+    }
+  }
+
   function decorateMessages(channel) {
     if (decorating) return;
     decorating = true;
 
     try {
-      const userRows = Array.from(messages.querySelectorAll(".message-row.user"));
+      const userRows = Array.from(messages.querySelectorAll(".message-row.user:not(.channel-seen-row)"));
       messages.querySelectorAll(".message-row").forEach((row) => row.classList.remove("is-last-outgoing"));
 
       userRows.forEach((row) => {
@@ -179,21 +213,8 @@
       });
 
       const latestUserRow = userRows[userRows.length - 1];
-      if (latestUserRow) {
-        latestUserRow.classList.add("is-last-outgoing");
-        if (channel === "instagram") {
-          const seen = document.createElement("span");
-          seen.className = "channel-seen";
-          seen.textContent = "Seen";
-          latestUserRow.appendChild(seen);
-        } else if (channel === "facebook") {
-          const seenAvatar = document.createElement("span");
-          seenAvatar.className = "channel-seen-avatar";
-          seenAvatar.textContent = "N";
-          seenAvatar.setAttribute("aria-label", "Seen");
-          latestUserRow.appendChild(seenAvatar);
-        }
-      }
+      if (latestUserRow) latestUserRow.classList.add("is-last-outgoing");
+      ensureSeenRow(channel, latestUserRow);
     } finally {
       decorating = false;
     }
