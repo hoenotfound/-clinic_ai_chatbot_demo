@@ -332,10 +332,15 @@ async function getGeminiReply(messages, isFirstMessage) {
 }
 
 async function getReply(messages, isFirstMessage = false) {
-  if (provider === "mock") return getFallbackReply(messages);
-  if (provider === "claude") return getClaudeReply(messages, isFirstMessage);
-  if (provider === "gemini") return getGeminiReply(messages, isFirstMessage);
-  throw new Error(`Unknown AI_PROVIDER: ${provider}`);
+  try {
+    if (provider === "mock") return getFallbackReply(messages);
+    if (provider === "claude") return await getClaudeReply(messages, isFirstMessage);
+    if (provider === "gemini") return await getGeminiReply(messages, isFirstMessage);
+    throw new Error(`Unknown AI_PROVIDER: ${provider}`);
+  } catch (error) {
+    console.error(`AI provider "${provider}" failed; using deterministic demo fallback:`, error);
+    return getFallbackReply(messages);
+  }
 }
 
 module.exports = {
