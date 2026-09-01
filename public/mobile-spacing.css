@@ -213,6 +213,35 @@ b {
 }
 
 @media (max-width: 600px) {
+  /*
+    Mobile readability pass.
+    Marketing labels stay compact, but meaningful UI text should not fall into the
+    8–9px range. !important is intentional here because subpage-polish.css loads
+    later and otherwise shrinks a few helper labels back down.
+  */
+  .page-shell .scaling-pill {
+    font-size: 9px !important;
+  }
+
+  .page-shell .hero-eyebrow,
+  .page-shell .section-eyebrow {
+    font-size: 10px !important;
+    line-height: 1.35;
+  }
+
+  .page-shell .demo-reset-button {
+    font-size: 10px !important;
+  }
+
+  .page-shell .experience-tab strong {
+    font-size: 11px !important;
+    line-height: 1.25;
+  }
+
+  .page-shell #patientView .channel-button strong {
+    font-size: 10px !important;
+  }
+
   /* A true 2 × 2 action grid: no clipped third card and no horizontal scrolling. */
   .page-shell #patientView .prompt-panel .suggestion-list {
     display: grid;
@@ -229,10 +258,9 @@ b {
     padding: 12px;
   }
 
-  /* Raise the smallest supporting text one step without making the UI feel oversized. */
   .page-shell #patientView .channel-preview-note,
   .page-shell #patientView .prompt-helper {
-    font-size: 10.5px;
+    font-size: 11px !important;
     line-height: 1.55;
   }
 
@@ -242,30 +270,42 @@ b {
   }
 
   .page-shell #patientView .tour-heading div > span {
-    font-size: 8.5px;
+    font-size: 9.5px;
   }
 
   .page-shell #patientView .tour-heading div > strong {
-    font-size: 11.5px;
+    font-size: 12px;
   }
 
   .page-shell #patientView #tourProgress {
-    font-size: 9px;
+    font-size: 10px;
   }
 
   .page-shell #patientView .suggestion-chip > span {
-    font-size: 9px;
+    font-size: 10px;
     line-height: 1.2;
   }
 
   .page-shell #patientView .suggestion-chip > strong {
-    font-size: 11px;
-    line-height: 1.3;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .page-shell #patientView .device-stage-heading {
+    font-size: 9.5px;
+  }
+
+  .page-shell #patientView .device-stage-heading strong {
+    font-size: 10.5px;
+  }
+
+  .page-shell #patientView .privacy-note {
+    font-size: 10px;
   }
 
   .page-shell .journey-strip small {
-    font-size: 10.5px;
-    line-height: 1.45;
+    font-size: 11.5px;
+    line-height: 1.5;
   }
 
   .page-shell .capability-card > span {
@@ -277,12 +317,30 @@ b {
   }
 
   .page-shell .capability-card li {
-    font-size: 11.5px;
-    line-height: 1.45;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  /* Balance this headline so “bot.” does not become a visually weak orphan line. */
+  .page-shell #capabilitiesTitle {
+    text-wrap: balance;
   }
 
   .page-shell .sales-cta-trust span {
     font-size: 11px;
+  }
+
+  .page-shell .sales-cta-actions small {
+    font-size: 10px;
+  }
+
+  .page-shell .subpage-footer p {
+    font-size: 10px !important;
+    line-height: 1.45;
+  }
+
+  .page-shell .subpage-footer-links a {
+    font-size: 10px !important;
   }
 
   .capabilities-section {
