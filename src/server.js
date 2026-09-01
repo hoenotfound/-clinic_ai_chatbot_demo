@@ -303,9 +303,8 @@ async function handleApi(req, res, url) {
       try {
         reply = await ai.getReply(history, isFirstMessage);
       } catch (aiError) {
-        degraded = true;
-        console.error("AI provider failed while handling a demo message:", aiError);
-        reply = "Sorry, I’m having a little trouble replying right now. Please try again in a moment 🙂";
+        console.error("AI service escaped its fallback boundary; using deterministic demo fallback:", aiError);
+        reply = ai.getFallbackReply(history);
       }
 
       // Staff may take over while the model request is still in flight. In that
