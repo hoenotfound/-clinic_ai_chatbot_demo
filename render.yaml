@@ -2,7 +2,7 @@ services:
   - type: web
     name: clinic-ai-chatbot-demo
     runtime: node
-    plan: free
+    plan: 0.5c-512mb
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /health
@@ -15,6 +15,24 @@ services:
         sync: false
       - key: GEMINI_MODEL
         value: gemini-2.5-flash
+      - key: DEMO_SESSION_MINUTES
+        value: 60
+      - key: DEMO_MAX_MESSAGES
+        value: 30
+      - key: DEMO_MAX_SESSIONS_PER_IP_DAY
+        value: 20
+      - key: DEMO_MAX_TOTAL_MESSAGES_PER_DAY
+        value: 500
+      - key: DEMO_MIN_MESSAGE_INTERVAL_MS
+        value: 900
+      - key: DEMO_MAX_TOTAL_MESSAGES_PER_SESSION
+        value: 60
+      - key: DEMO_MAX_STAFF_MESSAGES_PER_SESSION
+        value: 20
+      - key: DEMO_MIN_STAFF_MESSAGE_INTERVAL_MS
+        value: 700
+      - key: DEMO_MAX_CONCURRENT_AI_REQUESTS
+        value: 8
       - key: SALES_CTA_LABEL
         value: Set up my clinic
       - key: SALES_CTA_URL
