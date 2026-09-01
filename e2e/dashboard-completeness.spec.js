@@ -36,9 +36,10 @@ test("Contacts, Settings and Team & Access work as real dashboard pages", async 
 
   await frame.getByRole("link", { name: "Team & Access" }).click();
   await expect(frame.getByRole("heading", { name: "Team & Access", exact: true })).toBeVisible();
-  await expect(frame.getByText("Demo Admin", { exact: true }).first()).toBeVisible();
-  await expect(frame.getByText("Sarah", { exact: true }).first()).toBeVisible();
-  await expect(frame.getByText("Mira", { exact: true }).first()).toBeVisible();
+  const desktopMembers = frame.locator("table tbody");
+  await expect(desktopMembers.getByText("Demo Admin", { exact: true })).toBeVisible();
+  await expect(desktopMembers.getByText("Sarah", { exact: true })).toBeVisible();
+  await expect(desktopMembers.getByText("Mira", { exact: true })).toBeVisible();
 });
 
 test("dashboard ignores an old session poll after a new demo starts", async ({ page }) => {
@@ -54,7 +55,7 @@ test("dashboard ignores an old session poll after a new demo starts", async ({ p
   const liveInbox = frame.locator('aside[aria-label="Conversation inbox"]');
   await liveInbox.getByRole("button", { name: /Demo Patient/ }).click();
   const liveThread = frame.locator('section[aria-label="Conversation with Demo Patient"]');
-  await expect(liveThread).toContainText("How much is HIFU?");
+  await expect(liveThread).toContainText("Hi, how much is HIFU?");
 
   let heldOldPoll = false;
   let releaseOldPoll = null;
@@ -90,5 +91,5 @@ test("dashboard ignores an old session poll after a new demo starts", async ({ p
   await page.waitForTimeout(500);
 
   await expect(liveThread.getByText("No messages yet", { exact: true })).toBeVisible();
-  await expect(liveThread.getByText("How much is HIFU?", { exact: true })).toHaveCount(0);
+  await expect(liveThread.getByText("Hi, how much is HIFU?", { exact: true })).toHaveCount(0);
 });
