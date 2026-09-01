@@ -1,0 +1,112 @@
+@import "tailwindcss";
+@import "@fontsource/manrope/600.css";
+@import "@fontsource/manrope/700.css";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+
+@theme {
+  --font-display: "Manrope", ui-sans-serif, sans-serif;
+  --font-body: "Inter", ui-sans-serif, sans-serif;
+
+  --color-bg: #faf9f6;
+  --color-surface: #ffffff;
+  --color-sidebar: #16211d;
+  --color-sidebar-hover: #202f29;
+  --color-sidebar-text: #e7ece9;
+  --color-sidebar-text-muted: #8fa199;
+
+  --color-primary: #2f6f62;
+  --color-primary-hover: #245a4f;
+  --color-primary-light: #e4efec;
+
+  --color-accent: #d8a34e;
+  --color-accent-light: #faf1e0;
+
+  --color-text: #1a211f;
+  --color-text-muted: #5b675f;
+  --color-border: #e6e5de;
+
+  --color-danger: #b5462f;
+  --color-danger-light: #f7e9e5;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+}
+
+.bubble-in::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  bottom: 6px;
+  width: 12px;
+  height: 12px;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  clip-path: polygon(100% 0, 0 100%, 100% 100%);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.bubble-out::before {
+  content: "";
+  position: absolute;
+  right: -6px;
+  bottom: 6px;
+  width: 12px;
+  height: 12px;
+  background: var(--color-primary);
+  clip-path: polygon(0 0, 100% 100%, 0 100%);
+}
+
+.inbox-thread-bg {
+  background-color: #f5f7f5;
+  background-image: radial-gradient(circle at 1px 1px, rgba(47, 111, 98, 0.055) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+
+html[data-can-manage-leads="false"] section[aria-label^="Conversation with "] button:has(+ button[aria-label="Conversation actions"]),
+html[data-can-manage-leads="false"] section[aria-label^="Conversation with "] button[aria-label="Conversation actions"] { display: none; }
+
+html[data-can-reply-leads="false"] section[aria-label^="Conversation with "] > form,
+html[data-can-reply-leads="false"] section[aria-label^="Conversation with "] div[class*="ring-[var(--color-danger)]"] button { display: none; }
+
+html[data-can-reply-leads="false"] section[aria-label^="Conversation with "]::after {
+  content: "Replying is disabled for this account.";
+  flex-shrink: 0;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: 12px 16px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 639px) {
+  div:has(> svg[aria-label$="over time"]) {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  div:has(> svg[aria-label$="over time"])::-webkit-scrollbar { display: none; }
+  svg[aria-label$="over time"] { width: 360px; min-width: 360px; max-width: none; }
+  svg[aria-label$="over time"] text { font-size: 18px; font-weight: 600; }
+  svg[aria-label$="over time"] line,
+  svg[aria-label$="over time"] polyline { vector-effect: non-scaling-stroke; }
+  svg[aria-label$="over time"] polyline { stroke-width: 3px; }
+  svg[aria-label$="over time"] circle { transform-box: fill-box; transform-origin: center; transform: scale(1.45); }
+}
