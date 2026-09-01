@@ -131,37 +131,96 @@ test("capture and verify demo-first desktop layout", async ({ page }) => {
   expect(trustTypography.weight).toBe("700");
   expect(trustTypography.size).toBe("10px");
 
-  const capabilityMasks = await page.locator(".capability-icon").evaluateAll((icons) => icons.map((el) => {
-    const style = getComputedStyle(el, "::before");
-    return style.maskImage || style.webkitMaskImage;
+  const capabilityIcons = await page.locator(".capability-icon").evaluateAll((icons) => icons.map((el) => {
+    const style = getComputedStyle(el);
+    const pseudo = getComputedStyle(el, "::before");
+    return {
+      mask: pseudo.maskImage || pseudo.webkitMaskImage,
+      display: style.display,
+      placeItems: style.placeItems,
+    };
   }));
-  expect(capabilityMasks).toHaveLength(3);
-  capabilityMasks.forEach((mask) => expect(mask).not.toBe("none"));
+  expect(capabilityIcons).toHaveLength(3);
+  capabilityIcons.forEach((icon) => {
+    expect(icon.mask).not.toBe("none");
+    expect(icon.display).toBe("grid");
+    expect(icon.placeItems).toBe("center");
+  });
+
+  const leadIntelligenceCard = page.locator(".capability-card").nth(1);
+  const leadCardStyle = await leadIntelligenceCard.evaluate((el) => ({
+    background: getComputedStyle(el).backgroundColor,
+    heading: getComputedStyle(el.querySelector("h3")).color,
+  }));
+  expect(leadCardStyle.background).toBe("rgb(255, 255, 255)");
+  expect(leadCardStyle.heading).not.toBe("rgb(255, 255, 255)");
+
+  const capabilityBackground = await page.locator(".capabilities-section").evaluate((el) => getComputedStyle(el, "::before").backgroundImage);
+  expect(capabilityBackground).not.toBe("none");
 
   await page.screenshot({ path: "visual-artifacts/public-demo-desktop.png", fullPage: true });
 });
 
-test("capture and verify streamlined mobile demo order", async ({ page }) => {
+test("capture and verify polished mobile demo at 360, 390 and 430px", async ({ page }) => {
   ensureDir();
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/", { waitUntil: "networkidle" });
 
-  const channels = await page.locator(".channel-panel").boundingBox();
-  const prompts = await page.locator(".prompt-panel").boundingBox();
-  const phone = await page.locator("#phone").boundingBox();
-  expect(channels).not.toBeNull();
-  expect(prompts).not.toBeNull();
-  expect(phone).not.toBeNull();
-  expect(channels.y).toBeLessThan(prompts.y);
-  expect(prompts.y).toBeLessThan(phone.y);
-  await expect(page.locator(".floating-enquiry")).toBeHidden();
+  for (const width of [360, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/", { waitUntil: "networkidle" });
 
-  const mobileBrand = await page.locator(".da-brand").evaluate((el) => ({
-    titleSize: getComputedStyle(el, "::before").fontSize,
-    subtitleSize: getComputedStyle(el, "::after").fontSize,
-  }));
-  expect(mobileBrand.titleSize).toBe("14px");
-  expect(mobileBrand.subtitleSize).toBe("6.3px");
+    const channels = await page.locator(".channel-panel").boundingBox();
+    const prompts = await page.locator(".prompt-panel").boundingBox();
+    const phone = await page.locator("#phone").boundingBox();
+    expect(channels).not.toBeNull();
+    expect(prompts).not.toBeNull();
+    expect(phone).not.toBeNull();
+    expect(channels.y).toBeLessThan(prompts.y);
+    expect(prompts.y).toBeLessThan(phone.y);
+    await expect(page.locator(".floating-enquiry")).toBeHidden();
 
-  await page.screenshot({ path: "visual-artifacts/public-demo-mobile.png", fullPage: true });
+    const rootWidth = await page.locator("html").evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }));
+    expect(rootWidth.scrollWidth).toBeLessThanOrEqual(rootWidth.clientWidth);
+
+    const promptCards = page.locator(".suggestion-chip");
+    await expect(promptCards).toHaveCount(4);
+    const promptBoxes = await promptCards.evaluateAll((cards) => cards.map((card) => {
+      const rect = card.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, width: rect.width, right: rect.right };
+    }));
+    expect(Math.abs(promptBoxes[0].y - promptBoxes[1].y)).toBeLessThan(2);
+    expect(promptBoxes[2].y).toBeGreaterThan(promptBoxes[0].y + 20);
+    expect(Math.abs(promptBoxes[2].y - promptBoxes[3].y)).toBeLessThan(2);
+    expect(Math.abs(promptBoxes[0].width - promptBoxes[1].width)).toBeLessThan(2);
+    expect(Math.abs(promptBoxes[2].width - promptBoxes[3].width)).toBeLessThan(2);
+    promptBoxes.forEach((box) => {
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.right).toBeLessThanOrEqual(width);
+    });
+
+    const microcopy = await page.locator("#patientView").evaluate((root) => ({
+      promptLabel: parseFloat(getComputedStyle(root.querySelector(".suggestion-chip > span")).fontSize),
+      promptTitle: parseFloat(getComputedStyle(root.querySelector(".suggestion-chip > strong")).fontSize),
+      helper: parseFloat(getComputedStyle(root.querySelector(".prompt-helper")).fontSize),
+      channelNote: parseFloat(getComputedStyle(root.querySelector(".channel-preview-note")).fontSize),
+    }));
+    expect(microcopy.promptLabel).toBeGreaterThanOrEqual(9);
+    expect(microcopy.promptTitle).toBeGreaterThanOrEqual(11);
+    expect(microcopy.helper).toBeGreaterThanOrEqual(10);
+    expect(microcopy.channelNote).toBeGreaterThanOrEqual(10);
+
+    const mobileBrand = await page.locator(".da-brand").evaluate((el) => ({
+      titleSize: getComputedStyle(el, "::before").fontSize,
+      subtitleSize: getComputedStyle(el, "::after").fontSize,
+    }));
+    expect(mobileBrand.titleSize).toBe("14px");
+    expect(mobileBrand.subtitleSize).toBe("6.3px");
+
+    await page.screenshot({ path: `visual-artifacts/public-demo-mobile-${width}.png`, fullPage: true });
+    if (width === 390) {
+      await page.screenshot({ path: "visual-artifacts/public-demo-mobile.png", fullPage: true });
+    }
+  }
 });
