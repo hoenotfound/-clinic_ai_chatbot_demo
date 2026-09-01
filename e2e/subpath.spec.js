@@ -39,7 +39,7 @@ test("demo and React dashboard work under the /ai-chatbot mount path", async ({ 
   await expect(liveConversation).toBeVisible();
   await liveConversation.click();
   const liveThread = dashboardFrame.locator('section[aria-label="Conversation with Demo Patient"]');
-  await expect(liveThread.getByText("How much is HIFU?", { exact: true })).toBeVisible();
+  await expect(liveThread.getByText("Hi, how much is HIFU?", { exact: true })).toBeVisible();
   await expect(liveThread).toContainText("RM 888");
 
   await dashboardFrame.getByRole("link", { name: "Pipeline" }).click();
