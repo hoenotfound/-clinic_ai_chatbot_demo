@@ -205,11 +205,107 @@ b {
 /* One static CTA callback to the hero gradient; no extra animation competing for attention. */
 .page-shell .sales-cta-ai-accent {
   display: inline-block;
-  background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 38%, #8b5cf6 68%, #7c3aed 100%);
+  background: linear-gradient(135deg, #2563eb 0%, #6366f1 48%, #7c3aed 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  color: #a78bfa;
+  color: #6366f1;
+}
+
+/*
+  Light AI conversion panel.
+  This replaces the old dark block with a white / lavender / blue surface so the
+  ending feels like a continuation of the hero and Lead Intelligence language.
+*/
+.page-shell .sales-cta {
+  border: 1px solid rgba(99, 102, 241, .14);
+  background:
+    radial-gradient(circle at 12% 18%, rgba(124, 58, 237, .11), transparent 34%),
+    radial-gradient(circle at 88% 82%, rgba(37, 99, 235, .11), transparent 36%),
+    linear-gradient(135deg, #ffffff 0%, #fbfaff 48%, #f3f7ff 100%);
+  color: var(--brand-blue-2);
+  box-shadow:
+    0 32px 80px -48px rgba(79, 70, 229, .38),
+    0 14px 34px -24px rgba(15, 23, 42, .18);
+}
+
+.page-shell .sales-cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(125deg, rgba(37, 99, 235, .20), rgba(124, 58, 237, .18), rgba(255, 255, 255, .4));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.page-shell .sales-cta-glow {
+  width: 520px;
+  height: 520px;
+  right: -150px;
+  top: -270px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, .18), rgba(124, 58, 237, .15));
+  filter: blur(90px);
+  opacity: .72;
+}
+
+.page-shell .sales-kicker {
+  color: #6d28d9;
+}
+
+.page-shell .sales-cta h2 {
+  color: var(--brand-blue);
+}
+
+.page-shell .sales-cta-copy > p:not(.sales-kicker) {
+  color: var(--slate-500);
+}
+
+.page-shell .sales-cta-trust span {
+  border-color: rgba(99, 102, 241, .13);
+  background: rgba(255, 255, 255, .76);
+  color: var(--slate-600);
+  box-shadow: 0 8px 20px -18px rgba(79, 70, 229, .38);
+}
+
+.page-shell .sales-cta-actions {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(99, 102, 241, .14);
+  background: rgba(255, 255, 255, .86);
+  backdrop-filter: blur(14px);
+  box-shadow:
+    0 22px 50px -32px rgba(79, 70, 229, .34),
+    0 8px 24px -20px rgba(15, 23, 42, .16);
+}
+
+.page-shell .sales-cta-actions::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, #2563eb 0%, #6366f1 52%, #7c3aed 100%);
+}
+
+.page-shell .sales-response-label {
+  color: #6d28d9;
+}
+
+.page-shell .sales-cta-button {
+  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 68%, #7c3aed 100%);
+  box-shadow: 0 16px 30px -18px rgba(79, 70, 229, .68);
+}
+
+.page-shell .sales-cta-button:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #4338ca 68%, #6d28d9 100%);
+  box-shadow: 0 20px 34px -18px rgba(79, 70, 229, .72);
+}
+
+.page-shell .sales-cta-actions small {
+  color: var(--slate-500);
 }
 
 @media (max-width: 600px) {
@@ -326,8 +422,26 @@ b {
     text-wrap: balance;
   }
 
+  .page-shell .sales-cta {
+    border-radius: 30px;
+    box-shadow: 0 24px 56px -38px rgba(79, 70, 229, .42);
+  }
+
+  .page-shell .sales-kicker {
+    font-size: 10px;
+    line-height: 1.4;
+  }
+
+  .page-shell .sales-cta h2 {
+    text-wrap: balance;
+  }
+
   .page-shell .sales-cta-trust span {
     font-size: 11px;
+  }
+
+  .page-shell .sales-cta-actions {
+    border-radius: 20px;
   }
 
   .page-shell .sales-cta-actions small {
