@@ -91,54 +91,69 @@ test('React Pipeline filters are usable and Analytics remains scrollable', async
   expect(browserErrors, `Browser errors: ${browserErrors.join('\n')}`).toEqual([]);
 });
 
-test('embedded Clinic Dashboard is usable at a 360px mobile viewport', async ({ page }) => {
+test('embedded Clinic Dashboard stays mobile friendly at 360, 390 and 430px', async ({ page }) => {
   const browserErrors = collectBrowserErrors(page);
-  await page.setViewportSize({ width: 360, height: 800 });
-  const frame = await openDashboard(page);
 
-  const iframeBox = await page.locator('#reactDashboardFrame').boundingBox();
-  expect(iframeBox).not.toBeNull();
-  expect(iframeBox.width).toBeGreaterThan(320);
-  expect(iframeBox.width).toBeLessThanOrEqual(360);
+  for (const width of [360, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    const frame = await openDashboard(page);
 
-  const mobileNav = frame.getByRole('navigation', { name: 'Mobile dashboard navigation' });
-  await expect(mobileNav).toBeVisible();
-  const navBox = await mobileNav.boundingBox();
-  expect(navBox.width).toBeGreaterThan(300);
-  expect(navBox.height).toBeLessThanOrEqual(72);
-  await expect(mobileNav.getByRole('button', { name: 'More dashboard pages' })).toBeVisible();
+    const iframeBox = await page.locator('#reactDashboardFrame').boundingBox();
+    expect(iframeBox).not.toBeNull();
+    expect(iframeBox.width).toBeGreaterThan(width - 50);
+    expect(iframeBox.width).toBeLessThanOrEqual(width);
 
-  const inbox = frame.locator('aside[aria-label="Conversation inbox"]');
-  const inboxBox = await inbox.boundingBox();
-  expect(inboxBox.width).toBeGreaterThan(300);
+    const mobileNav = frame.getByRole('navigation', { name: 'Mobile dashboard navigation' });
+    await expect(mobileNav).toBeVisible();
+    const navBox = await mobileNav.boundingBox();
+    expect(navBox.width).toBeGreaterThan(width - 60);
+    expect(navBox.height).toBeLessThanOrEqual(72);
+    await expect(mobileNav.getByRole('button', { name: 'More dashboard pages' })).toBeVisible();
 
-  await inbox.getByRole('button', { name: /Amanda Lee/ }).click();
-  await expect(inbox).toBeHidden();
-  await expect(frame.getByRole('button', { name: 'Back to conversations' })).toBeVisible();
-  await frame.getByRole('button', { name: 'Back to conversations' }).click();
-  await expect(inbox).toBeVisible();
+    const inbox = frame.locator('aside[aria-label="Conversation inbox"]');
+    const inboxBox = await inbox.boundingBox();
+    expect(inboxBox.width).toBeGreaterThan(width - 60);
 
-  await mobileNav.getByRole('button', { name: 'More dashboard pages' }).click();
-  const moreMenu = frame.locator('#mobileMoreMenu');
-  await expect(moreMenu).toBeVisible();
-  await expect(moreMenu.getByRole('link', { name: 'Tools' })).toBeVisible();
-  await expect(moreMenu.getByRole('link', { name: 'Settings', exact: true })).toBeVisible();
-  await expect(moreMenu.getByRole('link', { name: 'Team & Access' })).toBeVisible();
-  await moreMenu.getByRole('link', { name: 'Team & Access' }).click();
-  await expect(frame.getByRole('heading', { name: 'Team & Access' })).toBeVisible();
+    await inbox.getByRole('button', { name: /Amanda Lee/ }).click();
+    await expect(inbox).toBeHidden();
+    await expect(frame.getByRole('button', { name: 'Back to conversations' })).toBeVisible();
+    await frame.getByRole('button', { name: 'Back to conversations' }).click();
+    await expect(inbox).toBeVisible();
 
-  await frame.getByRole('link', { name: 'Pipeline', exact: true }).click();
-  await expect(frame.getByRole('heading', { name: 'Lead Pipeline' })).toBeVisible();
-  await expect(frame.locator('main.md\\:hidden')).toBeVisible();
+    await mobileNav.getByRole('button', { name: 'More dashboard pages' }).click();
+    const moreMenu = frame.locator('#mobileMoreMenu');
+    await expect(moreMenu).toBeVisible();
+    await expect(moreMenu.getByRole('link', { name: 'Tools' })).toBeVisible();
+    await expect(moreMenu.getByRole('link', { name: 'Settings', exact: true })).toBeVisible();
+    await expect(moreMenu.getByRole('link', { name: 'Team & Access' })).toBeVisible();
+    await moreMenu.getByRole('link', { name: 'Team & Access' }).click();
+    await expect(frame.getByRole('heading', { name: 'Team & Access' })).toBeVisible();
 
-  await frame.getByRole('link', { name: 'Analytics', exact: true }).click();
-  await expect(frame.getByRole('heading', { name: 'Analytics' })).toBeVisible();
+    const mobileMembers = frame.locator('section[aria-label="Mobile workspace members"]');
+    await expect(mobileMembers).toBeVisible();
+    await expect(mobileMembers.locator('[data-mobile-member-card]')).toHaveCount(3);
+    await expect(mobileMembers.locator('[data-mobile-member-card]').first()).toBeVisible();
+    await expect(frame.locator('table')).toBeHidden();
 
-  const rootWidth = await frame.locator('html').evaluate((element) => ({
-    clientWidth: element.clientWidth,
-    scrollWidth: element.scrollWidth,
-  }));
-  expect(rootWidth.scrollWidth).toBeLessThanOrEqual(rootWidth.clientWidth);
+    const teamWidth = await frame.locator('html').evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }));
+    expect(teamWidth.scrollWidth).toBeLessThanOrEqual(teamWidth.clientWidth);
+
+    await mobileNav.getByRole('link', { name: 'Pipeline', exact: true }).click();
+    await expect(frame.getByRole('heading', { name: 'Lead Pipeline' })).toBeVisible();
+    await expect(frame.locator('main.md\\:hidden')).toBeVisible();
+
+    await mobileNav.getByRole('link', { name: 'Analytics', exact: true }).click();
+    await expect(frame.getByRole('heading', { name: 'Analytics' })).toBeVisible();
+
+    const rootWidth = await frame.locator('html').evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }));
+    expect(rootWidth.scrollWidth).toBeLessThanOrEqual(rootWidth.clientWidth);
+  }
 
   expect(browserErrors, `Browser errors: ${browserErrors.join('\n')}`).toEqual([]);
 });
