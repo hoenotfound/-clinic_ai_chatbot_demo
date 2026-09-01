@@ -17,7 +17,27 @@ test("capture and verify demo-first desktop layout", async ({ page }) => {
   expect(demo.y).toBeLessThan(journey.y);
   await expect(page.locator(".hero-metric-card")).toHaveCount(0);
   await expect(page.locator(".hero-context-card")).toHaveCount(0);
-  await expect(page.locator(".hero-showcase")).toHaveCSS("opacity", "1");
+
+  const heroShowcase = page.locator(".hero-showcase");
+  await expect(heroShowcase).toHaveCSS("opacity", "1");
+  const heroShowcaseState = await heroShowcase.evaluate((el) => {
+    const style = getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
+    return {
+      display: style.display,
+      visibility: style.visibility,
+      opacity: style.opacity,
+      transform: style.transform,
+      width: rect.width,
+      height: rect.height,
+      x: rect.x,
+      y: rect.y,
+    };
+  });
+  console.log("PUBLIC_DEMO_HERO_SHOWCASE", JSON.stringify(heroShowcaseState));
+  await expect(heroShowcase).toBeVisible();
+  expect(heroShowcaseState.width).toBeGreaterThan(300);
+  expect(heroShowcaseState.height).toBeGreaterThan(400);
 
   await expect(page.getByRole("link", { name: "Specialties" })).toHaveAttribute("href", "https://dasmarketingsolution.com/#specialties");
   await expect(page.getByRole("link", { name: "Clients" })).toHaveAttribute("href", "https://dasmarketingsolution.com/#portfolio");
