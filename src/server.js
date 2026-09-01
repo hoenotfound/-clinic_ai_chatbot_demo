@@ -53,7 +53,6 @@ const MAX_TOTAL_MESSAGES_PER_SESSION = intEnv("DEMO_MAX_TOTAL_MESSAGES_PER_SESSI
 const MAX_STAFF_MESSAGES_PER_SESSION = intEnv("DEMO_MAX_STAFF_MESSAGES_PER_SESSION", 20);
 const MIN_STAFF_MESSAGE_INTERVAL_MS = intEnv("DEMO_MIN_STAFF_MESSAGE_INTERVAL_MS", 700);
 let activeAiRequests = 0;
-const staffActivity = new WeakMap();
 
 function demoBusyError() {
   const err = new Error("The live demo is busy right now. Please try your message again in a moment.");
@@ -76,6 +75,35 @@ function enforceSessionMessageCapacity(session, additionalMessages = 1) {
   if (session.messages.length + additionalMessages > MAX_TOTAL_MESSAGES_PER_SESSION) {
     const err = new Error(`This demo session is limited to ${MAX_TOTAL_MESSAGES_PER_SESSION} total messages.`);
     err.statusCode = 429;
+    throw err;
+  }
+}
+
+function preflightCustomerMessage(session, rawText) {
+  const text = typeof rawText === "string" ? rawText.replace(/\u0000/g, "").trim() : "";
+  if (!text) {
+    const err = new Error("Please type a message first.");
+    err.statusCode = 400;
+    throw err;
+  }
+  if (session.customerMessageCount >= state.limits.maxMessages) {
+    const err = new Error(`This demo is limited to ${state.limits.maxMessages} customer messages per session.`);
+    err.statusCode = 429;
+    throw err;
+  }
+  const elapsed = Date.now() - (session.lastCustomerMessageAt || 0);
+  if (session.lastCustomerMessageAt && elapsed < state.limits.minMessageIntervalMs) {
+    const err = new Error("You’re sending messages a little too quickly. Please try again in a moment.");
+    err.statusCode = 429;
+    throw err;
+  }
+}
+
+function preflightStaffMessage(rawText) {
+  const text = typeof rawText === "string" ? rawText.replace(/\u0000/g, "").trim() : "";
+  if (!text) {
+    const err = new Error("Please type a staff reply first.");
+    err.statusCode = 400;
     throw err;
   }
 }
@@ -235,6 +263,7 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { session: state.publicSession(session) });
   }
   if (action === "staff-message") {
+    preflightStaffMessage(body.message);
     enforceStaffMessageLimit(session);
     state.addStaffMessage(session, body.message);
     await persistSession(session);
@@ -245,6 +274,7 @@ async function handleApi(req, res, url) {
     const releaseAiSlot = willUseAi ? acquireAiSlot() : null;
     try {
       enforceSessionMessageCapacity(session, willUseAi ? 2 : 1);
+      preflightCustomerMessage(session, body.message);
       await shared.enforceDailyMessageLimit(state.limits.maxTotalMessagesPerDay);
       state.addCustomerMessage(session, body.message);
       await persistSession(session);
