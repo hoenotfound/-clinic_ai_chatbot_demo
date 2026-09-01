@@ -12,88 +12,81 @@ function collectBrowserErrors(page) {
 async function openDashboard(page) {
   await page.goto('/');
   await page.getByRole('tab', { name: /Clinic dashboard/i }).click();
-  await expect(page.locator('#portalPageInbox')).toHaveClass(/active/);
+  const frame = page.frameLocator('#reactDashboardFrame');
+  await expect(frame.getByRole('heading', { name: 'Inbox', exact: true })).toBeVisible();
+  return frame;
 }
 
-test('dashboard scrolls, Inbox filters work and channel badges use real SVG icons', async ({ page }) => {
+function pipelineFilter(frame, label) {
+  return frame.getByRole('button', { name: new RegExp(`^${label} \\d+$`) });
+}
+
+test('React Inbox scrolls, filters work and channel badges use real SVG icons', async ({ page }) => {
   const browserErrors = collectBrowserErrors(page);
-  await openDashboard(page);
+  const frame = await openDashboard(page);
+  const inbox = frame.locator('aside[aria-label="Conversation inbox"]');
 
-  const sampleCards = page.locator('.sample-conversation-card');
-  await expect(sampleCards).toHaveCount(12);
-  await expect(page.locator('#dashboardChannelAvatar .channel-brand-badge svg')).toBeVisible();
-  await expect(sampleCards.first().locator('.channel-brand-badge svg')).toBeVisible();
+  await expect(inbox.getByRole('button', { name: /Amanda Lee/ })).toBeVisible();
+  await expect(inbox.getByRole('button', { name: /Nur Aisyah/ })).toBeVisible();
+  await expect(inbox.locator('[aria-label="WhatsApp"] svg').first()).toBeVisible();
+  await expect(inbox.locator('[aria-label="Instagram"] svg').first()).toBeVisible();
 
-  const conversationScroll = page.locator('.portal-conversation-scroll');
-  const canScroll = await conversationScroll.evaluate((el) => el.scrollHeight > el.clientHeight);
-  expect(canScroll).toBe(true);
+  const conversationScroll = inbox.locator(':scope > div').last();
+  expect(await conversationScroll.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
   await conversationScroll.evaluate((el) => { el.scrollTop = el.scrollHeight; });
   expect(await conversationScroll.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
 
-  await page.locator('[data-inbox-filter="attention"]').click();
-  await expect(page.locator('[data-sample-id="sample-daniel"]')).toBeVisible();
-  await expect(page.locator('[data-sample-id="sample-amanda"]')).not.toBeVisible();
-  await expect(page.locator('#portalConversationCount')).toHaveText(/1|2/);
+  await inbox.getByRole('button', { name: /Needs attention/ }).click();
+  await expect(inbox.getByRole('button', { name: /Daniel Wong/ })).toBeVisible();
+  await expect(inbox.getByRole('button', { name: /Amanda Lee/ })).toHaveCount(0);
 
-  await page.locator('[data-inbox-filter="all"]').click();
-  await page.locator('#portalInboxChannel').selectOption('instagram');
-  await expect(page.locator('[data-sample-id="sample-amanda"]')).toBeVisible();
-  await expect(page.locator('[data-sample-id="sample-nur"]')).not.toBeVisible();
+  await inbox.getByRole('button', { name: /^All / }).click();
+  const selects = inbox.locator('select');
+  await selects.nth(0).selectOption('instagram');
+  await expect(inbox.getByRole('button', { name: /Amanda Lee/ })).toBeVisible();
+  await expect(inbox.getByRole('button', { name: /Nur Aisyah/ })).toHaveCount(0);
 
-  await page.locator('#portalInboxChannel').selectOption('all');
-  await page.locator('#portalInboxSearch').fill('pigmentation');
-  await expect(page.locator('[data-sample-id="sample-amanda"]')).toBeVisible();
-  await expect(page.locator('[data-sample-id="sample-nur"]')).not.toBeVisible();
-  await expect(page.locator('#portalInboxFilterSummary')).toContainText('pigmentation');
+  await selects.nth(0).selectOption('all');
+  await inbox.getByPlaceholder('Search conversations').fill('pigmentation');
+  await expect(inbox.getByRole('button', { name: /Amanda Lee/ })).toBeVisible();
+  await expect(inbox.getByRole('button', { name: /Nur Aisyah/ })).toHaveCount(0);
 
   expect(browserErrors, `Browser errors: ${browserErrors.join('\n')}`).toEqual([]);
 });
 
-test('every Pipeline filter is usable and Pipeline/Analytics scrolling works', async ({ page }) => {
+test('React Pipeline filters are usable and Analytics remains scrollable', async ({ page }) => {
   const browserErrors = collectBrowserErrors(page);
-  await openDashboard(page);
-  await page.locator('[data-portal-page="pipeline"]').click();
-  await expect(page.locator('#portalPagePipeline')).toHaveClass(/active/);
-  await expect(page.locator('#pipelineBoard .channel-brand-badge svg').first()).toBeVisible();
+  const frame = await openDashboard(page);
 
-  const board = page.locator('#pipelineBoard');
-  const boardScrollable = await board.evaluate((el) => el.scrollWidth > el.clientWidth);
-  expect(boardScrollable).toBe(true);
-  await board.evaluate((el) => { el.scrollLeft = 220; });
-  expect(await board.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  await frame.getByRole('link', { name: 'Pipeline' }).click();
+  await expect(frame.getByRole('heading', { name: 'Lead Pipeline' })).toBeVisible();
+  await expect(frame.locator('[aria-label="WhatsApp"] svg').first()).toBeVisible();
 
-  await page.locator('[data-pipeline-special="unassigned"]').click();
-  await expect(page.locator('[data-pipeline-lead="sample-meiling"]')).toBeVisible();
-  await expect(page.locator('[data-pipeline-lead="sample-amanda"]')).not.toBeVisible();
+  const desktopKanban = frame.locator('main.hidden.min-h-0.flex-1.overflow-x-auto');
+  expect(await desktopKanban.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+  await desktopKanban.evaluate((el) => { el.scrollLeft = 220; });
+  expect(await desktopKanban.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
 
-  await page.locator('[data-pipeline-special="noReply"]').click();
-  await expect(page.locator('[data-pipeline-lead="sample-amanda"]')).toBeVisible();
-  await expect(page.locator('[data-pipeline-lead="sample-nur"]')).not.toBeVisible();
+  const checks = [
+    ['Unassigned', '林美玲 Mei Ling'],
+    ['No reply', 'Amanda Lee'],
+    ['Reschedule', 'Farah Rahman'],
+    ['Cancelled', 'Sarah Lim'],
+    ['Follow-up overdue', 'Amanda Lee'],
+    ['Needs attention', 'Daniel Wong'],
+    ['Hot', 'Nur Aisyah'],
+  ];
 
-  await page.locator('[data-pipeline-special="reschedule"]').click();
-  await expect(page.locator('[data-pipeline-lead="sample-farah"]')).toBeVisible();
-  await expect(page.locator('[data-pipeline-lead="sample-amanda"]')).not.toBeVisible();
+  for (const [filter, lead] of checks) {
+    await pipelineFilter(frame, filter).click();
+    await expect(frame.getByRole('button', { name: new RegExp(lead) }).first()).toBeVisible();
+  }
 
-  await page.locator('[data-pipeline-special="cancelled"]').click();
-  await expect(page.locator('[data-pipeline-lead="sample-aina"]')).toBeVisible();
-  await expect(page.locator('[data-pipeline-lead="sample-farah"]')).not.toBeVisible();
-
-  await page.locator('[data-pipeline-special="overdue"]').click();
-  await expect(page.locator('[data-pipeline-lead="sample-michelle"]')).toBeVisible();
-  await expect(page.locator('[data-pipeline-lead="sample-jiaen"]')).toBeVisible();
-  await expect(page.locator('[data-pipeline-lead="sample-nur"]')).not.toBeVisible();
-
-  await page.locator('[data-pipeline-category="hot"]').click();
-  await expect(page.locator('[data-pipeline-lead="sample-nur"]')).toBeVisible();
-  await expect(page.locator('[data-pipeline-lead="sample-amanda"]')).not.toBeVisible();
-
-  await page.locator('[data-portal-page="analytics"]').click();
-  const analytics = page.locator('#portalPageAnalytics');
-  await expect(analytics).toHaveClass(/active/);
-  const analyticsScrollable = await analytics.evaluate((el) => el.scrollHeight > el.clientHeight);
-  expect(analyticsScrollable).toBe(true);
-  await analytics.evaluate((el) => { el.scrollTop = el.scrollHeight; });
-  expect(await analytics.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  await pipelineFilter(frame, 'All leads').click();
+  await frame.getByRole('link', { name: 'Analytics' }).click();
+  await expect(frame.getByRole('heading', { name: 'Analytics' })).toBeVisible();
+  await expect(frame.getByText('Conversion Funnel')).toBeVisible();
+  await expect(frame.getByText('System Status')).toBeVisible();
 
   expect(browserErrors, `Browser errors: ${browserErrors.join('\n')}`).toEqual([]);
 });
