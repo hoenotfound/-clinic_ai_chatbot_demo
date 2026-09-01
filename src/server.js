@@ -42,6 +42,60 @@ const MIME = {
   ".ico": "image/x-icon",
 };
 
+function intEnv(name, fallback) {
+  const value = Number.parseInt(process.env[name] || "", 10);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+const MAX_CONCURRENT_AI_REQUESTS = intEnv("DEMO_MAX_CONCURRENT_AI_REQUESTS", 8);
+const MAX_TOTAL_MESSAGES_PER_SESSION = intEnv("DEMO_MAX_TOTAL_MESSAGES_PER_SESSION", 60);
+const MAX_STAFF_MESSAGES_PER_SESSION = intEnv("DEMO_MAX_STAFF_MESSAGES_PER_SESSION", 20);
+const MIN_STAFF_MESSAGE_INTERVAL_MS = intEnv("DEMO_MIN_STAFF_MESSAGE_INTERVAL_MS", 700);
+let activeAiRequests = 0;
+const staffActivity = new WeakMap();
+
+function demoBusyError() {
+  const err = new Error("The live demo is busy right now. Please try your message again in a moment.");
+  err.statusCode = 429;
+  return err;
+}
+
+function acquireAiSlot() {
+  if (activeAiRequests >= MAX_CONCURRENT_AI_REQUESTS) throw demoBusyError();
+  activeAiRequests += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    activeAiRequests = Math.max(0, activeAiRequests - 1);
+  };
+}
+
+function enforceSessionMessageCapacity(session, additionalMessages = 1) {
+  if (session.messages.length + additionalMessages > MAX_TOTAL_MESSAGES_PER_SESSION) {
+    const err = new Error(`This demo session is limited to ${MAX_TOTAL_MESSAGES_PER_SESSION} total messages.`);
+    err.statusCode = 429;
+    throw err;
+  }
+}
+
+function enforceStaffMessageLimit(session) {
+  enforceSessionMessageCapacity(session, 1);
+  const now = Date.now();
+  const current = staffActivity.get(session) || { count: 0, lastAt: 0 };
+  if (current.count >= MAX_STAFF_MESSAGES_PER_SESSION) {
+    const err = new Error(`This demo is limited to ${MAX_STAFF_MESSAGES_PER_SESSION} staff replies per session.`);
+    err.statusCode = 429;
+    throw err;
+  }
+  if (current.lastAt && now - current.lastAt < MIN_STAFF_MESSAGE_INTERVAL_MS) {
+    const err = new Error("Staff replies are being sent a little too quickly. Please try again in a moment.");
+    err.statusCode = 429;
+    throw err;
+  }
+  staffActivity.set(session, { count: current.count + 1, lastAt: now });
+}
+
 function securityHeaders(res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -115,8 +169,11 @@ function publicConfig() {
       label: process.env.SALES_CTA_LABEL || "Set up my clinic",
       url: process.env.SALES_CTA_URL || "",
     },
-    aiProvider: ai.provider,
-    limits: state.limits,
+    limits: {
+      ...state.limits,
+      maxTotalMessagesPerSession: MAX_TOTAL_MESSAGES_PER_SESSION,
+      maxStaffMessagesPerSession: MAX_STAFF_MESSAGES_PER_SESSION,
+    },
   };
 }
 
@@ -124,7 +181,6 @@ async function handleApi(req, res, url) {
   if (req.method === "GET" && url.pathname === "/health") {
     return sendJson(res, ai.configured ? 200 : 503, {
       ok: ai.configured,
-      aiProvider: ai.provider,
       configured: ai.configured,
     });
   }
@@ -157,46 +213,54 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { session: state.publicSession(session) });
   }
   if (action === "staff-message") {
+    enforceStaffMessageLimit(session);
     state.addStaffMessage(session, body.message);
     return sendJson(res, 200, { session: state.publicSession(session) });
   }
   if (action === "message") {
-    state.addCustomerMessage(session, body.message);
-    if (session.mode === "human") {
-      return sendJson(res, 200, { session: state.publicSession(session), aiReplied: false });
-    }
-    const history = session.messages.map((message) => ({ role: message.role, content: message.content }));
-    const isFirstMessage = session.customerMessageCount === 1;
-    let reply;
-    let degraded = false;
+    const willUseAi = session.mode === "ai";
+    const releaseAiSlot = willUseAi ? acquireAiSlot() : null;
     try {
-      reply = await ai.getReply(history, isFirstMessage);
-    } catch (aiError) {
-      degraded = true;
-      console.error("AI provider failed while handling a demo message:", aiError);
-      reply = "Sorry, I’m having a little trouble replying right now. Please try again in a moment 🙂";
-    }
+      enforceSessionMessageCapacity(session, willUseAi ? 2 : 1);
+      state.addCustomerMessage(session, body.message);
+      if (session.mode === "human") {
+        return sendJson(res, 200, { session: state.publicSession(session), aiReplied: false });
+      }
+      const history = session.messages.map((message) => ({ role: message.role, content: message.content }));
+      const isFirstMessage = session.customerMessageCount === 1;
+      let reply;
+      let degraded = false;
+      try {
+        reply = await ai.getReply(history, isFirstMessage);
+      } catch (aiError) {
+        degraded = true;
+        console.error("AI provider failed while handling a demo message:", aiError);
+        reply = "Sorry, I’m having a little trouble replying right now. Please try again in a moment 🙂";
+      }
 
-    // Staff may take over while the model request is still in flight. In that
-    // case, discard the generated reply so human ownership is respected.
-    if (session.mode === "human") {
+      // Staff may take over while the model request is still in flight. In that
+      // case, discard the generated reply so human ownership is respected.
+      if (session.mode === "human") {
+        return sendJson(res, 200, {
+          session: state.publicSession(session),
+          aiReplied: false,
+          cancelledByTakeover: true,
+        });
+      }
+
+      if (isFirstMessage) reply = `${clinic.introMessage}\n\n${reply}`;
+      const assistantMessage = state.addAssistantMessage(session, reply);
+      const showPromotion = !degraded && !session.needsAttention && state.shouldShowPromotion(session);
+      if (showPromotion) state.markPromotionShown(session, assistantMessage.id);
       return sendJson(res, 200, {
         session: state.publicSession(session),
-        aiReplied: false,
-        cancelledByTakeover: true,
+        aiReplied: !degraded,
+        degraded,
+        promotion: showPromotion ? clinic.promotion : null,
       });
+    } finally {
+      releaseAiSlot?.();
     }
-
-    if (isFirstMessage) reply = `${clinic.introMessage}\n\n${reply}`;
-    const assistantMessage = state.addAssistantMessage(session, reply);
-    const showPromotion = !degraded && !session.needsAttention && state.shouldShowPromotion(session);
-    if (showPromotion) state.markPromotionShown(session, assistantMessage.id);
-    return sendJson(res, 200, {
-      session: state.publicSession(session),
-      aiReplied: !degraded,
-      degraded,
-      promotion: showPromotion ? clinic.promotion : null,
-    });
   }
   return false;
 }
@@ -223,6 +287,11 @@ function buildEnhancedIndex(filePath) {
     html = html.slice(0, dashboardStart) + replacement + html.slice(proofStart);
   }
 
+  // Keep the strict style CSP. The dashboard uses CSS classes instead of inline
+  // style attributes, and this guard prevents a future sample fragment from
+  // accidentally reintroducing CSP-blocked inline styling.
+  html = html.replace(/\sstyle="[^"]*"/g, "");
+
   if (!html.includes('/portal-demo.css')) {
     html = html.replace('</head>', '  <link rel="stylesheet" href="/portal-demo.css" />\n  <link rel="stylesheet" href="/portal-fidelity.css" />\n  <link rel="stylesheet" href="/portal-fidelity-extra.css" />\n</head>');
   }
@@ -248,7 +317,7 @@ function serveStatic(req, res, pathname) {
     res.writeHead(200, {
       "Content-Type": "text/html; charset=utf-8",
       "Content-Length": payload.length,
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, max-age=0, must-revalidate",
     });
     if (req.method === "HEAD") {
       res.end();
@@ -262,7 +331,7 @@ function serveStatic(req, res, pathname) {
   res.writeHead(200, {
     "Content-Type": MIME[path.extname(filePath).toLowerCase()] || "application/octet-stream",
     "Content-Length": stat.size,
-    "Cache-Control": "public, max-age=3600",
+    "Cache-Control": "no-cache, max-age=0, must-revalidate",
   });
   if (req.method === "HEAD") {
     res.end();
@@ -291,5 +360,5 @@ setInterval(state.cleanupExpiredSessions, 10 * 60_000).unref();
 
 server.listen(PORT, () => {
   console.log(`Clinic AI demo running on port ${PORT}`);
-  console.log(`AI provider: ${ai.provider}`);
+  console.log("AI provider configured:", ai.configured);
 });
