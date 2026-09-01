@@ -93,39 +93,76 @@ test("channel experience stays inside a narrow mobile viewport", async ({ page }
   await page.screenshot({ path: "visual-artifacts/channel-messenger-mobile.png", fullPage: true });
 });
 
-test("Instagram and Messenger keep the outgoing bubble right-aligned while waiting for the AI reply", async ({ page }) => {
+test("all channels paint the first outgoing bubble before the AI reply", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
+
+  let releaseRequest = null;
   await page.route(/\/api\/demo\/sessions\/[^/]+\/message$/, async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 700));
-    await route.continue();
+    await new Promise((resolve) => {
+      releaseRequest = async () => {
+        releaseRequest = null;
+        await route.continue();
+        resolve();
+      };
+    });
   });
+
   await page.goto("/", { waitUntil: "networkidle" });
 
-  for (const [channel, experience] of [["instagram", "instagram"], ["facebook", "facebook"]]) {
+  for (const [channel, experience] of [
+    ["whatsapp", "whatsapp"],
+    ["instagram", "instagram"],
+    ["facebook", "facebook"],
+  ]) {
     await selectChannel(page, channel, experience);
+    await page.locator("#newDemoButton").click();
+
+    const userRows = page.locator("#messages .message-row.user:not(.channel-seen-row)");
+    await expect(userRows).toHaveCount(0);
+
     const input = page.locator("#customerInput");
     await input.fill("How much is HIFU?");
     await page.getByRole("button", { name: "Send message" }).click();
 
-    const outgoing = page.locator("#messages .message-row.user:not(.channel-seen-row)").last();
+    await expect.poll(() => Boolean(releaseRequest)).toBe(true);
+
+    const outgoing = userRows.last();
+    await expect(userRows).toHaveCount(1);
     await expect(outgoing).toContainText("How much is HIFU?");
     await expect(page.locator("#typingIndicator")).not.toHaveClass(/hidden/);
-    await expect(page.locator("#messages .channel-seen-row")).toBeVisible();
-    await expect(outgoing.locator(".channel-seen, .channel-seen-avatar")).toHaveCount(0);
+    await expect(page.locator("#messages .message-row.assistant")).toHaveCount(0);
 
-    const alignment = await outgoing.evaluate((row) => {
+    const position = await outgoing.evaluate((row) => {
       const bubble = row.querySelector(".message-bubble");
+      const messages = row.closest("#messages");
       const rowRect = row.getBoundingClientRect();
       const bubbleRect = bubble.getBoundingClientRect();
+      const messagesRect = messages.getBoundingClientRect();
       return {
+        rowTop: rowRect.top,
+        rowBottom: rowRect.bottom,
+        messagesTop: messagesRect.top,
+        messagesBottom: messagesRect.bottom,
         gapFromRight: Math.abs(rowRect.right - bubbleRect.right),
         bubbleLeft: bubbleRect.left,
         rowCenter: rowRect.left + rowRect.width / 2,
       };
     });
-    expect(alignment.gapFromRight).toBeLessThan(2);
-    expect(alignment.bubbleLeft).toBeGreaterThan(alignment.rowCenter);
 
+    expect(position.rowTop).toBeGreaterThanOrEqual(position.messagesTop - 1);
+    expect(position.rowBottom).toBeLessThanOrEqual(position.messagesBottom + 1);
+    expect(position.gapFromRight).toBeLessThan(2);
+    expect(position.bubbleLeft).toBeGreaterThan(position.rowCenter);
+
+    if (channel === "whatsapp") {
+      await expect(page.locator("#messages .channel-seen-row")).toHaveCount(0);
+    } else {
+      await expect(page.locator("#messages .channel-seen-row")).toBeVisible();
+      await expect(outgoing.locator(".channel-seen, .channel-seen-avatar")).toHaveCount(0);
+    }
+
+    const release = releaseRequest;
+    await release();
     await expect(page.locator("#messages")).toContainText("RM 888");
   }
 });
