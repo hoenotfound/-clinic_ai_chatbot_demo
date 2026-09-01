@@ -21,21 +21,6 @@ export function withAppBase(url, pathname = window.location.pathname) {
   return `${base}${url}`;
 }
 
-function syncEmbeddedDemoSessionId() {
-  if (typeof window === "undefined" || window.parent === window) return;
-  try {
-    if (window.parent.location.origin !== window.location.origin) return;
-    const parentId = window.parent.sessionStorage.getItem("clinicDemoSessionId");
-    if (!parentId) return;
-    if (window.sessionStorage.getItem("clinicDemoSessionId") !== parentId) {
-      window.sessionStorage.setItem("clinicDemoSessionId", parentId);
-    }
-  } catch {
-    // Cross-origin parents cannot be inspected. The standalone dashboard keeps
-    // using its own sessionStorage in that case.
-  }
-}
-
 function installAbsoluteApiFetchGuard() {
   if (typeof window === "undefined" || typeof window.fetch !== "function") return;
   const base = getAppBasePath();
@@ -51,10 +36,4 @@ function installAbsoluteApiFetchGuard() {
   window.__clinicDemoApiFetchGuardInstalled = true;
 }
 
-syncEmbeddedDemoSessionId();
 installAbsoluteApiFetchGuard();
-
-if (typeof window !== "undefined" && window.parent !== window) {
-  window.addEventListener("focus", syncEmbeddedDemoSessionId);
-  window.setInterval(syncEmbeddedDemoSessionId, 1000);
-}
