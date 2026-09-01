@@ -8,6 +8,7 @@ import Analytics from "./pages/Analytics";
 import Tools from "./pages/Tools";
 import Settings from "./pages/Settings";
 import TeamAccess from "./pages/TeamAccess";
+import { getDashboardBasePath } from "./basePath";
 
 function Page({ children }) {
   return <Layout>{children}</Layout>;
@@ -15,7 +16,7 @@ function Page({ children }) {
 
 export default function App() {
   return (
-    <BrowserRouter basename="/dashboard">
+    <BrowserRouter basename={getDashboardBasePath()}>
       <AuthProvider>
         <Routes>
           <Route path="/" element={<Navigate to="/inbox" replace />} />
