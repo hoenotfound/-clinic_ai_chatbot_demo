@@ -1,7 +1,9 @@
+import { withAppBase } from "../basePath";
+
 export const branding = {
   clientName: "Nova Demo Clinic",
-  clientLogo: "/dashboard/nova-demo-logo.svg",
+  clientLogo: withAppBase("/dashboard/nova-demo-logo.svg"),
   loginTagline: "Interactive clinic AI sales demo",
   agencyName: "AI Clinic Demo",
-  agencyLogo: "/dashboard/nova-demo-logo.svg",
+  agencyLogo: withAppBase("/dashboard/nova-demo-logo.svg"),
 };
