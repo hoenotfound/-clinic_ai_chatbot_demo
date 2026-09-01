@@ -346,7 +346,18 @@ function safeDashboardPath(pathname) {
   return fullPath.startsWith(DASHBOARD_DIST) ? fullPath : null;
 }
 
-function serveDashboard(req, res, pathname) {
+function buildDashboardIndex(filePath, mountPath = "") {
+  const baseHref = `${mountPath}/dashboard/`;
+  let html = fs.readFileSync(filePath, "utf8");
+  if (html.includes("<base ")) {
+    html = html.replace(/<base\s+href="[^"]*"\s*\/?>/, `<base href="${baseHref}" />`);
+  } else {
+    html = html.replace("<head>", `<head>\n    <base href="${baseHref}" />`);
+  }
+  return html;
+}
+
+function serveDashboard(req, res, pathname, mountPath = "") {
   if (!fs.existsSync(DASHBOARD_DIST)) {
     securityHeaders(res, { dashboard: true });
     const payload = Buffer.from("React dashboard has not been built yet. Run npm run build:dashboard.");
@@ -362,12 +373,25 @@ function serveDashboard(req, res, pathname) {
   const filePath = safeDashboardPath(pathname);
   if (!filePath || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return false;
   securityHeaders(res, { dashboard: true });
-  const stat = fs.statSync(filePath);
   const isIndex = path.basename(filePath) === "index.html";
+
+  if (isIndex) {
+    const payload = Buffer.from(buildDashboardIndex(filePath, mountPath));
+    res.writeHead(200, {
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": payload.length,
+      "Cache-Control": "no-cache, max-age=0, must-revalidate",
+    });
+    if (req.method === "HEAD") return res.end(), true;
+    res.end(payload);
+    return true;
+  }
+
+  const stat = fs.statSync(filePath);
   res.writeHead(200, {
     "Content-Type": MIME[path.extname(filePath).toLowerCase()] || "application/octet-stream",
     "Content-Length": stat.size,
-    "Cache-Control": isIndex ? "no-cache, max-age=0, must-revalidate" : "public, max-age=31536000, immutable",
+    "Cache-Control": "public, max-age=31536000, immutable",
   });
   if (req.method === "HEAD") return res.end(), true;
   fs.createReadStream(filePath).pipe(res);
@@ -479,6 +503,8 @@ function serveStatic(req, res, pathname) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   try {
+    const mountedRequest = url.pathname === PUBLIC_MOUNT_PATH || url.pathname.startsWith(`${PUBLIC_MOUNT_PATH}/`);
+
     if ((req.method === "GET" || req.method === "HEAD") && url.pathname === PUBLIC_MOUNT_PATH) {
       securityHeaders(res);
       res.writeHead(308, {
@@ -496,7 +522,7 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 404, { error: "API route not found." });
     }
     if ((req.method === "GET" || req.method === "HEAD") && url.pathname.startsWith("/dashboard")) {
-      if (serveDashboard(req, res, url.pathname)) return;
+      if (serveDashboard(req, res, url.pathname, mountedRequest ? PUBLIC_MOUNT_PATH : "")) return;
     }
     if (req.method === "GET" || req.method === "HEAD") return serveStatic(req, res, url.pathname);
     sendJson(res, 404, { error: "Not found." });
