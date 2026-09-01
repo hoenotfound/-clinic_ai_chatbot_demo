@@ -31,6 +31,17 @@ test("capture and verify demo-first desktop layout", async ({ page }) => {
   const heroProductState = await heroProduct.evaluate((el) => {
     const style = getComputedStyle(el);
     const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const stack = document.elementsFromPoint(cx, cy).slice(0, 8).map((node) => ({
+      tag: node.tagName,
+      id: node.id,
+      className: typeof node.className === "string" ? node.className : "",
+      position: getComputedStyle(node).position,
+      zIndex: getComputedStyle(node).zIndex,
+      background: getComputedStyle(node).backgroundColor,
+      opacity: getComputedStyle(node).opacity,
+    }));
     return {
       display: style.display,
       visibility: style.visibility,
@@ -41,12 +52,14 @@ test("capture and verify demo-first desktop layout", async ({ page }) => {
       height: rect.height,
       x: rect.x,
       y: rect.y,
+      stack,
     };
   });
   console.log("PUBLIC_DEMO_HERO_PRODUCT", JSON.stringify(heroProductState));
   expect(heroProductState.width).toBeGreaterThan(300);
   expect(heroProductState.height).toBeGreaterThan(400);
   expect(heroProductState.backgroundImage).not.toBe("none");
+  expect(heroProductState.stack.some((item) => item.className.includes("hero-product-card"))).toBeTruthy();
 
   await expect(page.getByRole("link", { name: "Specialties" })).toHaveAttribute("href", "https://dasmarketingsolution.com/#specialties");
   await expect(page.getByRole("link", { name: "Clients" })).toHaveAttribute("href", "https://dasmarketingsolution.com/#portfolio");
