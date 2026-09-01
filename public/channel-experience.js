@@ -1,4 +1,12 @@
 (() => {
+  if (!document.querySelector('link[data-section-rhythm="styles"]')) {
+    const sectionRhythm = document.createElement("link");
+    sectionRhythm.rel = "stylesheet";
+    sectionRhythm.href = "/section-rhythm.css";
+    sectionRhythm.dataset.sectionRhythm = "styles";
+    document.head.appendChild(sectionRhythm);
+  }
+
   const phone = document.getElementById("phone");
   const messages = document.getElementById("messages");
   const composer = document.getElementById("customerForm");
