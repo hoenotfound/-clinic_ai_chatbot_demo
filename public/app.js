@@ -2,6 +2,8 @@ const state = {
   config: null,
   session: null,
   loading: false,
+  messagePending: false,
+  transitioning: false,
   activeView: "patient",
   hasViewedDashboard: false,
   hasTakenOver: false,
@@ -76,6 +78,21 @@ async function paintOutgoingMessageBeforeRequest() {
   await waitForPaint();
   if (els.messages) els.messages.scrollTop = els.messages.scrollHeight;
   await waitForPaint();
+}
+
+function refreshInteractionState() {
+  const blocked = state.messagePending || state.transitioning;
+  if (els.customerInput) els.customerInput.disabled = blocked;
+  if (els.customerSendButton) els.customerSendButton.disabled = blocked;
+  if (els.newDemoButton) els.newDemoButton.disabled = blocked;
+  document.querySelectorAll(".channel-button, .suggestion-chip").forEach((button) => {
+    button.disabled = blocked;
+  });
+}
+
+function setTransitioning(transitioning) {
+  state.transitioning = transitioning;
+  refreshInteractionState();
 }
 
 function setActiveView(view) {
@@ -229,9 +246,8 @@ function renderAll() {
 
 function setLoading(loading) {
   state.loading = loading;
-  if (els.customerInput) els.customerInput.disabled = loading;
-  if (els.customerSendButton) els.customerSendButton.disabled = loading;
   els.typingIndicator?.classList.toggle("hidden", !loading);
+  refreshInteractionState();
   if (loading && els.messages) setTimeout(() => { els.messages.scrollTop = els.messages.scrollHeight; }, 0);
 }
 
@@ -264,13 +280,16 @@ async function restoreOrCreateSession() {
 }
 
 async function syncSession() {
-  if (state.loading || !state.session?.id) return;
+  if (state.messagePending || state.transitioning || !state.session?.id) return;
+  const sessionId = state.session.id;
   try {
-    const data = await api(`/api/demo/sessions/${encodeURIComponent(state.session.id)}`);
+    const data = await api(`/api/demo/sessions/${encodeURIComponent(sessionId)}`);
+    if (state.transitioning || state.messagePending || state.session?.id !== sessionId) return;
     state.session = data.session;
     state.hasTakenOver = state.hasTakenOver || state.session.mode === "human" || state.session.messages.some((message) => message.source === "staff");
     renderAll();
   } catch (error) {
+    if (state.session?.id !== sessionId) return;
     if (/expired/i.test(error.message)) {
       sessionStorage.removeItem("clinicDemoSessionId");
     }
@@ -278,10 +297,12 @@ async function syncSession() {
 }
 
 async function sendCustomerMessage(rawMessage) {
-  if (state.loading || !state.session) return;
+  if (state.messagePending || state.transitioning || !state.session) return;
   const message = rawMessage.trim();
   if (!message) return;
 
+  const sessionId = state.session.id;
+  const shouldShowTyping = state.session.mode === "ai";
   const optimistic = {
     id: `optimistic-${Date.now()}`,
     role: "user",
@@ -289,17 +310,20 @@ async function sendCustomerMessage(rawMessage) {
     source: "customer",
     createdAt: Date.now(),
   };
+
+  state.messagePending = true;
   state.session.messages.push(optimistic);
   if (els.customerInput) els.customerInput.value = "";
   renderAll();
-  setLoading(state.session.mode === "ai");
+  setLoading(shouldShowTyping);
   await paintOutgoingMessageBeforeRequest();
 
   try {
-    const data = await api(`/api/demo/sessions/${encodeURIComponent(state.session.id)}/message`, {
+    const data = await api(`/api/demo/sessions/${encodeURIComponent(sessionId)}/message`, {
       method: "POST",
       body: JSON.stringify({ message }),
     });
+    if (state.session?.id !== sessionId) return;
     state.session = data.session;
     renderAll();
     if (data.degraded) {
@@ -310,31 +334,40 @@ async function sendCustomerMessage(rawMessage) {
       showToast("Booking intent detected. Open Clinic Dashboard to see what your team would see.");
     }
   } catch (error) {
-    state.session.messages = state.session.messages.filter((item) => item.id !== optimistic.id);
-    renderAll();
-    showToast(error.message);
+    if (state.session?.id === sessionId) {
+      state.session.messages = state.session.messages.filter((item) => item.id !== optimistic.id);
+      renderAll();
+      showToast(error.message);
+    }
   } finally {
+    state.messagePending = false;
     setLoading(false);
-    renderPatientMessages();
+    if (state.session?.id === sessionId) renderPatientMessages();
   }
 }
 
 async function changeChannel(channel) {
-  if (!state.session || state.loading || state.session.channel === channel) return;
+  if (!state.session || state.messagePending || state.transitioning || state.session.channel === channel) return;
+  const sessionId = state.session.id;
+  setTransitioning(true);
   try {
-    const data = await api(`/api/demo/sessions/${encodeURIComponent(state.session.id)}/channel`, {
+    const data = await api(`/api/demo/sessions/${encodeURIComponent(sessionId)}/channel`, {
       method: "POST",
       body: JSON.stringify({ channel }),
     });
+    if (state.session?.id !== sessionId) return;
     state.session = data.session;
     renderAll();
   } catch (error) {
-    showToast(error.message);
+    if (state.session?.id === sessionId) showToast(error.message);
+  } finally {
+    setTransitioning(false);
   }
 }
 
 async function startNewDemo() {
-  if (state.loading) return;
+  if (state.messagePending || state.transitioning) return;
+  setTransitioning(true);
   try {
     const currentChannel = state.session?.channel || channelFromUi();
     await createSession(currentChannel);
@@ -342,6 +375,8 @@ async function startNewDemo() {
     showToast("New private demo session started.");
   } catch (error) {
     showToast(error.message);
+  } finally {
+    setTransitioning(false);
   }
 }
 
@@ -387,6 +422,7 @@ async function init() {
     state.config = await api("/api/demo/config");
     configureSalesCta();
     await restoreOrCreateSession();
+    refreshInteractionState();
     state.syncTimer = setInterval(syncSession, 1800);
   } catch (error) {
     showToast(error.message);
