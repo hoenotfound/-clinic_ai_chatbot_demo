@@ -85,11 +85,20 @@ function remainingBudgetMs(deadline) {
   return Math.max(0, deadline - Date.now());
 }
 
-function requestTimeoutMs(deadline) {
-  if (!Number.isFinite(deadline)) return AI_REQUEST_TIMEOUT_MS;
+function requestTiming(deadline) {
+  if (!Number.isFinite(deadline)) {
+    return { timeoutMs: AI_REQUEST_TIMEOUT_MS, budgetLimited: false };
+  }
   const remaining = remainingBudgetMs(deadline);
   if (remaining <= 0) throw failoverBudgetError();
-  return Math.max(1, Math.min(AI_REQUEST_TIMEOUT_MS, remaining));
+  return {
+    timeoutMs: Math.max(1, Math.min(AI_REQUEST_TIMEOUT_MS, remaining)),
+    budgetLimited: remaining <= AI_REQUEST_TIMEOUT_MS,
+  };
+}
+
+function requestTimeoutMs(deadline) {
+  return requestTiming(deadline).timeoutMs;
 }
 
 async function fetchJson(url, options, label, timeoutMs = AI_REQUEST_TIMEOUT_MS) {
@@ -113,6 +122,7 @@ async function fetchJson(url, options, label, timeoutMs = AI_REQUEST_TIMEOUT_MS)
   } catch (error) {
     if (controller.signal.aborted) {
       const timeoutError = new Error(`${label} timed out after ${timeoutMs}ms.`);
+      timeoutError.code = "AI_REQUEST_TIMEOUT";
       timeoutError.statusCode = 408;
       timeoutError.cause = error;
       throw timeoutError;
@@ -216,9 +226,11 @@ async function requestGemini(messages, isFirstMessage, apiKey, model, label, dea
 
   let data;
   const primaryBody = buildGeminiRequest(messages, isFirstMessage, model);
+  const primaryTiming = requestTiming(deadline);
   try {
-    data = await fetchJson(url, requestOptions(primaryBody), label, requestTimeoutMs(deadline));
+    data = await fetchJson(url, requestOptions(primaryBody), label, primaryTiming.timeoutMs);
   } catch (error) {
+    if (primaryTiming.budgetLimited && error?.code === "AI_REQUEST_TIMEOUT") throw failoverBudgetError();
     if (Number.isFinite(deadline) && remainingBudgetMs(deadline) <= 0) throw failoverBudgetError();
     const hasThinkingConfig = Boolean(primaryBody.generationConfig?.thinkingConfig);
     const isInvalidArgument = error.statusCode === 400 &&
@@ -227,12 +239,20 @@ async function requestGemini(messages, isFirstMessage, apiKey, model, label, dea
 
     console.warn(`${label} rejected thinkingConfig for model "${model}"; retrying without it.`);
     const fallbackBody = buildGeminiRequest(messages, isFirstMessage, model, { omitThinking: true });
-    data = await fetchJson(
-      url,
-      requestOptions(fallbackBody),
-      `${label} compatibility retry`,
-      requestTimeoutMs(deadline)
-    );
+    const compatibilityTiming = requestTiming(deadline);
+    try {
+      data = await fetchJson(
+        url,
+        requestOptions(fallbackBody),
+        `${label} compatibility retry`,
+        compatibilityTiming.timeoutMs
+      );
+    } catch (compatibilityError) {
+      if (compatibilityTiming.budgetLimited && compatibilityError?.code === "AI_REQUEST_TIMEOUT") {
+        throw failoverBudgetError();
+      }
+      throw compatibilityError;
+    }
   }
 
   const text = extractGeminiText(data);
