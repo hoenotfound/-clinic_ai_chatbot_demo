@@ -9,12 +9,40 @@
   box-shadow: 0 0 10px rgba(16, 185, 129, .4);
 }
 
+.status-dot.backend-unavailable {
+  background: #b7791f;
+  box-shadow: 0 0 10px rgba(183, 121, 31, .28);
+  animation: none;
+}
+
 #backendStatusLabel {
   transition: color .2s ease;
 }
 
 .backend-starting + div #backendStatusLabel {
   color: #9a6a1f;
+}
+
+.backend-unavailable + div #backendStatusLabel {
+  color: #8a5d1b;
+}
+
+.backend-retry-button {
+  margin-top: .35rem;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #7a5419;
+  font: inherit;
+  font-size: .72rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.backend-retry-button[hidden] {
+  display: none;
 }
 
 #customerInput:disabled,
