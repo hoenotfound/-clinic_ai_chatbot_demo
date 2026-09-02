@@ -27,7 +27,6 @@
     if (channelStatus) channelStatus.textContent = "starting AI…";
     controls.forEach((control) => {
       control.disabled = true;
-      control.setAttribute("aria-disabled", "true");
     });
   }
 
