@@ -1,0 +1,30 @@
+.status-dot.backend-starting {
+  background: #d8a34e;
+  box-shadow: 0 0 12px rgba(216, 163, 78, .42);
+  animation-duration: .9s;
+}
+
+.status-dot.backend-ready {
+  background: var(--success, #10b981);
+  box-shadow: 0 0 10px rgba(16, 185, 129, .4);
+}
+
+#backendStatusLabel {
+  transition: color .2s ease;
+}
+
+.backend-starting + div #backendStatusLabel {
+  color: #9a6a1f;
+}
+
+#customerInput:disabled,
+.send-button:disabled,
+.demo-reset-button:disabled,
+.channel-button:disabled,
+.suggestion-chip:disabled {
+  cursor: wait;
+}
+
+#customerInput:disabled {
+  opacity: .78;
+}
