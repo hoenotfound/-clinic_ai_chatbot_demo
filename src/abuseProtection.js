@@ -20,6 +20,7 @@ let redis = null;
 let redisWarned = false;
 let installed = false;
 let aiHistoryInstalled = false;
+let aiHistoryInstallScheduled = false;
 
 function rateLimitError(message) {
   const error = new Error(message);
@@ -181,6 +182,15 @@ function installAiHistoryCap() {
   aiHistoryInstalled = true;
 }
 
+function scheduleAiHistoryCap() {
+  if (aiHistoryInstalled || aiHistoryInstallScheduled) return;
+  aiHistoryInstallScheduled = true;
+  setImmediate(() => {
+    aiHistoryInstallScheduled = false;
+    installAiHistoryCap();
+  });
+}
+
 function installHttpRateLimit() {
   if (installed) return;
   const originalCreateServer = http.createServer;
@@ -206,9 +216,10 @@ function installHttpRateLimit() {
   installed = true;
 }
 
-function installAbuseProtection() {
-  installAiHistoryCap();
+function installAbuseProtection({ deferAiHistory = true } = {}) {
   installHttpRateLimit();
+  if (deferAiHistory) scheduleAiHistoryCap();
+  else installAiHistoryCap();
 }
 
 function resetForTests() {
