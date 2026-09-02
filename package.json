@@ -12,6 +12,7 @@
     "start": "node -r ./src/publicFontPolicy.js src/server.js",
     "dev": "node --watch -r ./src/publicFontPolicy.js src/server.js",
     "build:dashboard": "npm install --prefix portal-react --include=dev --no-audit --no-fund && npm --prefix portal-react run build",
+    "build:netlify": "npm run build:dashboard && node scripts/build-netlify.js",
     "postinstall": "npm run build:dashboard",
     "test": "node --test",
     "test:e2e": "playwright test"
