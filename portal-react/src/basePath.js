@@ -21,6 +21,17 @@ export function withAppBase(url, pathname = window.location.pathname) {
   return `${base}${url}`;
 }
 
+function requestUrl(input) {
+  if (typeof input === "string") return input;
+  return typeof input?.url === "string" ? input.url : null;
+}
+
+function requestMethod(input, init) {
+  if (init?.method) return String(init.method).toUpperCase();
+  if (typeof input?.method === "string") return input.method.toUpperCase();
+  return "GET";
+}
+
 function sessionIdFromApiUrl(url, base) {
   if (typeof url !== "string") return null;
   const relative = base && url.startsWith(`${base}/api/`) ? url.slice(base.length) : url;
@@ -31,6 +42,12 @@ function sessionIdFromApiUrl(url, base) {
   } catch {
     return match[1];
   }
+}
+
+function isExactSessionRead(url, base) {
+  if (typeof url !== "string") return false;
+  const relative = base && url.startsWith(`${base}/api/`) ? url.slice(base.length) : url;
+  return /^\/api\/demo\/sessions\/[^/?#]+(?:\?[^#]*)?(?:#.*)?$/.test(relative);
 }
 
 function staleSessionResponse() {
@@ -46,14 +63,31 @@ function installAbsoluteApiFetchGuard() {
 
   const base = getAppBasePath();
   const nativeFetch = window.fetch.bind(window);
+  const inFlightSessionGets = new Map();
+
   window.fetch = async (input, init) => {
     let requestInput = input;
     if (typeof requestInput === "string" && base && requestInput.startsWith("/api/")) {
       requestInput = `${base}${requestInput}`;
     }
 
-    const requestedSessionId = sessionIdFromApiUrl(requestInput, base);
-    const response = await nativeFetch(requestInput, init);
+    const url = requestUrl(requestInput);
+    const requestedSessionId = sessionIdFromApiUrl(url, base);
+    const shouldShareRequest = requestMethod(requestInput, init) === "GET" && isExactSessionRead(url, base);
+
+    let response;
+    if (shouldShareRequest && url) {
+      let pending = inFlightSessionGets.get(url);
+      if (!pending) {
+        pending = nativeFetch(requestInput, init).finally(() => {
+          inFlightSessionGets.delete(url);
+        });
+        inFlightSessionGets.set(url, pending);
+      }
+      response = (await pending).clone();
+    } else {
+      response = await nativeFetch(requestInput, init);
+    }
 
     if (requestedSessionId) {
       const currentSessionId = sessionStorage.getItem("clinicDemoSessionId");
