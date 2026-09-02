@@ -35,6 +35,14 @@ services:
         value: 20
       - key: DEMO_MAX_TOTAL_MESSAGES_PER_DAY
         value: 500
+      - key: DEMO_MAX_MESSAGES_PER_IP_MINUTE
+        value: 10
+      - key: DEMO_MAX_MESSAGES_PER_IP_DAY
+        value: 60
+      - key: DEMO_AI_HISTORY_MAX_MESSAGES
+        value: 16
+      - key: DEMO_AI_HISTORY_MAX_CHARS
+        value: 12000
       - key: DEMO_MIN_MESSAGE_INTERVAL_MS
         value: 900
       - key: DEMO_MAX_TOTAL_MESSAGES_PER_SESSION
