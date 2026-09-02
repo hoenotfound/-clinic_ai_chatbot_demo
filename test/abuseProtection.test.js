@@ -42,7 +42,7 @@ test("AI history cap keeps only recent messages inside both message and characte
     return "ok";
   };
 
-  protection.installAbuseProtection();
+  protection.installAbuseProtection({ deferAiHistory: false });
 
   const history = Array.from({ length: 20 }, (_, index) => ({
     role: index % 2 ? "assistant" : "user",
