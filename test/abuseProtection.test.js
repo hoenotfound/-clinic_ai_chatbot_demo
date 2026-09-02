@@ -42,7 +42,7 @@ test("AI history cap keeps only recent messages inside both message and characte
     return "ok";
   };
 
-  protection.installAbuseProtection({ deferAiHistory: false });
+  protection.installAbuseProtection();
 
   const history = Array.from({ length: 20 }, (_, index) => ({
     role: index % 2 ? "assistant" : "user",
@@ -120,9 +120,11 @@ test("HTTP preload guard blocks the 11th rapid customer-message request before t
 test("Render startup and config include the abuse-protection defaults", () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
   const renderYaml = fs.readFileSync(path.join(ROOT, "render.yaml"), "utf8");
+  const preload = fs.readFileSync(path.join(ROOT, "src", "abuseProtectionPreload.js"), "utf8");
 
   assert.match(packageJson.scripts.start, /abuseProtectionPreload\.js/);
   assert.match(packageJson.scripts.dev, /abuseProtectionPreload\.js/);
+  assert.ok(preload.indexOf("loadDotEnv();") < preload.indexOf("installAbuseProtection();"));
   assert.match(renderYaml, /DEMO_MAX_MESSAGES_PER_IP_MINUTE\n\s+value: 10/);
   assert.match(renderYaml, /DEMO_MAX_MESSAGES_PER_IP_DAY\n\s+value: 60/);
   assert.match(renderYaml, /DEMO_AI_HISTORY_MAX_MESSAGES\n\s+value: 16/);
