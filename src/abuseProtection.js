@@ -169,6 +169,7 @@ function trimAiHistory(messages, {
     chars += safeContent.length;
   }
 
+  while (selected.length > 1 && selected[0]?.role !== "user") selected.shift();
   return selected;
 }
 
