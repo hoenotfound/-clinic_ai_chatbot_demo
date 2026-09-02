@@ -18,9 +18,8 @@ const MESSAGE_PATH = /^\/(?:ai-chatbot\/)?api\/demo\/sessions\/[^/]+\/message$/;
 const localCounters = new Map();
 let redis = null;
 let redisWarned = false;
-let installed = false;
+let httpInstalled = false;
 let aiHistoryInstalled = false;
-let aiHistoryInstallScheduled = false;
 
 function rateLimitError(message) {
   const error = new Error(message);
@@ -182,17 +181,8 @@ function installAiHistoryCap() {
   aiHistoryInstalled = true;
 }
 
-function scheduleAiHistoryCap() {
-  if (aiHistoryInstalled || aiHistoryInstallScheduled) return;
-  aiHistoryInstallScheduled = true;
-  setImmediate(() => {
-    aiHistoryInstallScheduled = false;
-    installAiHistoryCap();
-  });
-}
-
 function installHttpRateLimit() {
-  if (installed) return;
+  if (httpInstalled) return;
   const originalCreateServer = http.createServer;
 
   http.createServer = function protectedCreateServer(...args) {
@@ -213,13 +203,12 @@ function installHttpRateLimit() {
     return originalCreateServer.apply(this, args);
   };
 
-  installed = true;
+  httpInstalled = true;
 }
 
-function installAbuseProtection({ deferAiHistory = true } = {}) {
+function installAbuseProtection() {
+  installAiHistoryCap();
   installHttpRateLimit();
-  if (deferAiHistory) scheduleAiHistoryCap();
-  else installAiHistoryCap();
 }
 
 function resetForTests() {
