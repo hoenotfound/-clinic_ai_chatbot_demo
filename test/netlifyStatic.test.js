@@ -14,11 +14,14 @@ test("Netlify build packages the demo and dashboard under /ai-chatbot", () => {
   assert.ok(fs.existsSync(path.join(mountDir, "backend-readiness.js")));
   assert.ok(fs.existsSync(path.join(mountDir, "cold-start.css")));
 
+  assert.match(html, /<base href="\/ai-chatbot\/" \/>/);
   assert.match(html, /id="backendStatusLabel">STARTING LIVE AI RECEPTIONIST/);
   assert.match(html, /src="\.\/backend-readiness\.js"/);
   assert.match(html, /src="\.\/dashboard\/inbox"/);
   assert.match(html, /href="\.\/cold-start\.css"/);
-  assert.doesNotMatch(html, /\b(?:href|src)="\/(?!\/)/);
+
+  const htmlWithoutBase = html.replace('<base href="/ai-chatbot/" />', "");
+  assert.doesNotMatch(htmlWithoutBase, /\b(?:href|src)="\/(?!\/)/);
 
   const redirects = fs.readFileSync(path.join(outputRoot, "_redirects"), "utf8");
   assert.match(redirects, /\/ai-chatbot\/dashboard\/\* \/ai-chatbot\/dashboard\/index\.html 200/);
