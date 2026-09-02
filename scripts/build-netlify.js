@@ -92,7 +92,6 @@ function buildNetlifyBundle() {
     path.join(OUTPUT_ROOT, "_redirects"),
     [
       "/ai-chatbot/dashboard/* /ai-chatbot/dashboard/index.html 200",
-      "/ai-chatbot /ai-chatbot/ 301",
       "",
     ].join("\n")
   );
