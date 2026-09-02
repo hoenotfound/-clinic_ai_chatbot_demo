@@ -20,4 +20,4 @@ function loadDotEnv() {
 }
 
 loadDotEnv();
-require("./abuseProtection").installAbuseProtection({ deferAiHistory: false });
+require("./abuseProtection").installAbuseProtection();
