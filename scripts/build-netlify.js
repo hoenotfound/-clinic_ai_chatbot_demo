@@ -30,10 +30,6 @@ function enhanceIndex(html) {
 
   html = html.replace(/\sstyle="[^"]*"/g, "");
 
-  if (!html.includes('<base href="/ai-chatbot/"')) {
-    html = html.replace("<head>", '<head>\n  <base href="/ai-chatbot/" />');
-  }
-
   if (!html.includes('/portal-demo.css')) {
     html = html.replace(
       '</head>',
@@ -62,9 +58,13 @@ function enhanceIndex(html) {
     '<div class="experience-status" aria-live="polite">\n              <span id="backendStatusDot" class="status-dot backend-starting"></span>\n              <div><small id="backendStatusLabel">STARTING LIVE AI RECEPTIONIST…</small><strong>Nova Demo Aesthetic Clinic</strong></div>'
   );
 
-  // Relative local assets, anchored by the base tag above, keep every request
-  // under /ai-chatbot/ even when the visitor omits the trailing slash.
+  // Convert local root-relative assets first, then add an absolute base tag.
+  // This keeps every generated request under /ai-chatbot/ even when the
+  // visitor opens the URL without a trailing slash.
   html = html.replace(/\b(href|src)="\/(?!\/)/g, '$1="./');
+  if (!html.includes('<base href="/ai-chatbot/"')) {
+    html = html.replace("<head>", '<head>\n  <base href="/ai-chatbot/" />');
+  }
   return html;
 }
 
