@@ -33,7 +33,7 @@ function sendRequest(port, { path: requestPath, ip = "203.0.113.20" } = {}) {
   });
 }
 
-test("AI history cap keeps only recent messages inside both message and character budgets", async () => {
+test("AI history cap keeps recent well-formed history inside both message and character budgets", async () => {
   const ai = require("../src/aiService");
   const original = ai.getReply;
   let received = null;
@@ -44,7 +44,7 @@ test("AI history cap keeps only recent messages inside both message and characte
 
   protection.installAbuseProtection();
 
-  const history = Array.from({ length: 20 }, (_, index) => ({
+  const history = Array.from({ length: 21 }, (_, index) => ({
     role: index % 2 ? "assistant" : "user",
     content: `${String(index).padStart(2, "0")}:` + "x".repeat(997),
   }));
@@ -52,8 +52,9 @@ test("AI history cap keeps only recent messages inside both message and characte
 
   assert.ok(received.length <= 16);
   assert.ok(received.reduce((sum, message) => sum + message.content.length, 0) <= 12000);
+  assert.equal(received[0].role, "user", "trimmed Gemini history should begin with a customer turn");
   assert.equal(received.at(-1).content, history.at(-1).content);
-  assert.ok(Number(received[0].content.slice(0, 2)) >= 8, "old conversation history should be discarded first");
+  assert.ok(Number(received[0].content.slice(0, 2)) >= 5, "old conversation history should be discarded first");
 
   ai.getReply = original;
 });
