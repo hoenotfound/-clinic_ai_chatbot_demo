@@ -92,6 +92,14 @@ async function flushMicrotasks(rounds = 10) {
   for (let i = 0; i < rounds; i += 1) await Promise.resolve();
 }
 
+async function waitFor(predicate, message, maxTurns = 50) {
+  for (let i = 0; i < maxTurns; i += 1) {
+    if (predicate()) return;
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  assert.fail(message);
+}
+
 test("cold-start readiness rejects a 200 HTML response before accepting valid config JSON", async () => {
   let calls = 0;
   const validConfig = {
@@ -133,15 +141,18 @@ test("cold-start readiness stops after five failed attempts and resumes only aft
   });
 
   const pending = harness.window.fetch("/ai-chatbot/api/demo/config");
-  await flushMicrotasks(30);
+  await waitFor(
+    () => harness.statusLabel.textContent === "AI IS TEMPORARILY UNAVAILABLE — EXPLORE THE DASHBOARD",
+    "readiness never entered the unavailable/manual-retry state"
+  );
 
   assert.equal(calls, 5);
-  assert.equal(harness.statusLabel.textContent, "AI IS TEMPORARILY UNAVAILABLE — EXPLORE THE DASHBOARD");
   assert.equal(harness.channelStatus.textContent, "temporarily unavailable");
   assert.equal(harness.statusDot.classList.contains("backend-unavailable"), true);
   assert.equal(harness.retryButton.hidden, false);
 
   await flushMicrotasks(20);
+  await new Promise((resolve) => setImmediate(resolve));
   assert.equal(calls, 5, "no background wake requests should continue while waiting for manual retry");
 
   healthy = true;
