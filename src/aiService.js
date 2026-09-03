@@ -2,6 +2,7 @@ const { buildSystemPrompt } = require("./systemPrompt");
 const { buildFallbackReply } = require("./clinicFallback");
 const { buildConcernFallback } = require("./concernFallback");
 const { enforceBookingRules } = require("./bookingRules");
+const { enforceSafetyRules } = require("./safetyRules");
 const { concernGuidanceForPrompt, bookingRulesForPrompt } = require("./clinicKnowledge");
 
 const provider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
@@ -39,6 +40,8 @@ function enhancedSystemPrompt(isFirstMessage) {
 }
 
 function getFallbackReply(messages) {
+  const safetyReply = enforceSafetyRules(messages);
+  if (safetyReply) return safetyReply;
   const ruleReply = enforceBookingRules(messages);
   if (ruleReply) return ruleReply;
   const concernReply = buildConcernFallback(messages);
@@ -329,6 +332,9 @@ async function getGeminiReply(messages, isFirstMessage) {
 }
 
 async function getReply(messages, isFirstMessage = false) {
+  const safetyReply = enforceSafetyRules(messages);
+  if (safetyReply) return safetyReply;
+
   const ruleReply = enforceBookingRules(messages);
   if (ruleReply) return ruleReply;
 

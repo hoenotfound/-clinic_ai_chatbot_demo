@@ -1,4 +1,5 @@
 const { detectConcernMappings } = require("./clinicKnowledge");
+const { buildFallbackIntentReply } = require("./fallbackIntentRules");
 
 function languageFor(text) {
   if (/\p{Script=Han}/u.test(String(text || ""))) return "zh";
@@ -10,13 +11,24 @@ function latestUserText(messages) {
   return String((messages || []).filter((message) => message?.role === "user").at(-1)?.content || "").trim();
 }
 
+function shouldSkipIntentLayer(text) {
+  return /not interested|no longer interested|never ?mind|don['’]t want|do not want|not booking|cancel(?: it| that| my appointment)?|no thanks|tak berminat|tidak berminat|tak nak|tidak mahu|tak jadi|tidak jadi|\bbatal\b|不要了|不想做|没兴趣|沒興趣|算了|取消|不预约|不預約|is this (?:a )?real clinic|are you (?:a )?real clinic|real clinic|real appointment|real payment|actual contact|real contact|betul.*clinic|klinik.*betul|真实诊所|真實診所|真的诊所|真的診所|真实预约|真實預約|付款/i.test(text);
+}
+
 function shouldDeferToNormalFallback(text) {
   return /\bprice\b|how much|\bcost\b|harga|berapa|多少钱|多少錢|\bbook(?:ing)?\b|appointment|slot|预约|預約|hifu|pico|botox|botulinum|skin ?booster|rejuran|profhilo|pregnan|breastfeed|hamil|menyusu|怀孕|懷孕|哺乳|medication|medicine|ubat|药|藥|accutane|isotretinoin|blood thinner|antibiotic|allerg|infection|open wound|side effects?|reaction|risk|pain|swelling|rash|complain|refund|human|staff|doctor/i.test(text);
 }
 
 function buildConcernFallback(messages) {
   const latest = latestUserText(messages);
-  if (!latest || shouldDeferToNormalFallback(latest)) return null;
+  if (!latest) return null;
+
+  if (!shouldSkipIntentLayer(latest)) {
+    const intentReply = buildFallbackIntentReply(messages);
+    if (intentReply) return intentReply;
+  }
+
+  if (shouldDeferToNormalFallback(latest)) return null;
   const mappings = detectConcernMappings(latest);
   if (!mappings.length) return null;
 

@@ -5,7 +5,7 @@ const clinicConfig = {
   assistantName: "Avery",
   location: "Kuala Lumpur, Malaysia",
   introMessage: "Hi, I'm Avery from Nova Demo Aesthetic Clinic! 😊",
-  consultation: "Complimentary consultation with our demo clinic team",
+  consultation: "Complimentary consultation with our clinic team",
 
   hours: {
     general: "Monday – Saturday, 10:00 AM – 7:00 PM",
@@ -23,13 +23,13 @@ const clinicConfig = {
     {
       name: "Kuala Lumpur",
       phone: "Demo line — not connected",
-      address: "Bukit Bintang, Kuala Lumpur (demo location)",
+      address: "Bukit Bintang, Kuala Lumpur",
       whatsapp: null,
     },
     {
       name: "Petaling Jaya",
       phone: "Demo line — not connected",
-      address: "Petaling Jaya, Selangor (demo location)",
+      address: "Petaling Jaya, Selangor",
       whatsapp: null,
     },
   ],
@@ -126,7 +126,7 @@ const clinicConfig = {
   faqs: [
     {
       q: "Do you offer a free consultation?",
-      a: "Yes. This fictional sample clinic offers a complimentary consultation so the team can understand your goals before discussing treatment options. No real appointment is created in this demo.",
+      a: "Yes. The consultation is complimentary so the team can understand your goals and discuss suitable treatment directions before you decide anything.",
     },
     {
       q: "Do I need to pay a deposit to book?",
@@ -142,11 +142,11 @@ const clinicConfig = {
     },
     {
       q: "Do you accept walk-ins?",
-      a: "Appointments are recommended in this demo. A real clinic can configure its own walk-in policy in Settings.",
+      a: "Appointments are recommended so the team can allocate enough time for consultation and treatment. Actual availability is confirmed by the clinic team.",
     },
     {
       q: "Which branch should I go to?",
-      a: "The demo has Kuala Lumpur and Petaling Jaya branches. The AI can help narrow it down based on which location is more convenient.",
+      a: "There are Kuala Lumpur and Petaling Jaya branches. The assistant can help narrow it down based on which area is more convenient for you.",
     },
   ],
 
@@ -177,7 +177,7 @@ CTA STYLE:
 
 EXAMPLE:
 - Robotic: "Thank you for your interest in HIFU. Would you like to schedule a consultation?"
-- Natural: "yep HIFU is commonly used for that. if u want, the clinic team can check properly during a free consult"
+- Natural: "HIFU is commonly used for that concern. If you'd like, the clinic team can check it properly during a complimentary consultation."
 `,
 
   sop: `
@@ -190,8 +190,8 @@ COMPLAINTS:
 - Acknowledge the concern and hand off to a human team member without inventing a response-time promise.
 
 PROMOTIONS:
-- HIFU Demo Special: HIFU from RM 888 with a complimentary consultation.
-- This is fictional sample pricing used only to demonstrate the product.
+- HIFU Lifting Special: HIFU from RM 888 with a complimentary consultation.
+- This is sample configuration data. Do not call it fictional or a demo offer during a normal promotion enquiry unless the visitor explicitly asks whether the offer or clinic is real.
 - Do not mention or invent any other discount.
 
 MEDICAL QUESTIONS:
@@ -239,7 +239,7 @@ HANDLING HESITATION:
 
 CREATING GENTLE URGENCY:
 - Never invent scarcity, countdowns or fake slot numbers.
-- Only reference a real configured promotion/deadline. The demo HIFU offer has no deadline.
+- Only reference a real configured promotion/deadline. The HIFU offer has no deadline.
 
 ASKING FOR THE BOOKING:
 - Once someone seems ready, ask an easy question such as preferred branch, weekday/weekend or morning/afternoon.
@@ -249,7 +249,7 @@ ASKING FOR THE BOOKING:
 
   escalation: {
     handoffNote: "Demo staff takeover is shown inside the Clinic Dashboard.",
-    handoffMessage: "for this one, better let our clinic team help u directly. they'll take over the chat here shortly",
+    handoffMessage: "For this one, it's better for the clinic team to help directly. I'll pass the conversation to them here.",
     outOfScopeTriggers: [
       "Medical advice, diagnosis, contraindications, complications, side effects, medication interactions, or treatment suitability",
       "Complaints, refund requests, threats, or a bad past treatment experience",
@@ -277,8 +277,8 @@ ASKING FOR THE BOOKING:
 
   promotions: [
     {
-      name: "HIFU Demo Special",
-      caption: "HIFU from RM 888 with a complimentary consultation — fictional sample offer for this software demo.",
+      name: "HIFU Lifting Special",
+      caption: "HIFU from RM 888 with a complimentary consultation.",
       imageUrl: "/promo-hifu.svg",
       validFrom: null,
       validUntil: null,
@@ -287,7 +287,7 @@ ASKING FOR THE BOOKING:
 
   // Compatibility object used by the existing Patient View promo card.
   promotion: {
-    title: "HIFU Demo Special",
+    title: "HIFU Lifting Special",
     description: "HIFU from RM 888 with a complimentary consultation.",
     assetPath: "/promo-hifu.svg",
   },
