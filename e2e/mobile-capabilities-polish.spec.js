@@ -3,7 +3,7 @@ const { test, expect } = require("@playwright/test");
 test("mobile CTA is centered and capability cards keep premium spacing", async ({ page }) => {
   for (const width of [360, 390, 430]) {
     await page.setViewportSize({ width, height: 844 });
-    await page.goto("/", { waitUntil: "networkidle" });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
 
     const headerCta = await page.locator(".header-audit-button").evaluate((el) => {
       const style = getComputedStyle(el);
