@@ -1,5 +1,8 @@
 const { buildSystemPrompt } = require("./systemPrompt");
-const clinic = require("./clinicConfig");
+const { buildFallbackReply } = require("./clinicFallback");
+const { buildConcernFallback } = require("./concernFallback");
+const { enforceBookingRules } = require("./bookingRules");
+const { concernGuidanceForPrompt, bookingRulesForPrompt } = require("./clinicKnowledge");
 
 const provider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
 const SUPPORTED_PROVIDERS = new Set(["mock", "claude", "gemini"]);
@@ -31,42 +34,16 @@ const GEMINI_FAILOVER_BUDGET_MS = Number.isFinite(parsedFailoverBudget) && parse
   ? parsedFailoverBudget
   : 12000;
 
-function mockReply(messages) {
-  const latest = (messages.at(-1)?.content || "").toLowerCase();
-  const userMessages = messages.filter((message) => message.role === "user");
-  const bookingPattern = /book|appointment|slot|come in|saturday|sunday|weekend|tomorrow/;
-  const negativePattern = /not interested|no longer interested|never ?mind|don['’]t want|do not want|not booking|cancel|no thanks/;
-  const latestIntent = [...userMessages]
-    .reverse()
-    .find((message) => bookingPattern.test(message.content.toLowerCase()) || negativePattern.test(message.content.toLowerCase()));
-  const reducedInterestActive = negativePattern.test((latestIntent?.content || "").toLowerCase());
-
-  if (negativePattern.test(latest)) {
-    return "No worries at all 😊 If you need anything later, you can message us again anytime.";
-  }
-  if (/human|staff|doctor|consultant|complain|refund/.test(latest)) {
-    return "Of course. I’ll flag this for a clinic team member to step in and help you directly. [[HANDOFF]]";
-  }
-  if (/weekday|monday|tuesday|wednesday|thursday|friday|morning|afternoon|evening|petaling jaya|\bpj\b|kuala lumpur|\bkl\b/.test(latest) && !/book|appointment|slot/.test(latest)) {
-    return "Got it 😊 I’ve noted that preference for this demo conversation. The clinic team would use it when confirming the actual appointment.";
-  }
-  if (/book|appointment|saturday|sunday|weekend|come in|slot/.test(latest)) {
-    return "Sure 😊 Which is more convenient for you, our Kuala Lumpur branch or Petaling Jaya branch? Once you choose, the team would confirm the actual available slot.";
-  }
-  if (/hifu|price|how much/.test(latest)) {
-    return "Our sample HIFU offer starts from RM 888 😊 It’s commonly used for lifting, tightening and jawline definition. Which area are you more concerned about, face, jawline or double chin?";
-  }
-  if (/pico|pigmentation|dark spot|acne/.test(latest)) {
-    return "Pico Laser starts from RM 388 in this demo. It’s commonly used for pigmentation, uneven tone and selected acne marks. What’s the main skin concern you’d like to improve?";
-  }
-  if (reducedInterestActive) {
-    return "Of course 😊 What would you like to ask?";
-  }
-  return `Thanks for asking 😊 ${clinic.consultation} is available. Tell me what you’d like to improve and I can point you to the most relevant option.`;
+function enhancedSystemPrompt(isFirstMessage) {
+  return `${buildSystemPrompt({ isFirstMessage })}\n\nSTRUCTURED CONCERN-TO-TREATMENT KNOWLEDGE:\nUse these mappings as general front-desk guidance, never as a diagnosis or guarantee. If more than one service is mapped, explain why the categories differ and let a clinician decide suitability.\n${concernGuidanceForPrompt()}\n\nDETERMINISTIC BOOKING RULES:\n${bookingRulesForPrompt()}`;
 }
 
 function getFallbackReply(messages) {
-  return mockReply(messages);
+  const ruleReply = enforceBookingRules(messages);
+  if (ruleReply) return ruleReply;
+  const concernReply = buildConcernFallback(messages);
+  if (concernReply) return concernReply;
+  return buildFallbackReply(messages);
 }
 
 function failoverBudgetError() {
@@ -150,7 +127,7 @@ async function getClaudeReply(messages, isFirstMessage) {
         model,
         max_tokens: 650,
         thinking: { type: "disabled" },
-        system: buildSystemPrompt({ isFirstMessage }),
+        system: enhancedSystemPrompt(isFirstMessage),
         messages,
       }),
     },
@@ -188,7 +165,7 @@ function buildGeminiRequest(messages, isFirstMessage, model, { omitThinking = fa
 
   return {
     systemInstruction: {
-      parts: [{ text: buildSystemPrompt({ isFirstMessage }) }],
+      parts: [{ text: enhancedSystemPrompt(isFirstMessage) }],
     },
     contents,
     generationConfig,
@@ -352,6 +329,9 @@ async function getGeminiReply(messages, isFirstMessage) {
 }
 
 async function getReply(messages, isFirstMessage = false) {
+  const ruleReply = enforceBookingRules(messages);
+  if (ruleReply) return ruleReply;
+
   try {
     if (provider === "mock") return getFallbackReply(messages);
     if (provider === "claude") return await getClaudeReply(messages, isFirstMessage);
@@ -369,6 +349,7 @@ module.exports = {
   provider,
   configured,
   _test: {
+    enhancedSystemPrompt,
     geminiThinkingConfig,
     buildGeminiRequest,
     getGeminiApiKeys,

@@ -15,6 +15,13 @@
 
   if (!phone || !messages || !composer || !input || !sendButton) return;
 
+  const acquisitionPresets = [
+    { key: "hifu-facebook", label: "HIFU Facebook Ad", source: "Meta Ads", campaign: "HIFU Jawline Demo Campaign", treatment: "HIFU Skin Lifting", channel: "facebook" },
+    { key: "pico-instagram", label: "Pico Instagram Ad", source: "Meta Ads", campaign: "Pico Pigmentation Demo Campaign", treatment: "Pico Laser", channel: "instagram" },
+    { key: "organic-whatsapp", label: "Organic WhatsApp", source: "Organic", campaign: null, treatment: null, channel: "whatsapp" },
+    { key: "referral", label: "Referral", source: "Referral", campaign: null, treatment: null, channel: "whatsapp" },
+  ];
+
   const svg = {
     video: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="3"></rect><path d="m16 10 5-3v10l-5-3z"></path></svg>`,
     phone: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.9.6 2.9.7A2 2 0 0 1 22 16.9z"></path></svg>`,
@@ -35,11 +42,7 @@
     whatsapp: {
       label: "WhatsApp",
       placeholder: "Message",
-      headerActions: [
-        ["video", "Video call"],
-        ["phone", "Voice call"],
-        ["more", "More options"],
-      ],
+      headerActions: [["video", "Video call"], ["phone", "Voice call"], ["more", "More options"]],
       leading: ["plus", "Add attachment"],
       inline: [["smile", "Emoji"], ["camera", "Camera"]],
       emptyAction: "mic",
@@ -48,11 +51,7 @@
     instagram: {
       label: "Instagram",
       placeholder: "Message...",
-      headerActions: [
-        ["phone", "Audio call"],
-        ["video", "Video call"],
-        ["info", "Conversation details"],
-      ],
+      headerActions: [["phone", "Audio call"], ["video", "Video call"], ["info", "Conversation details"]],
       leading: ["camera", "Camera"],
       inline: [["mic", "Voice message"], ["image", "Photo"], ["sticker", "Sticker"]],
       emptyAction: "heart",
@@ -61,11 +60,7 @@
     facebook: {
       label: "Messenger",
       placeholder: "Aa",
-      headerActions: [
-        ["phone", "Audio call"],
-        ["video", "Video call"],
-        ["info", "Conversation details"],
-      ],
+      headerActions: [["phone", "Audio call"], ["video", "Video call"], ["info", "Conversation details"]],
       leading: ["plus", "More actions"],
       inline: [["image", "Photo"], ["smile", "Emoji"]],
       emptyAction: "thumbsUp",
@@ -82,12 +77,78 @@
     return "whatsapp";
   }
 
+  function storedAcquisition() {
+    try {
+      const parsed = JSON.parse(sessionStorage.getItem("clinicDemoAcquisition") || "null");
+      return parsed && parsed.key ? parsed : acquisitionPresets.find((item) => item.key === "organic-whatsapp");
+    } catch {
+      return acquisitionPresets.find((item) => item.key === "organic-whatsapp");
+    }
+  }
+
+  function renderAcquisitionSelection(container) {
+    const selected = storedAcquisition().key;
+    container.querySelectorAll("[data-acquisition-key]").forEach((button) => {
+      const active = button.dataset.acquisitionKey === selected;
+      button.setAttribute("aria-pressed", String(active));
+      button.style.borderColor = active ? "var(--color-primary, #2f6f62)" : "";
+      button.style.background = active ? "rgba(47,111,98,.08)" : "";
+    });
+  }
+
+  function selectAcquisition(preset, container) {
+    const hasConversation = messages.querySelector(".message-row");
+    if (hasConversation) {
+      if (typeof window.showToast === "function") window.showToast("Restart the demo to change the acquisition source after a conversation has started.");
+      return;
+    }
+    sessionStorage.setItem("clinicDemoAcquisition", JSON.stringify(preset));
+    renderAcquisitionSelection(container);
+    const channelButton = document.querySelector(`.channel-button[data-channel="${preset.channel}"]`);
+    if (channelButton && !channelButton.classList.contains("active")) channelButton.click();
+    window.postMessage({ type: "clinic-demo-acquisition-updated" }, window.location.origin);
+  }
+
+  function ensureAcquisitionSelector() {
+    const panel = document.querySelector(".patient-guide.channel-panel");
+    if (!panel || panel.querySelector("[data-acquisition-selector]")) return;
+    const section = document.createElement("div");
+    section.className = "guide-section";
+    section.dataset.acquisitionSelector = "true";
+
+    const label = document.createElement("div");
+    label.className = "guide-label";
+    label.innerHTML = "<span>A</span><strong>Choose where the lead came from</strong>";
+
+    const helper = document.createElement("p");
+    helper.className = "prompt-helper";
+    helper.textContent = "This source follows the live visitor into the Clinic Dashboard.";
+
+    const list = document.createElement("div");
+    list.className = "suggestion-list";
+    acquisitionPresets.forEach((preset) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "suggestion-chip";
+      button.dataset.acquisitionKey = preset.key;
+      const kicker = preset.source === "Meta Ads" ? "Meta Ads" : preset.source;
+      button.innerHTML = `<span>${kicker}</span><strong>${preset.label}</strong><b>→</b>`;
+      button.addEventListener("click", () => selectAcquisition(preset, list));
+      list.appendChild(button);
+    });
+
+    section.append(label, helper, list);
+    panel.appendChild(section);
+    if (!sessionStorage.getItem("clinicDemoAcquisition")) {
+      sessionStorage.setItem("clinicDemoAcquisition", JSON.stringify(storedAcquisition()));
+    }
+    renderAcquisitionSelection(list);
+  }
+
   function demoOnly(button, label) {
     button.dataset.nativeDemoOnly = "true";
     button.addEventListener("click", () => {
-      if (typeof window.showToast === "function") {
-        window.showToast(`${label} is visual only in this demo.`);
-      }
+      if (typeof window.showToast === "function") window.showToast(`${label} is visual only in this demo.`);
     });
   }
 
@@ -105,7 +166,6 @@
     const header = phone.querySelector(".chat-header");
     const legacyMore = phone.querySelector(".header-glyph");
     if (!header) return;
-
     let actions = header.querySelector(".channel-header-actions");
     if (!actions) {
       actions = document.createElement("div");
@@ -113,7 +173,6 @@
       if (legacyMore) header.insertBefore(actions, legacyMore);
       else header.appendChild(actions);
     }
-
     actions.innerHTML = "";
     config.headerActions.forEach(([icon, label]) => actions.appendChild(makeAction(icon, label, "channel-header-action")));
   }
@@ -124,7 +183,6 @@
       leading.innerHTML = svg[config.leading[0]];
       leading.setAttribute("aria-label", config.leading[1]);
     }
-
     let shell = composer.querySelector(".composer-input-shell");
     if (!shell) {
       shell = document.createElement("div");
@@ -132,14 +190,12 @@
       composer.insertBefore(shell, input);
       shell.appendChild(input);
     }
-
     let inlineActions = shell.querySelector(".composer-inline-actions");
     if (!inlineActions) {
       inlineActions = document.createElement("div");
       inlineActions.className = "composer-inline-actions";
       shell.appendChild(inlineActions);
     }
-
     inlineActions.innerHTML = "";
     config.inline.forEach(([icon, label]) => inlineActions.appendChild(makeAction(icon, label, "composer-inline-action")));
     input.placeholder = config.placeholder;
@@ -159,12 +215,10 @@
       seenRow?.remove();
       return;
     }
-
     if (!seenRow) {
       seenRow = document.createElement("div");
       seenRow.className = "message-row user channel-seen-row";
     }
-
     if (seenRow.dataset.channel !== channel) {
       seenRow.replaceChildren();
       if (channel === "instagram") {
@@ -181,24 +235,18 @@
       }
       seenRow.dataset.channel = channel;
     }
-
-    if (latestUserRow.nextElementSibling !== seenRow) {
-      latestUserRow.insertAdjacentElement("afterend", seenRow);
-    }
+    if (latestUserRow.nextElementSibling !== seenRow) latestUserRow.insertAdjacentElement("afterend", seenRow);
   }
 
   function decorateMessages(channel) {
     if (decorating) return;
     decorating = true;
-
     try {
       const userRows = Array.from(messages.querySelectorAll(".message-row.user:not(.channel-seen-row)"));
       messages.querySelectorAll(".message-row").forEach((row) => row.classList.remove("is-last-outgoing"));
-
       userRows.forEach((row) => {
         const bubble = row.querySelector(".message-bubble");
         if (!bubble) return;
-
         let receipt = bubble.querySelector(".message-receipt");
         if (!receipt) {
           receipt = document.createElement("span");
@@ -207,11 +255,9 @@
           bubble.appendChild(receipt);
         }
         receipt.textContent = "✓✓";
-
         row.querySelector(".channel-seen")?.remove();
         row.querySelector(".channel-seen-avatar")?.remove();
       });
-
       const latestUserRow = userRows[userRows.length - 1];
       if (latestUserRow) latestUserRow.classList.add("is-last-outgoing");
       ensureSeenRow(channel, latestUserRow);
@@ -235,7 +281,6 @@
   function applyChannelExperience({ force = false } = {}) {
     const channel = currentChannel();
     if (!force && appliedChannel === channel && phone.classList.contains("native-channel-ui")) return;
-
     const config = channelConfig[channel];
     if (!phone.classList.contains("native-channel-ui")) phone.classList.add("native-channel-ui");
     phone.dataset.channelExperience = channel;
@@ -255,14 +300,13 @@
   const phoneClassObserver = new MutationObserver((records) => {
     if (!records.some((record) => record.attributeName === "class")) return;
     const channel = currentChannel();
-    if (channel !== appliedChannel || !phone.classList.contains("native-channel-ui")) {
-      applyChannelExperience();
-    }
+    if (channel !== appliedChannel || !phone.classList.contains("native-channel-ui")) applyChannelExperience();
   });
   phoneClassObserver.observe(phone, { attributes: true, attributeFilter: ["class"] });
 
   const messagesObserver = new MutationObserver(() => decorateMessages(currentChannel()));
   messagesObserver.observe(messages, { childList: true });
 
+  ensureAcquisitionSelector();
   applyChannelExperience({ force: true });
 })();

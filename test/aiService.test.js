@@ -59,6 +59,73 @@ function successResponse(text) {
   };
 }
 
+test("fallback answers configured clinic prices directly without demo chatter", () => {
+  const reply = aiService.getFallbackReply([{ role: "user", content: "How much is HIFU?" }]);
+  assert.match(reply, /RM 888/);
+  assert.match(reply, /HIFU/i);
+  assert.doesNotMatch(reply, /demo|fictional|sample/i);
+});
+
+test("fallback mirrors Chinese for a Pico price enquiry", () => {
+  const reply = aiService.getFallbackReply([{ role: "user", content: "皮秒多少钱？" }]);
+  assert.match(reply, /Pico Laser/);
+  assert.match(reply, /RM 388/);
+  assert.match(reply, /起/);
+});
+
+test("fallback treats concern-only messages as context instead of resetting", () => {
+  const reply = aiService.getFallbackReply([{ role: "user", content: "double chin" }]);
+  assert.match(reply, /HIFU/i);
+  assert.match(reply, /jawline|lifting|tightening/i);
+  assert.doesNotMatch(reply, /what would you like to improve/i);
+});
+
+test("fallback finishes a booking handoff when branch and timing are already supplied", () => {
+  const reply = aiService.getFallbackReply([
+    { role: "user", content: "nak buat hifu weekend, PJ" },
+  ]);
+  assert.match(reply, /Petaling Jaya/i);
+  assert.match(reply, /weekend/i);
+  assert.match(reply, /\[\[HANDOFF\]\]/);
+  assert.doesNotMatch(reply, /which branch|branch mana/i);
+});
+
+test("fallback remembers the branch and asks only for the missing booking preference", () => {
+  const reply = aiService.getFallbackReply([
+    { role: "user", content: "I want to book HIFU" },
+    { role: "assistant", content: "Which branch is more convenient for you?" },
+    { role: "user", content: "PJ" },
+  ]);
+  assert.match(reply, /Petaling Jaya/i);
+  assert.match(reply, /weekday|weekend/i);
+  assert.doesNotMatch(reply, /which branch/i);
+  assert.doesNotMatch(reply, /\[\[HANDOFF\]\]/);
+});
+
+test("fallback hands personalized medical suitability to staff", () => {
+  const reply = aiService.getFallbackReply([
+    { role: "user", content: "I'm pregnant, can I do HIFU?" },
+  ]);
+  assert.match(reply, /clinic team/i);
+  assert.match(reply, /\[\[HANDOFF\]\]/);
+});
+
+test("fallback answers general side-effect questions without automatic handoff", () => {
+  const reply = aiService.getFallbackReply([
+    { role: "user", content: "Does HIFU have side effects?" },
+  ]);
+  assert.match(reply, /vary|clinician/i);
+  assert.doesNotMatch(reply, /\[\[HANDOFF\]\]/);
+});
+
+test("fallback escalates urgent post-treatment symptoms", () => {
+  const reply = aiService.getFallbackReply([
+    { role: "user", content: "I did HIFU yesterday and now I have severe pain" },
+  ]);
+  assert.match(reply, /urgent medical attention|medical care/i);
+  assert.match(reply, /\[\[HANDOFF\]\]/);
+});
+
 test("Gemini thinking config matches the model family", () => {
   assert.deepEqual(
     aiService._test.geminiThinkingConfig("gemini-2.5-flash"),

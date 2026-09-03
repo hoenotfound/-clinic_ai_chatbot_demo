@@ -110,7 +110,7 @@ test("capture and verify demo-first desktop layout", async ({ page }) => {
       channelDetail: read(".channel-button small"),
       tourTitle: read(".tour-heading div > span"),
       phoneTitle: read(".chat-title strong"),
-      promptTitle: read(".suggestion-chip > strong"),
+      promptTitle: read(".prompt-panel .suggestion-chip > strong"),
     };
   });
   for (const sample of Object.values(patientTypography)) {
@@ -184,7 +184,7 @@ test("capture and verify polished mobile demo at 360, 390 and 430px", async ({ p
     }));
     expect(rootWidth.scrollWidth).toBeLessThanOrEqual(rootWidth.clientWidth);
 
-    const promptCards = page.locator(".suggestion-chip");
+    const promptCards = page.locator(".prompt-panel .suggestion-chip");
     await expect(promptCards).toHaveCount(4);
     const promptBoxes = await promptCards.evaluateAll((cards) => cards.map((card) => {
       const rect = card.getBoundingClientRect();
@@ -201,9 +201,9 @@ test("capture and verify polished mobile demo at 360, 390 and 430px", async ({ p
     });
 
     const microcopy = await page.locator("#patientView").evaluate((root) => ({
-      promptLabel: parseFloat(getComputedStyle(root.querySelector(".suggestion-chip > span")).fontSize),
-      promptTitle: parseFloat(getComputedStyle(root.querySelector(".suggestion-chip > strong")).fontSize),
-      helper: parseFloat(getComputedStyle(root.querySelector(".prompt-helper")).fontSize),
+      promptLabel: parseFloat(getComputedStyle(root.querySelector(".prompt-panel .suggestion-chip > span")).fontSize),
+      promptTitle: parseFloat(getComputedStyle(root.querySelector(".prompt-panel .suggestion-chip > strong")).fontSize),
+      helper: parseFloat(getComputedStyle(root.querySelector(".prompt-panel .prompt-helper")).fontSize),
       channelNote: parseFloat(getComputedStyle(root.querySelector(".channel-preview-note")).fontSize),
     }));
     expect(microcopy.promptLabel).toBeGreaterThanOrEqual(9);
