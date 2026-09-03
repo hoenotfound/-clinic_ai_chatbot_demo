@@ -32,6 +32,7 @@ jobs:
           node --check public/app.js
           node --check public/ops.js
           node --check public/subpath-bootstrap.js
+          node --check netlify/functions/render-proxy.mjs
           node --check playwright.config.js
           node --check e2e/demo.spec.js
           node --check e2e/dashboard-ux.spec.js
