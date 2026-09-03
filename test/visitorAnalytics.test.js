@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 
 const analytics = require("../src/visitorAnalyticsStore");
 
-const { aggregateAudienceRows, visitorHash, safeVisitorId, publicRecentVisitor } = analytics._test;
+const { aggregateAudienceRows, visitorHash, safeVisitorId, publicRecentVisitor, dayString } = analytics._test;
 
 test("visitor analytics aggregate total visits, unique/new/returning and source conversion", () => {
   const rows = [
@@ -63,6 +63,12 @@ test("visitor analytics aggregate total visits, unique/new/returning and source 
   assert.equal(result.sources[0].dashboardRate, 100);
   assert.equal(result.sources[0].ctaRate, 100);
   assert.equal(result.devices.reduce((sum, item) => sum + item.count, 0), 2);
+});
+
+test("visitor analytics normalize PostgreSQL date values to stable day keys", () => {
+  assert.equal(dayString(new Date("2026-09-02T00:00:00.000Z")), "2026-09-02");
+  assert.equal(dayString("2026-09-03"), "2026-09-03");
+  assert.equal(dayString("2026-09-03T12:34:56.000Z"), "2026-09-03");
 });
 
 test("visitor analytics use one-way hashes and reject malformed anonymous ids", () => {
