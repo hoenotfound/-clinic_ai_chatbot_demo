@@ -2,13 +2,17 @@ const shared = require("./sharedState");
 
 const TIMEZONE = String(process.env.DEMO_STATS_TIMEZONE || "Asia/Kuala_Lumpur").trim() || "Asia/Kuala_Lumpur";
 const ACTIVE_WINDOW_MS = 2 * 60_000;
-const RETENTION_SECONDS = 35 * 24 * 60 * 60;
+const RETENTION_DAYS = 400;
+const RETENTION_SECONDS = RETENTION_DAYS * 24 * 60 * 60;
+const HISTORY_DAYS = 90;
 const KEY_STATUS_WINDOW_MS = 15 * 60_000;
+const HISTORY_EVENTS = ["patient_view", "dashboard_view", "sales_cta_clicks"];
 
 const memory = {
   countersByDay: new Map(),
   uniqueByDay: new Map(),
   uniqueBySurfaceDay: new Map(),
+  uniqueByEventDay: new Map(),
   activeVisitors: new Map(),
   activeBySurface: new Map(),
   keyByDay: new Map(),
@@ -24,6 +28,14 @@ function localDayKey(now = new Date()) {
   }).formatToParts(now);
   const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${byType.year}-${byType.month}-${byType.day}`;
+}
+
+function recentDayKeys(count, now = new Date()) {
+  const keys = [];
+  for (let index = count - 1; index >= 0; index -= 1) {
+    keys.push(localDayKey(new Date(now.getTime() - (index * 24 * 60 * 60_000))));
+  }
+  return keys;
 }
 
 function safeCounterName(name) {
@@ -58,6 +70,12 @@ function uniqueSet(day, surface = null) {
   return map.get(key);
 }
 
+function eventUniqueSet(day, event) {
+  const key = `${day}:${safeCounterName(event)}`;
+  if (!memory.uniqueByEventDay.has(key)) memory.uniqueByEventDay.set(key, new Set());
+  return memory.uniqueByEventDay.get(key);
+}
+
 function keyStats(day, keyIndex) {
   const key = `${day}:${keyIndex}`;
   if (!memory.keyByDay.has(key)) {
@@ -86,6 +104,7 @@ function redisCountersKey(day) { return `demo:ops:counters:${day}`; }
 function redisMetaKey(day) { return `demo:ops:meta:${day}`; }
 function redisUniqueKey(day) { return `demo:ops:unique:${day}`; }
 function redisSurfaceUniqueKey(day, surface) { return `demo:ops:unique:${surface}:${day}`; }
+function redisEventUniqueKey(day, event) { return `demo:ops:event:${safeCounterName(event)}:${day}`; }
 function redisActiveKey(surface = "all") { return `demo:ops:active:${surface}`; }
 function redisKeyStatsKey(day, keyIndex) { return `demo:ops:gemini:key:${keyIndex}:${day}`; }
 
@@ -121,14 +140,18 @@ function recordVisitor({ visitorId, event = "heartbeat", surface = "patient" } =
   const day = localDayKey();
   const now = Date.now();
   const normalizedSurface = safeSurface(surface);
+  const normalizedEvent = safeCounterName(event);
+
   uniqueSet(day).add(id);
   uniqueSet(day, normalizedSurface).add(id);
   memory.activeVisitors.set(id, now);
   if (!memory.activeBySurface.has(normalizedSurface)) memory.activeBySurface.set(normalizedSurface, new Map());
   memory.activeBySurface.get(normalizedSurface).set(id, now);
 
-  const normalizedEvent = safeCounterName(event);
-  if (normalizedEvent !== "heartbeat") recordCounter(normalizedEvent);
+  if (normalizedEvent !== "heartbeat") {
+    eventUniqueSet(day, normalizedEvent).add(id);
+    recordCounter(normalizedEvent);
+  }
 
   void shared.withRedis(async (redis) => {
     const uniqueKey = redisUniqueKey(day);
@@ -140,6 +163,11 @@ function recordVisitor({ visitorId, event = "heartbeat", surface = "patient" } =
     pipeline.expire(uniqueKey, RETENTION_SECONDS);
     pipeline.pfadd(surfaceUniqueKey, id);
     pipeline.expire(surfaceUniqueKey, RETENTION_SECONDS);
+    if (normalizedEvent !== "heartbeat") {
+      const eventKey = redisEventUniqueKey(day, normalizedEvent);
+      pipeline.pfadd(eventKey, id);
+      pipeline.expire(eventKey, RETENTION_SECONDS);
+    }
     pipeline.zadd(activeKey, now, id);
     pipeline.expire(activeKey, 24 * 60 * 60);
     pipeline.zadd(surfaceActiveKey, now, id);
@@ -337,6 +365,138 @@ async function redisSnapshot(day) {
   }, null);
 }
 
+function historyRow(day, counters, visitors, events = {}) {
+  const dashboardVisitors = Number(events.dashboard_view) || 0;
+  const ctaVisitors = Number(events.sales_cta_clicks) || 0;
+  const geminiAttempts = Number(counters.gemini_api_attempts) || 0;
+  const geminiSuccesses = Number(counters.gemini_api_successes) || 0;
+  return {
+    day,
+    visitors: Number(visitors) || 0,
+    patientVisitors: Number(events.patient_view) || 0,
+    dashboardVisitors,
+    ctaVisitors,
+    sessions: Number(counters.sessions_started) || 0,
+    messages: Number(counters.customer_messages) || 0,
+    takeovers: Number(counters.human_takeovers) || 0,
+    staffMessages: Number(counters.staff_messages) || 0,
+    geminiAttempts,
+    geminiSuccesses,
+    geminiFailures: Number(counters.gemini_api_failures) || 0,
+    fallbackModelSuccesses: Number(counters.gemini_fallback_model_successes) || 0,
+    deterministicFallbacks: Number(counters.deterministic_fallbacks) || 0,
+    totalTokens: Number(counters.gemini_total_tokens) || 0,
+    dashboardRate: visitors ? (dashboardVisitors / visitors) * 100 : 0,
+    ctaRate: visitors ? (ctaVisitors / visitors) * 100 : 0,
+    aiSuccessRate: geminiAttempts ? (geminiSuccesses / geminiAttempts) * 100 : 0,
+  };
+}
+
+function sumRows(rows) {
+  const fields = ["sessions", "messages", "takeovers", "staffMessages", "geminiAttempts", "geminiSuccesses", "geminiFailures", "fallbackModelSuccesses", "deterministicFallbacks", "totalTokens"];
+  const result = Object.fromEntries(fields.map((field) => [field, rows.reduce((sum, row) => sum + (Number(row[field]) || 0), 0)]));
+  return result;
+}
+
+function memoryRangeSummary(days, rows) {
+  const visitorUnion = new Set();
+  const eventUnions = Object.fromEntries(HISTORY_EVENTS.map((event) => [event, new Set()]));
+  for (const day of days) {
+    for (const id of uniqueSet(day)) visitorUnion.add(id);
+    for (const event of HISTORY_EVENTS) {
+      for (const id of eventUniqueSet(day, event)) eventUnions[event].add(id);
+    }
+  }
+  const sums = sumRows(rows);
+  const visitors = visitorUnion.size;
+  const dashboardVisitors = eventUnions.dashboard_view.size;
+  const ctaVisitors = eventUnions.sales_cta_clicks.size;
+  return {
+    ...sums,
+    visitors,
+    patientVisitors: eventUnions.patient_view.size,
+    dashboardVisitors,
+    ctaVisitors,
+    dashboardRate: visitors ? (dashboardVisitors / visitors) * 100 : 0,
+    ctaRate: visitors ? (ctaVisitors / visitors) * 100 : 0,
+    messagesPerVisitor: visitors ? sums.messages / visitors : 0,
+    aiSuccessRate: sums.geminiAttempts ? (sums.geminiSuccesses / sums.geminiAttempts) * 100 : 0,
+  };
+}
+
+async function redisHistory(days) {
+  return shared.withRedis(async (redis) => {
+    const pipeline = redis.multi();
+    for (const day of days) {
+      pipeline.hgetall(redisCountersKey(day));
+      pipeline.pfcount(redisUniqueKey(day));
+      for (const event of HISTORY_EVENTS) pipeline.pfcount(redisEventUniqueKey(day, event));
+    }
+    const results = await pipeline.exec();
+    const rows = [];
+    const stride = 2 + HISTORY_EVENTS.length;
+    for (let index = 0; index < days.length; index += 1) {
+      const offset = index * stride;
+      const counters = numericObject(results[offset]?.[1] || {});
+      const visitors = Number(results[offset + 1]?.[1]) || 0;
+      const events = {};
+      HISTORY_EVENTS.forEach((event, eventIndex) => {
+        events[event] = Number(results[offset + 2 + eventIndex]?.[1]) || 0;
+      });
+      rows.push(historyRow(days[index], counters, visitors, events));
+    }
+    return rows;
+  }, null);
+}
+
+async function redisRangeSummary(days, rows) {
+  return shared.withRedis(async (redis) => {
+    if (!days.length) return memoryRangeSummary(days, rows);
+    const pipeline = redis.multi();
+    pipeline.pfcount(...days.map(redisUniqueKey));
+    for (const event of HISTORY_EVENTS) pipeline.pfcount(...days.map((day) => redisEventUniqueKey(day, event)));
+    const results = await pipeline.exec();
+    const sums = sumRows(rows);
+    const visitors = Number(results[0]?.[1]) || 0;
+    const eventTotals = {};
+    HISTORY_EVENTS.forEach((event, index) => { eventTotals[event] = Number(results[index + 1]?.[1]) || 0; });
+    const dashboardVisitors = eventTotals.dashboard_view || 0;
+    const ctaVisitors = eventTotals.sales_cta_clicks || 0;
+    return {
+      ...sums,
+      visitors,
+      patientVisitors: eventTotals.patient_view || 0,
+      dashboardVisitors,
+      ctaVisitors,
+      dashboardRate: visitors ? (dashboardVisitors / visitors) * 100 : 0,
+      ctaRate: visitors ? (ctaVisitors / visitors) * 100 : 0,
+      messagesPerVisitor: visitors ? sums.messages / visitors : 0,
+      aiSuccessRate: sums.geminiAttempts ? (sums.geminiSuccesses / sums.geminiAttempts) * 100 : 0,
+    };
+  }, null);
+}
+
+async function getHistory() {
+  const days = recentDayKeys(HISTORY_DAYS);
+  const persistentRows = await redisHistory(days);
+  const rows = persistentRows || days.map((day) => {
+    const events = Object.fromEntries(HISTORY_EVENTS.map((event) => [event, eventUniqueSet(day, event).size]));
+    return historyRow(day, numericObject(dayCounters(day)), uniqueSet(day).size, events);
+  });
+  const ranges = {};
+  for (const range of [7, 30, 90]) {
+    const rangeDays = days.slice(-range);
+    const rangeRows = rows.slice(-range);
+    ranges[String(range)] = (await redisRangeSummary(rangeDays, rangeRows)) || memoryRangeSummary(rangeDays, rangeRows);
+  }
+  return {
+    retentionDays: RETENTION_DAYS,
+    availableDays: HISTORY_DAYS,
+    daily: rows,
+    ranges,
+  };
+}
+
 async function getSnapshot() {
   const day = localDayKey();
   cleanupMemoryActive();
@@ -393,6 +553,7 @@ async function getSnapshot() {
         ...stats,
       })),
     },
+    history: await getHistory(),
   };
 }
 
@@ -404,12 +565,15 @@ module.exports = {
   recordGeminiFailure,
   recordDeterministicFallback,
   getSnapshot,
+  getHistory,
   _test: {
     localDayKey,
+    recentDayKeys,
     safeVisitorId,
     safeSurface,
     keyHealth,
     usageNumbers,
     isQuotaError,
+    historyRow,
   },
 };
