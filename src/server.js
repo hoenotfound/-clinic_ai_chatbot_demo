@@ -68,10 +68,21 @@ const MAX_STAFF_MESSAGES_PER_SESSION = intEnv("DEMO_MAX_STAFF_MESSAGES_PER_SESSI
 const MIN_STAFF_MESSAGE_INTERVAL_MS = intEnv("DEMO_MIN_STAFF_MESSAGE_INTERVAL_MS", 700);
 const OPS_USERNAME = String(process.env.DEMO_OPS_USERNAME || "").trim();
 const OPS_PASSWORD = String(process.env.DEMO_OPS_PASSWORD || "");
-const PUBLIC_TELEMETRY_EVENTS = new Set(["heartbeat", "patient_view", "dashboard_view", "sales_cta_clicks"]);
+const PUBLIC_TELEMETRY_EVENTS = new Set([
+  "heartbeat",
+  "patient_view",
+  "demo_started",
+  "message_1",
+  "message_3",
+  "dashboard_view",
+  "human_takeover",
+  "journey_complete",
+  "sales_cta_clicks",
+]);
 let activeAiRequests = 0;
 
 function demoBusyError() {
+  opsStats.recordCounter("demo_busy_errors");
   const err = new Error("The live demo is busy right now. Please try your message again in a moment.");
   err.statusCode = 429;
   return err;
@@ -592,7 +603,12 @@ function buildEnhancedIndex(filePath) {
   if (!html.includes('/portal-data.js')) {
     html = html.replace(
       '  <script src="/app.js" defer></script>',
-      '  <script src="/subpath-bootstrap.js" defer></script>\n  <script src="/portal-data.js" defer></script>\n  <script src="/app.js" defer></script>\n  <script src="/portal-demo.js" defer></script>\n  <script src="/portal-fidelity.js" defer></script>'
+      '  <script src="/subpath-bootstrap.js" defer></script>\n  <script src="/portal-data.js" defer></script>\n  <script src="/funnel-telemetry.js" defer></script>\n  <script src="/app.js" defer></script>\n  <script src="/portal-demo.js" defer></script>\n  <script src="/portal-fidelity.js" defer></script>'
+    );
+  } else if (!html.includes('/funnel-telemetry.js')) {
+    html = html.replace(
+      '  <script src="/app.js" defer></script>',
+      '  <script src="/funnel-telemetry.js" defer></script>\n  <script src="/app.js" defer></script>'
     );
   }
 
