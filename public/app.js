@@ -8,6 +8,7 @@ const state = {
   hasViewedDashboard: false,
   hasTakenOver: false,
   syncTimer: null,
+  telemetryTimer: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -44,6 +45,35 @@ const channelMeta = {
   instagram: { label: "Instagram", theme: "instagram-theme", status: "Active now", caption: "Instagram customer experience" },
   facebook: { label: "Messenger", theme: "facebook-theme", status: "Active now", caption: "Messenger customer experience" },
 };
+
+function createVisitorId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `visitor-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+}
+
+function getVisitorId() {
+  try {
+    const stored = localStorage.getItem("clinicDemoVisitorId");
+    if (stored) return stored;
+    const created = createVisitorId();
+    localStorage.setItem("clinicDemoVisitorId", created);
+    return created;
+  } catch {
+    return createVisitorId();
+  }
+}
+
+const visitorId = getVisitorId();
+
+function recordTelemetry(event = "heartbeat", surface = state.activeView) {
+  if (document.visibilityState === "hidden" && event === "heartbeat") return;
+  fetch("/api/telemetry", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ visitorId, event, surface }),
+    keepalive: true,
+  }).catch(() => {});
+}
 
 function showToast(message) {
   if (!els.toast) return;
@@ -96,6 +126,7 @@ function setTransitioning(transitioning) {
 }
 
 function setActiveView(view) {
+  const changed = state.activeView !== view;
   state.activeView = view;
   if (view === "dashboard") state.hasViewedDashboard = true;
   const patient = view === "patient";
@@ -105,6 +136,7 @@ function setActiveView(view) {
   els.dashboardTab?.setAttribute("aria-selected", String(!patient));
   els.patientView?.classList.toggle("active", patient);
   els.dashboardView?.classList.toggle("active", !patient);
+  if (changed) recordTelemetry(`${view}_view`, view);
   renderTour();
 }
 
@@ -401,6 +433,7 @@ function bindEvents() {
     button.addEventListener("click", () => sendCustomerMessage(button.dataset.message || ""));
   });
   els.salesCtaButton?.addEventListener("click", (event) => {
+    recordTelemetry("sales_cta_clicks", state.activeView);
     if (els.salesCtaButton.dataset.ctaUnconfigured === "true") {
       event.preventDefault();
       showToast("This demo setup button is not connected yet. Please contact us to continue.");
@@ -413,17 +446,25 @@ function bindEvents() {
     if (event.origin !== window.location.origin) return;
     if (event.data?.type === "clinic-demo-session-updated") syncSession();
   });
-  window.addEventListener("focus", syncSession);
+  window.addEventListener("focus", () => {
+    syncSession();
+    recordTelemetry("heartbeat", state.activeView);
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") recordTelemetry("heartbeat", state.activeView);
+  });
 }
 
 async function init() {
   bindEvents();
+  recordTelemetry("patient_view", "patient");
   try {
     state.config = await api("/api/demo/config");
     configureSalesCta();
     await restoreOrCreateSession();
     refreshInteractionState();
     state.syncTimer = setInterval(syncSession, 1800);
+    state.telemetryTimer = setInterval(() => recordTelemetry("heartbeat", state.activeView), 30_000);
   } catch (error) {
     showToast(error.message);
   }
