@@ -26,6 +26,16 @@ function text(value, max = 160) {
   return normalized ? normalized.slice(0, max) : null;
 }
 
+function dayString(value) {
+  if (!value) return "";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+  const raw = String(value);
+  const iso = raw.match(/^\d{4}-\d{2}-\d{2}/);
+  if (iso) return iso[0];
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? raw.slice(0, 10) : parsed.toISOString().slice(0, 10);
+}
+
 function visitorHash(id) {
   return crypto.createHash("sha256").update(String(id || "")).digest("hex").slice(0, 40);
 }
@@ -412,7 +422,7 @@ async function readAudience(days = []) {
       `,
     ]);
 
-    const normalizedRows = dailyRows.map((row) => ({ ...row, day: String(row.day).slice(0, 10), first_day: String(row.first_day).slice(0, 10) }));
+    const normalizedRows = dailyRows.map((row) => ({ ...row, day: dayString(row.day), first_day: dayString(row.first_day) }));
     const ranges = {};
     for (const range of [7, 30, 90]) {
       const subsetDays = days.slice(-range);
@@ -436,6 +446,7 @@ module.exports = {
   _test: {
     safeVisitorId,
     visitorHash,
+    dayString,
     normalizedContext,
     aggregateAudienceRows,
     sourceBreakdown,
