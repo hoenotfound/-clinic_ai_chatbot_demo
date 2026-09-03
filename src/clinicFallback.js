@@ -11,7 +11,7 @@ const PATTERNS = {
   complaint: /complain|complaint|refund|bad experience|unhappy|angry|投诉|投訴|退款|不满意|不滿意|aduan|refund|tak puas hati/i,
   emergency: /difficulty breathing|can['’]?t breathe|vision changes?|blurred vision|severe pain|worsening pain|spreading rash|blanching|skin discolou?r(?:ation)?|sesak nafas|susah bernafas|penglihatan|sakit teruk|semakin sakit|ruam merebak|呼吸困难|呼吸困難|视力|視力|剧痛|劇痛|越来越痛|越來越痛|扩散.*疹|擴散.*疹/i,
   contraindication: /pregnan|breastfeed|accutane|isotretinoin|blood thinner|antibiotic|medication|medicine|allerg|skin infection|open wound|cystic acne|recent (?:chemical )?peel|recent laser|hamil|menyusu|ubat|alerg|jangkitan kulit|luka terbuka|孕|怀孕|懷孕|哺乳|药|藥|过敏|過敏|感染|伤口|傷口|刚做.*(?:激光|雷射|换肤|換膚)/i,
-  personalSuitability: /am i suitable|is it safe for me|can i do (?:this|hifu|pico|botox|skin booster)|suitable for me|sesuai (?:untuk )?saya|selamat untuk saya|boleh saya buat|适合我吗|適合我嗎|我适合|我適合|我可以做吗|我可以做嗎/i,
+  personalSuitability: /am i suitable|is it safe for me|suitable for me|sesuai (?:untuk )?saya|selamat untuk saya|适合我吗|適合我嗎|我适合|我適合/i,
   postTreatment: /after (?:my )?(?:hifu|pico|botox|skin booster|treatment|laser|injection)|post[- ]?treatment|lepas (?:buat|treatment|hifu|pico|botox)|selepas (?:rawatan|treatment)|做完(?:hifu|皮秒|肉毒|水光|治疗|治療)|术后|術後/i,
   symptom: /pain|swelling|rash|red|bruis|numb|burn|itch|sakit|bengkak|ruam|merah|lebam|kebas|pedih|gatal|痛|肿|腫|红|紅|淤青|麻|灼热|灼熱|痒|癢/i,
   photoAssessment: /(?:photo|picture|image|selfie).*(?:check|see|assess|suitable|recommend)|(?:check|see|assess|recommend).*(?:photo|picture|image|selfie)|照片.*(?:看|评估|評估|适合|適合|推荐|推薦)|gambar.*(?:check|tengok|nilai|sesuai|recommend)/i,
@@ -333,9 +333,9 @@ function generalPriceReply(lang) {
 
 function promotionReply(lang) {
   return replyByLanguage(lang, {
-    en: "The current HIFU Lifting Special is HIFU from RM 888 with a complimentary consultation. There isn’t a configured expiry date, so I won’t make up a countdown or fake urgency.",
-    ms: "Promo HIFU sekarang ialah HIFU dari RM 888 dengan complimentary consultation. Tiada expiry date yang ditetapkan, jadi saya tak akan buat-buat countdown atau urgency.",
-    zh: "目前的 HIFU Lifting Special 是 HIFU 从 RM 888 起，并包含免费 consultation。目前没有设定截止日期，所以我不会乱说倒数或制造假的紧迫感。",
+    en: "The current HIFU Lifting Special is HIFU from RM 888 with a complimentary consultation. There isn’t a set expiry date listed at the moment.",
+    ms: "Promo HIFU sekarang ialah HIFU dari RM 888 dengan complimentary consultation. Buat masa ini tiada expiry date yang ditetapkan.",
+    zh: "目前的 HIFU Lifting Special 是 HIFU 从 RM 888 起，并包含免费 consultation。目前没有设定截止日期。",
   });
 }
 
@@ -376,20 +376,20 @@ function buildFallbackReply(messages) {
 
   const service = inferService(messages, latest);
 
+  if (PATTERNS.expensive.test(latest)) {
+    const price = service ? servicePriceSentence(service, lang) : "";
+    return replyByLanguage(lang, {
+      en: `${price ? `${price} ` : ""}I understand the budget concern. There isn’t another discount I can confirm here, and the consultation is complimentary if you want to understand the options before deciding. No pressure.`,
+      ms: `${price ? `${price} ` : ""}Faham pasal budget concern tu. Tak ada discount lain yang saya boleh confirm di sini, dan consultation adalah complimentary kalau you nak faham option dulu sebelum decide. No pressure.`,
+      zh: `${price ? `${price}` : ""}预算方面可以理解。目前没有其他我能确认的折扣，不过 consultation 是免费的，你可以先了解清楚再决定，不用急。`,
+    });
+  }
+
   if (PATTERNS.hesitation.test(latest)) {
     return replyByLanguage(lang, {
       en: "Of course, no pressure. Take your time — if anything is unclear later, you can just continue from here.",
       ms: "Boleh, no pressure. Take your time dulu — kalau nanti ada apa-apa yang tak clear, sambung je chat ni.",
       zh: "当然，可以慢慢考虑，不用急。之后有哪里不清楚，直接继续这个 chat 就可以。",
-    });
-  }
-
-  if (PATTERNS.expensive.test(latest)) {
-    const price = service ? servicePriceSentence(service, lang) : "";
-    return replyByLanguage(lang, {
-      en: `${price ? `${price} ` : ""}I understand the budget concern. I won’t invent a discount, but the consultation is complimentary if you want to understand the options properly before deciding.`,
-      ms: `${price ? `${price} ` : ""}Faham pasal budget concern tu. Saya tak akan reka discount, tapi consultation adalah complimentary kalau you nak faham option dulu sebelum decide.`,
-      zh: `${price ? `${price}` : ""}预算方面可以理解。我不会乱说有折扣，不过 consultation 是免费的，你可以先了解清楚再决定。`,
     });
   }
 
@@ -482,9 +482,9 @@ function buildFallbackReply(messages) {
   if ((PATTERNS.downtime.test(latest) || PATTERNS.resultTiming.test(latest)) && service) {
     const name = shortServiceName(service);
     return replyByLanguage(lang, {
-      en: `${name} can vary from person to person, and I don’t have a fixed ${PATTERNS.downtime.test(latest) ? "downtime" : "result-timing"} number I can safely quote here. The clinic team can explain what to expect without me making up a timeline.`,
-      ms: `${name} boleh berbeza ikut individu, dan saya tak ada fixed ${PATTERNS.downtime.test(latest) ? "downtime" : "result timing"} yang selamat untuk saya quote. Team clinic boleh explain expectation tanpa saya reka timeline.`,
-      zh: `${name} 会因人而异，我这里没有一个可以安全直接报给你的固定${PATTERNS.downtime.test(latest) ? "恢复期" : "见效时间"}。Clinic team 可以说明一般预期，我不会乱编时间。`,
+      en: `${name} can vary from person to person, and I don’t have a fixed ${PATTERNS.downtime.test(latest) ? "downtime" : "result-timing"} number to quote. The clinic team can explain what to expect for your case.`,
+      ms: `${name} boleh berbeza ikut individu, dan saya tak ada fixed ${PATTERNS.downtime.test(latest) ? "downtime" : "result timing"} untuk quote. Team clinic boleh explain expectation ikut keadaan you.`,
+      zh: `${name} 会因人而异，我这里没有一个固定的${PATTERNS.downtime.test(latest) ? "恢复期" : "见效时间"}可以直接报给你。Clinic team 可以根据你的情况说明一般预期。`,
     });
   }
 
@@ -496,9 +496,9 @@ function buildFallbackReply(messages) {
 
   if (PATTERNS.unconfiguredTreatment.test(latest)) {
     return replyByLanguage(lang, {
-      en: "That treatment isn’t in the service list I have here, so I don’t want to make up details. I can help with HIFU, Pico Laser, Botulinum Toxin or Skin Booster, or I can pass your question to the clinic team.",
-      ms: "Treatment tu tak ada dalam service list yang saya ada, jadi saya tak nak reka info. Saya boleh bantu untuk HIFU, Pico Laser, Botulinum Toxin atau Skin Booster, atau pass soalan you kepada team clinic.",
-      zh: "这个 treatment 不在我目前的 service list 里，所以我不想乱编资料。我可以帮你了解 HIFU、Pico Laser、Botulinum Toxin 或 Skin Booster，也可以把你的问题转给 clinic team。",
+      en: "I don’t have confirmed details for that treatment here. I can help with HIFU, Pico Laser, Botulinum Toxin or Skin Booster, or pass your question to the clinic team.",
+      ms: "Saya tak ada confirmed details untuk treatment tu di sini. Saya boleh bantu untuk HIFU, Pico Laser, Botulinum Toxin atau Skin Booster, atau pass soalan you kepada team clinic.",
+      zh: "我这里没有这个 treatment 的确认资料。我可以帮你了解 HIFU、Pico Laser、Botulinum Toxin 或 Skin Booster，也可以把你的问题转给 clinic team。",
     });
   }
 
