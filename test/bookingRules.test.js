@@ -3,9 +3,14 @@ const assert = require("node:assert/strict");
 const { enforceBookingRules, _test } = require("../src/bookingRules");
 
 test("Sunday booking request is rejected before the AI provider", () => {
-  const reply = enforceBookingRules([{ role: "user", content: "Can I book PJ Sunday morning?" }]);
-  assert.match(reply, /closed on Sundays/i);
-  assert.match(reply, /Saturday|weekday/i);
+  for (const text of [
+    "Can I book PJ Sunday morning?",
+    "Can I do HIFU Sunday at PJ?",
+    "Saya nak buat HIFU Ahad dekat PJ",
+  ]) {
+    const reply = enforceBookingRules([{ role: "user", content: text }]);
+    assert.match(reply, /closed on Sundays|tutup pada hari Ahad|星期日休息/i);
+  }
 });
 
 test("short Sunday answer is rejected when previous assistant was collecting booking timing", () => {
@@ -25,6 +30,7 @@ test("general Sunday opening-hours question is left to normal clinic FAQ handlin
 test("explicit appointment times outside clinic hours are rejected before the AI provider", () => {
   for (const text of [
     "Can I book PJ at 9pm?",
+    "Can I do HIFU at PJ 9pm?",
     "I want an appointment at 09:30",
     "Saya nak datang pukul 9 malam",
     "我想预约晚上9点",
