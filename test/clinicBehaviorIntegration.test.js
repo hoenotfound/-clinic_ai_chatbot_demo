@@ -16,7 +16,7 @@ test("AI prompt includes structured concern mappings and deterministic opening d
 
 test("deterministic fallback uses the structured mappings for concern-only messages", () => {
   assert.match(buildConcernFallback([{ role: "user", content: "My skin is very dry and dull" }]), /Skin Booster/);
-  const wideJaw = buildConcernFallback([{ role: "user", content: "My jaw looks quite wide" }]);
+  const wideJaw = buildConcernFallback([{ role: "user", content: "I have a wide jaw" }]);
   assert.match(wideJaw, /Botulinum Toxin/);
   assert.match(wideJaw, /HIFU Skin Lifting/);
 });
