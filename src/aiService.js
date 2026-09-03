@@ -1,5 +1,7 @@
 const { buildSystemPrompt } = require("./systemPrompt");
 const { buildFallbackReply } = require("./clinicFallback");
+const { enforceBookingRules } = require("./bookingRules");
+const { concernGuidanceForPrompt, bookingRulesForPrompt } = require("./clinicKnowledge");
 
 const provider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
 const SUPPORTED_PROVIDERS = new Set(["mock", "claude", "gemini"]);
@@ -31,7 +33,13 @@ const GEMINI_FAILOVER_BUDGET_MS = Number.isFinite(parsedFailoverBudget) && parse
   ? parsedFailoverBudget
   : 12000;
 
+function enhancedSystemPrompt(isFirstMessage) {
+  return `${buildSystemPrompt({ isFirstMessage })}\n\nSTRUCTURED CONCERN-TO-TREATMENT KNOWLEDGE:\nUse these mappings as general front-desk guidance, never as a diagnosis or guarantee. If more than one service is mapped, explain why the categories differ and let a clinician decide suitability.\n${concernGuidanceForPrompt()}\n\nDETERMINISTIC BOOKING RULES:\n${bookingRulesForPrompt()}`;
+}
+
 function getFallbackReply(messages) {
+  const ruleReply = enforceBookingRules(messages);
+  if (ruleReply) return ruleReply;
   return buildFallbackReply(messages);
 }
 
@@ -116,7 +124,7 @@ async function getClaudeReply(messages, isFirstMessage) {
         model,
         max_tokens: 650,
         thinking: { type: "disabled" },
-        system: buildSystemPrompt({ isFirstMessage }),
+        system: enhancedSystemPrompt(isFirstMessage),
         messages,
       }),
     },
@@ -154,7 +162,7 @@ function buildGeminiRequest(messages, isFirstMessage, model, { omitThinking = fa
 
   return {
     systemInstruction: {
-      parts: [{ text: buildSystemPrompt({ isFirstMessage }) }],
+      parts: [{ text: enhancedSystemPrompt(isFirstMessage) }],
     },
     contents,
     generationConfig,
@@ -318,6 +326,9 @@ async function getGeminiReply(messages, isFirstMessage) {
 }
 
 async function getReply(messages, isFirstMessage = false) {
+  const ruleReply = enforceBookingRules(messages);
+  if (ruleReply) return ruleReply;
+
   try {
     if (provider === "mock") return getFallbackReply(messages);
     if (provider === "claude") return await getClaudeReply(messages, isFirstMessage);
@@ -335,6 +346,7 @@ module.exports = {
   provider,
   configured,
   _test: {
+    enhancedSystemPrompt,
     geminiThinkingConfig,
     buildGeminiRequest,
     getGeminiApiKeys,
