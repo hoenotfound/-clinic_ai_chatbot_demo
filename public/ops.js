@@ -13,6 +13,7 @@ function percent(value) {
 
 function milliseconds(value) {
   const ms = Number(value) || 0;
+  if (!ms) return "—";
   if (ms < 1000) return `${number(ms)} ms`;
   return `${number(ms / 1000, 2)} s`;
 }
@@ -32,6 +33,177 @@ function set(id, value) {
   if (element) element.textContent = value;
 }
 
+function rate(count, total) {
+  return Number(total) > 0 ? (Number(count) / Number(total)) * 100 : 0;
+}
+
+function buildDashboardShell() {
+  const main = document.querySelector("main.ops-shell") || document.querySelector("main");
+  if (!main) return;
+  main.className = "ops-shell";
+  main.innerHTML = `
+    <header class="topbar">
+      <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true">DA</div>
+        <div>
+          <p class="eyebrow">PRIVATE · DEMO OPERATIONS</p>
+          <h1>AI Chatbot Performance</h1>
+        </div>
+      </div>
+      <div class="topbar-meta">
+        <span id="liveStatus" class="status-pill"><i></i> Live</span>
+        <span id="storageLabel" class="meta-pill">Checking storage…</span>
+        <span id="updatedAt" class="meta-text">Loading…</span>
+      </div>
+    </header>
+
+    <section class="overview-head">
+      <div>
+        <h2>Overview</h2>
+        <p id="rangeCaption">Last 30 days · Malaysia time</p>
+      </div>
+      <div class="range-picker" role="group" aria-label="Dashboard range">
+        <button type="button" data-range="7">7D</button>
+        <button type="button" data-range="30" class="active">30D</button>
+        <button type="button" data-range="90">90D</button>
+      </div>
+    </section>
+
+    <section class="kpi-grid" aria-label="Key performance indicators">
+      <article class="kpi-card">
+        <div class="kpi-label"><span>Unique visitors</span><small id="activeVisitors">0 live now</small></div>
+        <strong id="kpiVisitors">0</strong>
+        <p id="kpiVisitorsNote">Selected period</p>
+      </article>
+      <article class="kpi-card">
+        <div class="kpi-label"><span>Engaged visitors</span><small>Sent a message</small></div>
+        <strong id="kpiEngaged">0</strong>
+        <p id="kpiEngagedRate">0% of visitors</p>
+      </article>
+      <article class="kpi-card kpi-accent">
+        <div class="kpi-label"><span>Consultations</span><small>CTA conversion</small></div>
+        <strong id="kpiConsultations">0</strong>
+        <p id="kpiConsultationRate">0% of visitors</p>
+      </article>
+      <article class="kpi-card">
+        <div class="kpi-label"><span>AI response P95</span><small id="kpiAiHealth">Checking health</small></div>
+        <strong id="kpiP95">—</strong>
+        <p id="kpiAiSuccess">0% provider success</p>
+      </article>
+    </section>
+
+    <section class="primary-grid">
+      <article class="panel funnel-panel">
+        <div class="panel-heading">
+          <div><p class="section-kicker">CONVERSION</p><h2>Demo funnel</h2></div>
+          <span class="panel-helper">Unique visitors · selected period</span>
+        </div>
+        <div id="funnelStages" class="funnel-list"></div>
+      </article>
+
+      <article class="panel health-panel">
+        <div class="panel-heading health-heading">
+          <div><p class="section-kicker">SYSTEM</p><h2>AI health</h2></div>
+          <span id="healthBadge" class="health-badge" data-tone="idle">Checking</span>
+        </div>
+        <div class="health-metrics">
+          <div><span>Average reply</span><strong id="healthAvg">—</strong></div>
+          <div><span>P95 reply</span><strong id="healthP95">—</strong></div>
+          <div><span>Provider error rate</span><strong id="healthErrorRate">0%</strong></div>
+          <div><span>Gemini request avg</span><strong id="healthGeminiAvg">—</strong></div>
+        </div>
+        <div class="reliability-row" aria-label="Reliability counters">
+          <div><span>Retries</span><strong id="healthRetries">0</strong></div>
+          <div><span>Key failovers</span><strong id="healthFailovers">0</strong></div>
+          <div><span>Timeouts</span><strong id="healthTimeouts">0</strong></div>
+          <div><span>Fallbacks</span><strong id="healthFallbacks">0</strong></div>
+        </div>
+        <div id="healthNotice" class="health-notice" data-tone="neutral">
+          <span class="notice-dot"></span><p>Waiting for live AI data.</p>
+        </div>
+        <div class="usage-line">
+          <div><span>Gemini tokens</span><strong id="healthTokens">0</strong></div>
+          <div><span>API calls</span><strong id="healthCalls">0</strong></div>
+          <div><span>Slow replies</span><strong id="healthSlow">0</strong></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="panel trends-panel">
+      <div class="panel-heading">
+        <div><p class="section-kicker">TRENDS</p><h2>Performance over time</h2></div>
+        <span class="panel-helper">Daily aggregates</span>
+      </div>
+      <div class="chart-grid">
+        <article class="chart-card">
+          <div class="chart-title"><div><strong>Engagement</strong><span>Visitors → engaged → consultation</span></div></div>
+          <div id="engagementTrend" class="trend-chart"></div>
+        </article>
+        <article class="chart-card">
+          <div class="chart-title"><div><strong>Response speed</strong><span>Average and P95 end-to-end reply time</span></div></div>
+          <div id="responseTrend" class="trend-chart"></div>
+        </article>
+      </div>
+    </section>
+
+    <details class="diagnostics panel">
+      <summary>
+        <div><p class="section-kicker">ADVANCED</p><strong>Diagnostics & daily breakdown</strong><span>API keys, errors, token split and raw daily metrics</span></div>
+        <span class="summary-action">View details</span>
+      </summary>
+      <div class="diagnostics-body">
+        <div class="diagnostic-grid">
+          <section class="diagnostic-card">
+            <h3>Gemini status</h3>
+            <div class="diagnostic-list">
+              <div><span>Quota status</span><strong id="quotaStatus">—</strong></div>
+              <div><span>Last quota hit</span><strong id="quotaDetail">—</strong></div>
+              <div><span>Prompt tokens</span><strong id="promptTokens">0</strong></div>
+              <div><span>Output tokens</span><strong id="outputTokens">0</strong></div>
+              <div><span>Thinking tokens</span><strong id="thoughtTokens">0</strong></div>
+              <div><span>Deterministic fallbacks</span><strong id="deterministicFallback">0</strong></div>
+            </div>
+          </section>
+          <section class="diagnostic-card">
+            <h3>Error breakdown · today</h3>
+            <div class="diagnostic-list">
+              <div><span>Quota</span><strong id="errorQuota">0</strong></div>
+              <div><span>Timeout</span><strong id="errorTimeout">0</strong></div>
+              <div><span>Server</span><strong id="errorServer">0</strong></div>
+              <div><span>Client</span><strong id="errorClient">0</strong></div>
+              <div><span>Empty response</span><strong id="errorEmpty">0</strong></div>
+              <div><span>Other</span><strong id="errorOther">0</strong></div>
+            </div>
+          </section>
+        </div>
+
+        <div class="table-section">
+          <div class="table-heading"><h3>API key health</h3><span>Today</span></div>
+          <div class="table-wrap compact-table-wrap">
+            <table><thead><tr><th>Key</th><th>Status</th><th>Attempts</th><th>Success</th><th>Failures</th><th>Quota</th><th>Tokens</th><th>Last activity</th></tr></thead><tbody id="keyRows"></tbody></table>
+          </div>
+        </div>
+
+        <div class="table-section">
+          <div class="table-heading"><h3>Daily breakdown</h3><span id="historyRetention">Historical aggregates</span></div>
+          <div class="table-wrap history-table-wrap">
+            <table class="history-table"><thead><tr><th>Date</th><th>Visitors</th><th>Engaged</th><th>3+ msg</th><th>Dashboard</th><th>Completed</th><th>CTA</th><th>P95</th><th>Retries</th><th>Errors</th><th>Tokens</th></tr></thead><tbody id="historyRows"></tbody></table>
+          </div>
+        </div>
+        <p class="privacy-note">Historical visitor counts are aggregated and deduplicated. No names, phone numbers or chat contents are shown here.</p>
+      </div>
+    </details>
+  `;
+
+  main.querySelectorAll("[data-range]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedRange = Number(button.dataset.range) || 30;
+      main.querySelectorAll("[data-range]").forEach((item) => item.classList.toggle("active", item === button));
+      if (latestData) render(latestData);
+    });
+  });
+}
+
 function statusLabel(status) {
   if (status === "healthy") return "Healthy";
   if (status === "rate_limited") return "Rate limited";
@@ -40,7 +212,7 @@ function statusLabel(status) {
   return "Unknown";
 }
 
-function statusClass(status) {
+function statusTone(status) {
   if (status === "healthy") return "good";
   if (status === "rate_limited") return "warn";
   if (status === "error") return "bad";
@@ -57,111 +229,15 @@ function renderKeyRow(stats) {
     number(stats.failures),
     number(stats.quotaHits),
     number(stats.totalTokens),
-    stats.lastModel || "—",
     stats.lastSuccessAt ? time(stats.lastSuccessAt) : (stats.lastErrorAt ? time(stats.lastErrorAt) : "—"),
   ];
   cells.forEach((value, index) => {
     const cell = document.createElement(index === 0 ? "th" : "td");
     cell.textContent = value;
-    if (index === 1) cell.className = `status-text ${statusClass(stats.health)}`;
+    if (index === 1) cell.className = `status-text ${statusTone(stats.health)}`;
     row.appendChild(cell);
   });
   return row;
-}
-
-function ensurePerformanceUi() {
-  if ($("performanceSection")) return;
-  const sections = document.querySelectorAll(".section");
-  const geminiSection = sections[1] || null;
-  const section = document.createElement("section");
-  section.id = "performanceSection";
-  section.className = "section";
-  section.innerHTML = `
-    <div class="section-heading">
-      <div><h2>Response speed & reliability</h2><p>End-to-end chatbot speed, Gemini request speed, retries, failovers and errors seen today.</p></div>
-    </div>
-    <div class="grid performance-grid">
-      <article class="mini"><span>Chatbot average</span><strong id="perfAvg">0 ms</strong></article>
-      <article class="mini"><span>Chatbot P50</span><strong id="perfP50">0 ms</strong></article>
-      <article class="mini"><span>Chatbot P95</span><strong id="perfP95">0 ms</strong></article>
-      <article class="mini"><span>Gemini request avg</span><strong id="geminiRequestAvg">0 ms</strong></article>
-      <article class="mini"><span>Provider error rate</span><strong id="providerErrorRate">0%</strong></article>
-      <article class="mini"><span>Slow responses</span><strong id="slowResponses">0</strong><small id="slowThreshold">Threshold 4 s</small></article>
-    </div>
-    <div class="grid reliability-grid">
-      <article class="mini"><span>Retries</span><strong id="retryCount">0</strong></article>
-      <article class="mini"><span>Key failovers</span><strong id="failoverCount">0</strong></article>
-      <article class="mini"><span>Fallback model uses</span><strong id="fallbackUseCount">0</strong></article>
-      <article class="mini"><span>Timeouts</span><strong id="timeoutCount">0</strong></article>
-      <article class="mini"><span>Demo busy errors</span><strong id="busyCount">0</strong></article>
-    </div>
-    <div class="error-strip" aria-label="Gemini error breakdown">
-      <span>Errors:</span>
-      <b id="errorQuota">Quota 0</b>
-      <b id="errorTimeout">Timeout 0</b>
-      <b id="errorServer">Server 0</b>
-      <b id="errorClient">Client 0</b>
-      <b id="errorEmpty">Empty 0</b>
-      <b id="errorOther">Other 0</b>
-    </div>
-  `;
-  if (geminiSection) geminiSection.before(section);
-  else document.querySelector("main")?.appendChild(section);
-}
-
-function ensureHistoryUi() {
-  if ($("historySection")) return;
-  const geminiSection = [...document.querySelectorAll(".section")].find((section) => section.querySelector("#geminiAttempts")) || null;
-  const section = document.createElement("section");
-  section.id = "historySection";
-  section.className = "section";
-  section.innerHTML = `
-    <div class="section-heading history-heading">
-      <div><h2>Historical performance</h2><p>Unique visitor funnel, response speed, reliability and Gemini usage from deployment onward.</p></div>
-      <div class="range-picker" role="group" aria-label="History range">
-        <button type="button" data-range="7">7 days</button>
-        <button type="button" data-range="30" class="active">30 days</button>
-        <button type="button" data-range="90">90 days</button>
-      </div>
-    </div>
-
-    <div class="funnel-shell">
-      <div class="funnel-heading"><strong>Demo conversion funnel</strong><span>Each browser visitor counts once at each stage in the selected period.</span></div>
-      <div id="funnelStages" class="funnel-stages"></div>
-    </div>
-
-    <div class="grid history-summary-grid">
-      <article class="mini"><span>Unique visitors</span><strong id="rangeVisitors">0</strong></article>
-      <article class="mini"><span>Consultation rate</span><strong id="rangeCtaRate">0%</strong></article>
-      <article class="mini"><span>Chatbot P95</span><strong id="rangeP95">0 ms</strong></article>
-      <article class="mini"><span>Retries</span><strong id="rangeRetries">0</strong></article>
-      <article class="mini"><span>Timeouts</span><strong id="rangeTimeouts">0</strong></article>
-      <article class="mini"><span>Gemini tokens</span><strong id="rangeTokens">0</strong></article>
-    </div>
-
-    <div class="chart-grid">
-      <article class="chart-card"><div class="chart-title"><strong>Visitor funnel trend</strong><span>Visitors, engaged visitors, dashboard viewers and completed guided journeys</span></div><div id="visitorTrend" class="trend-chart"></div></article>
-      <article class="chart-card"><div class="chart-title"><strong>Chatbot response speed</strong><span>Daily average, P50 and P95 end-to-end response time</span></div><div id="responseTrend" class="trend-chart"></div></article>
-      <article class="chart-card"><div class="chart-title"><strong>Reliability events</strong><span>Retries, API-key failovers, timeouts and demo-busy errors</span></div><div id="reliabilityTrend" class="trend-chart"></div></article>
-      <article class="chart-card"><div class="chart-title"><strong>Gemini token usage</strong><span>Total tokens used each day</span></div><div id="tokenTrend" class="trend-chart"></div></article>
-      <article class="chart-card"><div class="chart-title"><strong>Conversion rates</strong><span>Dashboard and consultation click rate by day</span></div><div id="conversionTrend" class="trend-chart"></div></article>
-      <article class="chart-card"><div class="chart-title"><strong>Provider error rate</strong><span>Failed Gemini calls as a percentage of API attempts</span></div><div id="errorRateTrend" class="trend-chart"></div></article>
-    </div>
-
-    <div class="table-wrap history-table-wrap">
-      <table class="history-table"><thead><tr><th>Date</th><th>Visitors</th><th>1+ msg</th><th>3+ msg</th><th>Dashboard</th><th>Completed</th><th>CTA</th><th>P95</th><th>Retries</th><th>Errors</th><th>Tokens</th></tr></thead><tbody id="historyRows"></tbody></table>
-    </div>
-    <div class="note" id="historyNote">Historical data begins when this feature is deployed. Redis is required for history to survive service restarts.</div>
-  `;
-  if (geminiSection) geminiSection.before(section);
-  else document.querySelector("main")?.appendChild(section);
-  section.querySelectorAll("[data-range]").forEach((button) => {
-    button.addEventListener("click", () => {
-      selectedRange = Number(button.dataset.range) || 30;
-      section.querySelectorAll("[data-range]").forEach((item) => item.classList.toggle("active", item === button));
-      if (latestData) renderHistory(latestData.history);
-    });
-  });
 }
 
 function svgElement(name, attributes = {}) {
@@ -171,7 +247,6 @@ function svgElement(name, attributes = {}) {
 }
 
 function axisText(value, valueKind) {
-  if (valueKind === "percent") return `${Math.round(value)}%`;
   if (valueKind === "ms") return value >= 1000 ? `${number(value / 1000, 1)}s` : `${Math.round(value)}ms`;
   return number(value >= 10 ? Math.round(value) : value, value < 10 ? 1 : 0);
 }
@@ -180,61 +255,62 @@ function renderLineChart(containerId, rows, series, { valueKind = "count" } = {}
   const container = $(containerId);
   if (!container) return;
   container.replaceChildren();
-  if (!rows.length || !series.length) {
-    container.textContent = "No historical data yet.";
-    container.classList.add("empty-chart");
+  const populated = rows.some((row) => series.some((item) => Number(row[item.key]) > 0));
+  if (!rows.length || !populated) {
+    const empty = document.createElement("div");
+    empty.className = "chart-empty";
+    empty.innerHTML = "<strong>No data yet</strong><span>Trend lines will appear as the demo gets used.</span>";
+    container.appendChild(empty);
     return;
   }
-  container.classList.remove("empty-chart");
 
-  const width = 760;
-  const height = 250;
-  const pad = { left: 52, right: 18, top: 20, bottom: 36 };
+  const legend = document.createElement("div");
+  legend.className = "chart-legend-html";
+  series.forEach((item, index) => {
+    const badge = document.createElement("span");
+    badge.innerHTML = `<i class="legend-line legend-${index}"></i>${item.label}`;
+    legend.appendChild(badge);
+  });
+
+  const width = 720;
+  const height = 238;
+  const pad = { left: 48, right: 16, top: 12, bottom: 34 };
   const plotWidth = width - pad.left - pad.right;
   const plotHeight = height - pad.top - pad.bottom;
   const values = rows.flatMap((row) => series.map((item) => Number(row[item.key]) || 0));
-  const fixedPercent = valueKind === "percent";
-  const rawMax = Math.max(...values, fixedPercent ? 100 : 1);
-  const maxValue = fixedPercent ? 100 : Math.max(1, rawMax * 1.1);
+  const rawMax = Math.max(...values, 1);
+  const maxValue = Math.max(1, rawMax * 1.12);
   const svg = svgElement("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": `${containerId} chart` });
 
-  for (let index = 0; index <= 4; index += 1) {
-    const y = pad.top + (plotHeight * index / 4);
-    svg.appendChild(svgElement("line", { x1: pad.left, y1: y, x2: width - pad.right, y2: y, class: "chart-gridline" }));
-    const label = svgElement("text", { x: pad.left - 8, y: y + 4, "text-anchor": "end", class: "chart-axis-label" });
-    label.textContent = axisText(maxValue * (1 - index / 4), valueKind);
+  for (let index = 0; index <= 3; index += 1) {
+    const yPos = pad.top + (plotHeight * index / 3);
+    svg.appendChild(svgElement("line", { x1: pad.left, y1: yPos, x2: width - pad.right, y2: yPos, class: "chart-gridline" }));
+    const label = svgElement("text", { x: pad.left - 8, y: yPos + 4, "text-anchor": "end", class: "chart-axis-label" });
+    label.textContent = axisText(maxValue * (1 - index / 3), valueKind);
     svg.appendChild(label);
   }
 
   const x = (index) => rows.length === 1 ? pad.left + (plotWidth / 2) : pad.left + (plotWidth * index / (rows.length - 1));
   const y = (value) => pad.top + plotHeight - ((Math.max(0, Number(value) || 0) / maxValue) * plotHeight);
-
   const labelIndexes = new Set([0, rows.length - 1]);
-  const desiredLabels = rows.length <= 7 ? rows.length : 6;
-  for (let index = 0; index < desiredLabels; index += 1) {
-    labelIndexes.add(Math.round(index * (rows.length - 1) / Math.max(1, desiredLabels - 1)));
+  const labelCount = rows.length <= 7 ? rows.length : 5;
+  for (let index = 0; index < labelCount; index += 1) {
+    labelIndexes.add(Math.round(index * (rows.length - 1) / Math.max(1, labelCount - 1)));
   }
-  for (const index of [...labelIndexes].sort((a, b) => a - b)) {
-    const label = svgElement("text", { x: x(index), y: height - 10, "text-anchor": "middle", class: "chart-axis-label" });
+  [...labelIndexes].sort((a, b) => a - b).forEach((index) => {
+    const label = svgElement("text", { x: x(index), y: height - 9, "text-anchor": "middle", class: "chart-axis-label" });
     label.textContent = shortDay(rows[index].day);
     svg.appendChild(label);
-  }
+  });
 
   series.forEach((item, seriesIndex) => {
     const points = rows.map((row, index) => `${x(index)},${y(row[item.key])}`).join(" ");
     svg.appendChild(svgElement("polyline", { points, fill: "none", class: `chart-line chart-line-${seriesIndex}` }));
+    const last = rows.length - 1;
+    svg.appendChild(svgElement("circle", { cx: x(last), cy: y(rows[last][item.key]), r: 3.5, class: `chart-dot chart-dot-${seriesIndex}` }));
   });
 
-  const legend = svgElement("g", { class: "chart-legend" });
-  series.forEach((item, index) => {
-    const baseX = pad.left + (index * 155);
-    legend.appendChild(svgElement("line", { x1: baseX, y1: 9, x2: baseX + 18, y2: 9, class: `chart-line chart-line-${index}` }));
-    const text = svgElement("text", { x: baseX + 24, y: 13, class: "chart-legend-text" });
-    text.textContent = item.label;
-    legend.appendChild(text);
-  });
-  svg.appendChild(legend);
-  container.appendChild(svg);
+  container.append(legend, svg);
 }
 
 function renderFunnel(funnel) {
@@ -242,83 +318,70 @@ function renderFunnel(funnel) {
   if (!container) return;
   const stages = Array.isArray(funnel?.stages) ? funnel.stages : [];
   container.replaceChildren(...stages.map((stage, index) => {
-    const card = document.createElement("article");
-    card.className = "funnel-stage";
-    const step = document.createElement("small");
+    const item = document.createElement("div");
+    item.className = "funnel-row";
+
+    const identity = document.createElement("div");
+    identity.className = "funnel-identity";
+    const step = document.createElement("span");
+    step.className = "funnel-index";
     step.textContent = String(index + 1).padStart(2, "0");
-    const label = document.createElement("span");
+    const label = document.createElement("strong");
     label.textContent = stage.label;
+    identity.append(step, label);
+
+    const progress = document.createElement("progress");
+    progress.max = 100;
+    progress.value = Math.max(0, Math.min(100, Number(stage.rate) || 0));
+    progress.setAttribute("aria-label", `${stage.label}: ${percent(stage.rate)}`);
+
+    const value = document.createElement("div");
+    value.className = "funnel-value";
     const count = document.createElement("strong");
     count.textContent = number(stage.count);
-    const rate = document.createElement("em");
-    rate.textContent = index === 0 ? "100%" : `${percent(stage.rate)} of visitors`;
-    card.append(step, label, count, rate);
-    return card;
+    const conversion = document.createElement("span");
+    conversion.textContent = index === 0 ? "100%" : percent(stage.rate);
+    value.append(count, conversion);
+
+    item.append(identity, progress, value);
+    return item;
   }));
 }
 
-function renderPerformance(performance) {
-  ensurePerformanceUi();
-  const p = performance || {};
-  set("perfAvg", milliseconds(p.aiResponse?.avgMs));
-  set("perfP50", milliseconds(p.aiResponse?.p50Ms));
-  set("perfP95", milliseconds(p.aiResponse?.p95Ms));
-  set("geminiRequestAvg", milliseconds(p.geminiRequest?.avgMs));
-  set("providerErrorRate", percent(p.providerErrorRate));
-  set("slowResponses", number(p.slowResponses));
-  set("slowThreshold", `Threshold ${milliseconds(p.slowResponseMs)}`);
-  set("retryCount", number(p.retries));
-  set("failoverCount", number(p.keyFailovers));
-  set("fallbackUseCount", number(p.fallbackModelUses));
-  set("timeoutCount", number(p.timeouts));
-  set("busyCount", number(p.busyErrors));
-  set("errorQuota", `Quota ${number(p.errors?.quota)}`);
-  set("errorTimeout", `Timeout ${number(p.errors?.timeout)}`);
-  set("errorServer", `Server ${number(p.errors?.server)}`);
-  set("errorClient", `Client ${number(p.errors?.client)}`);
-  set("errorEmpty", `Empty ${number(p.errors?.empty)}`);
-  set("errorOther", `Other ${number(p.errors?.other)}`);
+function healthState(data, summary) {
+  const p = data.performance || {};
+  const g = data.gemini || {};
+  const attempts = Number(summary?.geminiAttempts ?? g.attempts) || 0;
+  const errorRate = Number(summary?.providerErrorRate ?? p.providerErrorRate) || 0;
+  const timeouts = Number(summary?.timeouts ?? p.timeouts) || 0;
+  if (!attempts) return { label: "Idle", tone: "idle", message: "No Gemini calls in this period yet." };
+  if (g.quotaStatus === "rate_limited") return { label: "Attention", tone: "bad", message: "Gemini quota or rate limit was recently hit." };
+  if (errorRate >= 10 || timeouts >= 3) return { label: "Attention", tone: "bad", message: "AI reliability needs attention in this period." };
+  if (errorRate > 0 || timeouts > 0 || Number(summary?.retries ?? p.retries) > 0) return { label: "Watch", tone: "warn", message: "AI is working, with some retries or provider errors." };
+  return { label: "Healthy", tone: "good", message: "No significant AI reliability issues detected." };
 }
 
-function renderHistory(history) {
-  ensureHistoryUi();
-  const daily = Array.isArray(history?.daily) ? history.daily.slice(-selectedRange) : [];
-  const summary = history?.ranges?.[String(selectedRange)] || {};
+function renderDiagnostics(data, daily) {
+  const g = data.gemini || {};
+  const p = data.performance || {};
+  set("quotaStatus", g.quotaStatus === "rate_limited" ? "Recently limited" : "No recent limit");
+  set("quotaDetail", g.lastQuotaHitAt ? time(g.lastQuotaHitAt) : "—");
+  set("promptTokens", number(g.tokens?.prompt));
+  set("outputTokens", number(g.tokens?.output));
+  set("thoughtTokens", number(g.tokens?.thoughts));
+  set("deterministicFallback", number(g.deterministicFallbacks));
+  set("errorQuota", number(p.errors?.quota));
+  set("errorTimeout", number(p.errors?.timeout));
+  set("errorServer", number(p.errors?.server));
+  set("errorClient", number(p.errors?.client));
+  set("errorEmpty", number(p.errors?.empty));
+  set("errorOther", number(p.errors?.other));
 
-  renderFunnel(summary.funnel);
-  set("rangeVisitors", number(summary.visitors));
-  set("rangeCtaRate", percent(summary.ctaRate));
-  set("rangeP95", milliseconds(summary.aiResponseP95Ms));
-  set("rangeRetries", number(summary.retries));
-  set("rangeTimeouts", number(summary.timeouts));
-  set("rangeTokens", number(summary.totalTokens));
+  const keyRows = $("keyRows");
+  if (keyRows) keyRows.replaceChildren(...(g.keys || []).map(renderKeyRow));
 
-  renderLineChart("visitorTrend", daily, [
-    { key: "visitors", label: "Visitors" },
-    { key: "message1Visitors", label: "1+ message" },
-    { key: "dashboardVisitors", label: "Dashboard" },
-    { key: "completedVisitors", label: "Completed" },
-  ]);
-  renderLineChart("responseTrend", daily, [
-    { key: "aiResponseAvgMs", label: "Average" },
-    { key: "aiResponseP50Ms", label: "P50" },
-    { key: "aiResponseP95Ms", label: "P95" },
-  ], { valueKind: "ms" });
-  renderLineChart("reliabilityTrend", daily, [
-    { key: "retries", label: "Retries" },
-    { key: "keyFailovers", label: "Key failovers" },
-    { key: "timeouts", label: "Timeouts" },
-    { key: "busyErrors", label: "Busy" },
-  ]);
-  renderLineChart("tokenTrend", daily, [{ key: "totalTokens", label: "Tokens" }]);
-  renderLineChart("conversionTrend", daily, [
-    { key: "dashboardRate", label: "Dashboard rate" },
-    { key: "ctaRate", label: "CTA rate" },
-  ], { valueKind: "percent" });
-  renderLineChart("errorRateTrend", daily, [{ key: "providerErrorRate", label: "Error rate" }], { valueKind: "percent" });
-
-  const tbody = $("historyRows");
-  if (tbody) {
+  const historyRows = $("historyRows");
+  if (historyRows) {
     const rows = [...daily].reverse().map((item) => {
       const row = document.createElement("tr");
       const cells = [
@@ -341,75 +404,95 @@ function renderHistory(history) {
       });
       return row;
     });
-    tbody.replaceChildren(...rows);
+    historyRows.replaceChildren(...rows);
   }
-
-  set("historyNote", history?.retentionDays
-    ? `Historical aggregates are retained for about ${number(history.retentionDays)} days. Funnel counts are unique visitors; latency P50/P95 values use lightweight timing buckets. Collection starts when this feature is deployed.`
-    : "Historical data begins when this feature is deployed. Redis is required for history to survive service restarts.");
 }
 
 function render(data) {
   latestData = data;
-  const c = data.counters || {};
+  const history = data.history || {};
+  const daily = Array.isArray(history.daily) ? history.daily.slice(-selectedRange) : [];
+  const summary = history.ranges?.[String(selectedRange)] || {};
+  const funnel = summary.funnel || data.funnel || {};
+  const p = data.performance || {};
   const g = data.gemini || {};
   const v = data.visitors || {};
 
-  set("activeVisitors", number(v.active));
-  set("uniqueVisitors", number(v.uniqueToday));
-  set("patientViews", number(c.patient_view));
-  set("dashboardViews", number(c.dashboard_view));
-  set("sessionsStarted", number(c.sessions_started));
-  set("customerMessages", number(c.customer_messages));
-  set("channelSwitches", number(c.channel_switches));
-  set("humanTakeovers", number(c.human_takeovers));
-  set("staffReplies", number(c.staff_messages));
-  set("ctaClicks", number(c.sales_cta_clicks));
+  set("rangeCaption", `Last ${selectedRange} days · ${data.timezone || "Asia/Kuala_Lumpur"}`);
+  set("activeVisitors", `${number(v.active)} live now`);
+  set("kpiVisitors", number(summary.visitors));
+  set("kpiVisitorsNote", `${number(summary.demoStartedVisitors)} started a demo`);
+  set("kpiEngaged", number(summary.message1Visitors));
+  set("kpiEngagedRate", `${percent(rate(summary.message1Visitors, summary.visitors))} of visitors`);
+  set("kpiConsultations", number(summary.ctaVisitors));
+  set("kpiConsultationRate", `${percent(summary.ctaRate)} of visitors`);
+  set("kpiP95", milliseconds(summary.aiResponseP95Ms));
+  set("kpiAiSuccess", `${percent(summary.aiSuccessRate)} provider success`);
 
-  set("geminiAttempts", number(g.attempts));
-  set("geminiSuccesses", number(g.successes));
-  set("geminiFailures", number(g.failures));
-  set("fallbackModel", number(g.fallbackModelSuccesses));
-  set("deterministicFallback", number(g.deterministicFallbacks));
-  set("promptTokens", number(g.tokens?.prompt));
-  set("outputTokens", number(g.tokens?.output));
-  set("thoughtTokens", number(g.tokens?.thoughts));
-  set("totalTokens", number(g.tokens?.total));
+  renderFunnel(funnel);
 
-  const quota = $("quotaStatus");
-  if (quota) {
-    const limited = g.quotaStatus === "rate_limited";
-    quota.textContent = limited ? "Quota / rate limit recently hit" : "No recent quota hit detected";
-    quota.className = `quota-state ${limited ? "bad" : "good"}`;
+  set("healthAvg", milliseconds(summary.aiResponseAvgMs));
+  set("healthP95", milliseconds(summary.aiResponseP95Ms));
+  set("healthErrorRate", percent(summary.providerErrorRate));
+  set("healthGeminiAvg", milliseconds(summary.geminiRequestAvgMs));
+  set("healthRetries", number(summary.retries));
+  set("healthFailovers", number(summary.keyFailovers));
+  set("healthTimeouts", number(summary.timeouts));
+  set("healthFallbacks", number(summary.fallbackModelUses));
+  set("healthTokens", number(summary.totalTokens));
+  set("healthCalls", number(summary.geminiAttempts));
+  set("healthSlow", number(summary.slowResponses));
+
+  const health = healthState(data, summary);
+  const badge = $("healthBadge");
+  if (badge) {
+    badge.textContent = health.label;
+    badge.dataset.tone = health.tone;
   }
-  set("quotaDetail", g.lastQuotaHitAt
-    ? `Last hit: ${time(g.lastQuotaHitAt)}${g.lastQuotaMessage ? ` · ${g.lastQuotaMessage}` : ""}`
-    : "The demo will flag actual Gemini 429 RESOURCE_EXHAUSTED responses here.");
+  set("kpiAiHealth", health.label);
+  const notice = $("healthNotice");
+  if (notice) {
+    notice.dataset.tone = health.tone;
+    const copy = notice.querySelector("p");
+    if (copy) copy.textContent = health.message;
+  }
 
-  const tbody = $("keyRows");
-  if (tbody) tbody.replaceChildren(...(g.keys || []).map(renderKeyRow));
+  renderLineChart("engagementTrend", daily, [
+    { key: "visitors", label: "Visitors" },
+    { key: "message1Visitors", label: "Engaged" },
+    { key: "ctaVisitors", label: "Consultation" },
+  ]);
+  renderLineChart("responseTrend", daily, [
+    { key: "aiResponseAvgMs", label: "Average" },
+    { key: "aiResponseP95Ms", label: "P95" },
+  ], { valueKind: "ms" });
 
-  renderPerformance(data.performance);
-  if (data.history) renderHistory(data.history);
-  set("todayLabel", `${data.day} · ${data.timezone}`);
-  set("storageLabel", data.storage === "redis" ? "Persistent Redis stats" : "In-memory stats · reset on server restart");
+  renderDiagnostics(data, daily);
+
+  const storage = data.storage === "redis" ? "History saved" : "Temporary memory";
+  set("storageLabel", storage);
   set("updatedAt", `Updated ${time(data.generatedAt)}`);
+  set("historyRetention", history.retentionDays ? `Up to ${number(history.retentionDays)} days retained` : "Historical aggregates");
+
+  document.body.dataset.state = "ready";
 }
 
 async function refresh() {
   try {
     const response = await fetch("./api/ops/stats", { cache: "no-store" });
     if (!response.ok) throw new Error(`Stats request failed (${response.status})`);
-    const data = await response.json();
-    render(data);
-    document.body.dataset.state = "ready";
+    render(await response.json());
   } catch (error) {
-    set("updatedAt", error.message || "Could not load stats");
     document.body.dataset.state = "error";
+    set("updatedAt", error.message || "Could not load stats");
+    const live = $("liveStatus");
+    if (live) {
+      live.classList.add("is-error");
+      live.innerHTML = "<i></i> Offline";
+    }
   }
 }
 
-ensurePerformanceUi();
-ensureHistoryUi();
+buildDashboardShell();
 refresh();
 setInterval(refresh, 5000);
