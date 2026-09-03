@@ -1,6 +1,5 @@
 const clinic = require("./clinicConfig");
 const { bookingRuleViolation } = require("./clinicKnowledge");
-const { enforceSafetyRules } = require("./safetyRules");
 
 const BOOKING_CONTEXT = /\bbook(?:ing)?\b|appointment|slot|available|can\s+i\s+do|want\s+to\s+do|come|visit|arrange|tempah|temujanji|boleh\s+saya\s+buat|nak\s+buat|mahu\s+buat|datang|预约|預約|我可以做|想做|有空位|想来|想來|来咨询|來諮詢/i;
 const BOOKING_QUESTION = /which.*branch|weekday|weekend|what day|which day|what time|morning|afternoon|evening|preferred.*(?:day|time)|confirm.*availability|cawangan|hari.*sesuai|pukul|哪.*(?:天|时间|時間)|什么时候|什麼時候/i;
@@ -83,11 +82,6 @@ function outsideHoursReply(text) {
 }
 
 function enforceBookingRules(messages) {
-  // This is the deterministic pre-provider guard used by aiService. Safety takes
-  // precedence so high-risk messages can never be treated as routine booking chat.
-  const safetyReply = enforceSafetyRules(messages);
-  if (safetyReply) return safetyReply;
-
   const latest = String((messages || []).filter((message) => message?.role === "user").at(-1)?.content || "");
   if (!hasBookingContext(messages, latest)) return null;
 
