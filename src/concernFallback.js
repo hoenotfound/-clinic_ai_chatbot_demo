@@ -1,4 +1,5 @@
 const { detectConcernMappings } = require("./clinicKnowledge");
+const { buildFallbackIntentReply } = require("./fallbackIntentRules");
 
 function languageFor(text) {
   if (/\p{Script=Han}/u.test(String(text || ""))) return "zh";
@@ -15,6 +16,9 @@ function shouldDeferToNormalFallback(text) {
 }
 
 function buildConcernFallback(messages) {
+  const intentReply = buildFallbackIntentReply(messages);
+  if (intentReply) return intentReply;
+
   const latest = latestUserText(messages);
   if (!latest || shouldDeferToNormalFallback(latest)) return null;
   const mappings = detectConcernMappings(latest);
