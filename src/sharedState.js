@@ -104,6 +104,7 @@ async function loadSession(id) {
 
 module.exports = {
   enabled,
+  withRedis: run,
   enforceSessionCreationLimit,
   enforceDailyMessageLimit,
   saveSession,
