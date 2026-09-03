@@ -24,6 +24,7 @@ jobs:
         run: npm test
       - name: Check JavaScript syntax
         run: |
+          node --check src/loadEnv.js
           node --check src/server.js
           node --check src/demoState.js
           node --check src/aiService.js
