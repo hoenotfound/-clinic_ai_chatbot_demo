@@ -50,7 +50,15 @@ export default async (req) => {
       redirect: "manual",
     });
     const headers = new Headers();
-    for (const name of ["content-type", "www-authenticate"]) {
+    for (const name of [
+      "content-type",
+      "www-authenticate",
+      "content-security-policy",
+      "x-content-type-options",
+      "x-robots-tag",
+      "referrer-policy",
+      "permissions-policy",
+    ]) {
       const value = upstream.headers.get(name);
       if (value) headers.set(name, value);
     }
