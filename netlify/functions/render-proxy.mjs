@@ -33,8 +33,11 @@ export default async (req) => {
   }
 
   const incoming = new URL(req.url);
-  let apiPath = incoming.pathname.replace(/^\/ai-chatbot/, "");
-  if (apiPath === "/ops/") apiPath = "/ops";
+  if (incoming.pathname === "/ai-chatbot/ops/") {
+    return Response.redirect(new URL("/ai-chatbot/ops", incoming.origin), 308);
+  }
+
+  const apiPath = incoming.pathname.replace(/^\/ai-chatbot/, "");
   if (!apiPath.startsWith("/api/") && apiPath !== "/health" && apiPath !== "/ops") {
     return Response.json({ error: "API route not found." }, { status: 404 });
   }
