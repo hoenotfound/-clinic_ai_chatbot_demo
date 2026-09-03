@@ -8,18 +8,40 @@ function renderOrigin() {
   return url.origin;
 }
 
-function forwardedHeaders(req) {
+function safeGeoHeader(value, max = 160) {
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/[\r\n]/g, " ")
+    .trim()
+    .slice(0, max);
+}
+
+function forwardedHeaders(req, context = {}) {
   const headers = new Headers();
-  for (const name of ["accept", "content-type", "user-agent", "authorization"]) {
+  for (const name of ["accept", "content-type", "user-agent", "authorization", "referer"]) {
     const value = req.headers.get(name);
     if (value) headers.set(name, value);
   }
-  const clientIp = req.headers.get("x-forwarded-for") || req.headers.get("x-nf-client-connection-ip");
+  const clientIp = req.headers.get("x-forwarded-for") || req.headers.get("x-nf-client-connection-ip") || context.ip;
   if (clientIp) headers.set("x-forwarded-for", clientIp);
+
+  const geo = context.geo || {};
+  const geoHeaders = {
+    "x-demo-geo-country-code": geo.country?.code,
+    "x-demo-geo-country-name": geo.country?.name,
+    "x-demo-geo-region": geo.subdivision?.name,
+    "x-demo-geo-city": geo.city,
+    "x-demo-geo-timezone": geo.timezone,
+  };
+  for (const [name, value] of Object.entries(geoHeaders)) {
+    const safe = safeGeoHeader(value);
+    if (safe) headers.set(name, safe);
+  }
   return headers;
 }
 
-export default async (req) => {
+export default async (req, context = {}) => {
   if (!ALLOWED_METHODS.has(req.method)) {
     return Response.json({ error: "Method not allowed." }, { status: 405 });
   }
@@ -48,7 +70,7 @@ export default async (req) => {
   try {
     const upstream = await fetch(target, {
       method: req.method,
-      headers: forwardedHeaders(req),
+      headers: forwardedHeaders(req, context),
       body,
       redirect: "manual",
     });
