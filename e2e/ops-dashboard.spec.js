@@ -1,6 +1,7 @@
 const { test, expect } = require("@playwright/test");
 
 const credentials = { username: "ops-e2e", password: "ops-e2e-pass" };
+const baseURL = "http://127.0.0.1:3100";
 
 async function seedDemo(request) {
   await request.post("/api/telemetry", {
@@ -18,7 +19,7 @@ async function seedDemo(request) {
 }
 
 test("ops dashboard keeps a clear hierarchy on desktop", async ({ browser }) => {
-  const context = await browser.newContext({ httpCredentials: credentials, viewport: { width: 1440, height: 1000 } });
+  const context = await browser.newContext({ baseURL, httpCredentials: credentials, viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
   await seedDemo(page.request);
   await page.goto("/ops");
@@ -37,7 +38,7 @@ test("ops dashboard keeps a clear hierarchy on desktop", async ({ browser }) => 
 });
 
 test("ops dashboard stays usable on mobile", async ({ browser }) => {
-  const context = await browser.newContext({ httpCredentials: credentials, viewport: { width: 390, height: 844 } });
+  const context = await browser.newContext({ baseURL, httpCredentials: credentials, viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   await page.goto("/ops");
 
