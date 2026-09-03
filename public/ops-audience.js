@@ -48,9 +48,38 @@
     return node;
   }
 
+  function setText(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.textContent = value;
+  }
+
+  function polishExistingShell() {
+    const consultationLabel = [...document.querySelectorAll(".kpi-label > span")]
+      .find((node) => node.textContent.trim() === "Consultations");
+    if (consultationLabel) consultationLabel.textContent = "Consultation clicks";
+
+    const engagementSubtitle = [...document.querySelectorAll(".chart-title span")]
+      .find((node) => node.textContent.includes("Visitors → engaged → consultation"));
+    if (engagementSubtitle) engagementSubtitle.textContent = "Visitors → engaged → CTA clicks";
+  }
+
+  function addKpi(grid, id, label, note, noteId = null) {
+    const card = make("article", "audience-kpi");
+    card.append(make("span", "", label));
+    const strong = make("strong", "", "—");
+    strong.id = id;
+    const small = make("small", "", note);
+    if (noteId) small.id = noteId;
+    card.append(strong, small);
+    grid.appendChild(card);
+  }
+
   function buildShell() {
+    polishExistingShell();
     if (document.getElementById("audienceAnalytics")) return true;
+
     const kpis = document.querySelector(".kpi-grid");
+    const primary = document.querySelector(".primary-grid");
     if (!kpis) return false;
 
     const section = make("section", "audience-section");
@@ -58,24 +87,20 @@
 
     const heading = make("div", "audience-heading");
     const left = make("div");
-    left.append(make("h2", "", "Visitor analytics"), make("p", "", "Anonymous audience, acquisition and engagement details."));
-    heading.append(left, make("span", "", "Approximate geo · no raw IP stored"));
+    left.append(
+      make("p", "section-kicker", "AUDIENCE"),
+      make("h2", "", "Visitor analytics"),
+      make("p", "audience-heading-copy", "Anonymous audience, acquisition and engagement details.")
+    );
+    const privacyChip = make("span", "audience-privacy-chip", "ⓘ Approximate geo · no raw IP stored");
+    privacyChip.title = "Geo is approximate city/region/country supplied by Netlify. VPNs, mobile networks and corporate connections can make it inaccurate.";
+    heading.append(left, privacyChip);
 
     const kpiGrid = make("div", "audience-kpis");
-    const kpiDefs = [
-      ["audienceVisits", "Total visits", "Page entries in selected period"],
-      ["audienceNew", "New visitors", "First-ever visit in selected period"],
-      ["audienceReturning", "Returning", "Seen before selected period"],
-      ["audienceSpan", "Avg active span", "Approx. visible engagement"],
-    ];
-    for (const [id, label, note] of kpiDefs) {
-      const card = make("article", "audience-kpi");
-      card.append(make("span", "", label));
-      const strong = make("strong", "", "—");
-      strong.id = id;
-      card.append(strong, make("small", "", note));
-      kpiGrid.appendChild(card);
-    }
+    addKpi(kpiGrid, "audienceVisits", "Total visits", "Page entries in selected period");
+    addKpi(kpiGrid, "audienceNew", "New visitors", "First-ever visit in selected period");
+    addKpi(kpiGrid, "audienceReturning", "Returning visitors", "Seen before selected period");
+    addKpi(kpiGrid, "audienceRepeat", "Repeat rate", "Returning ÷ unique visitors", "audienceRepeatNote");
 
     const grid = make("div", "audience-grid");
     for (const [id, title, subtitle] of [
@@ -92,21 +117,34 @@
     }
 
     const sourceCard = make("article", "audience-card audience-wide");
-    sourceCard.append(make("h3", "", "Acquisition & conversion"), make("p", "audience-subtitle", "UTM source or click identifier → engagement → dashboard → consultation CTA."));
+    sourceCard.append(
+      make("h3", "", "Acquisition & conversion"),
+      make("p", "audience-subtitle", "UTM source or click identifier → engagement → dashboard → consultation CTA.")
+    );
     const sourceWrap = make("div", "audience-table-wrap");
-    sourceWrap.innerHTML = '<table class="audience-source-table"><thead><tr><th>Source</th><th>Visitors</th><th>Engaged</th><th>Dashboard</th><th>CTA</th></tr></thead><tbody id="audienceSourceRows"></tbody></table>';
+    sourceWrap.innerHTML = '<table class="audience-source-table"><thead><tr><th>Source</th><th>Visitors</th><th>Engage %</th><th>Dashboard %</th><th>CTA %</th></tr></thead><tbody id="audienceSourceRows"></tbody></table>';
     sourceCard.appendChild(sourceWrap);
     grid.appendChild(sourceCard);
 
-    const recentCard = make("article", "audience-card audience-wide");
-    recentCard.append(make("h3", "", "Recent anonymous visitors"), make("p", "audience-subtitle", "Anonymous visitor history only — no name, phone number, raw IP or chat transcript."));
-    const recentWrap = make("div", "audience-table-wrap");
-    recentWrap.innerHTML = '<table class="audience-recent-table"><thead><tr><th>Visitor</th><th>Location</th><th>Source</th><th>Device</th><th>Visits</th><th>Message stage</th><th>Journey</th><th>Last seen</th></tr></thead><tbody id="audienceRecentRows"></tbody></table>';
+    const recentCard = make("article", "audience-card audience-wide audience-recent-card");
+    recentCard.append(
+      make("h3", "", "Recent anonymous visitors"),
+      make("p", "audience-subtitle", "Latest anonymous visitors in the selected period — no name, phone number, raw IP or chat transcript.")
+    );
+    const recentWrap = make("div", "audience-table-wrap audience-recent-wrap");
+    recentWrap.innerHTML = '<table class="audience-recent-table"><thead><tr><th>Visitor</th><th>Location</th><th>Source</th><th>Device</th><th>Visits</th><th>Messages</th><th>Journey</th><th>Last seen</th></tr></thead><tbody id="audienceRecentRows"></tbody></table>';
     recentCard.appendChild(recentWrap);
     grid.appendChild(recentCard);
 
-    section.append(heading, kpiGrid, grid, make("p", "audience-privacy", "Geo is approximate IP-based city/region/country supplied by Netlify. VPNs, mobile networks and corporate connections can make it inaccurate. Latitude, longitude and the visitor’s raw IP are not persisted."));
-    kpis.insertAdjacentElement("afterend", section);
+    section.append(
+      heading,
+      kpiGrid,
+      grid,
+      make("p", "audience-privacy", "Geo is approximate. Latitude, longitude and raw visitor IP are not persisted in audience analytics.")
+    );
+
+    if (primary) primary.insertAdjacentElement("afterend", section);
+    else kpis.insertAdjacentElement("afterend", section);
 
     document.querySelectorAll("[data-range]").forEach((button) => button.addEventListener("click", () => {
       queueMicrotask(() => { if (latestAudience) render(latestAudience); });
@@ -141,46 +179,93 @@
     tbody.replaceChildren();
     for (const source of rows.slice(0, 8)) {
       const tr = document.createElement("tr");
-      for (const value of [source.label || "Direct / unknown", fmt(source.visitors), pct(source.engagementRate), pct(source.dashboardRate), pct(source.ctaRate)]) {
-        tr.appendChild(make("td", "", value));
-      }
+      const values = [
+        source.label || "Direct / unknown",
+        fmt(source.visitors),
+        pct(source.engagementRate),
+        pct(source.dashboardRate),
+        pct(source.ctaRate),
+      ];
+      values.forEach((value, index) => {
+        const td = make("td", index > 1 ? "audience-rate-cell" : "", value);
+        tr.appendChild(td);
+      });
       tbody.appendChild(tr);
     }
     if (!rows.length) {
       const tr = document.createElement("tr");
-      const td = make("td", "", "No acquisition data yet.");
+      const td = make("td", "audience-table-empty", "No acquisition data yet.");
       td.colSpan = 5;
       tr.appendChild(td);
       tbody.appendChild(tr);
     }
   }
 
+  function stageTone(stage) {
+    if (stage === "Consultation click" || stage === "Journey complete") return "strong";
+    if (stage === "Human takeover") return "attention";
+    if (stage === "Dashboard viewed") return "dashboard";
+    if (stage === "Messaged" || stage === "3+ messages") return "engaged";
+    return "neutral";
+  }
+
+  function recentInSelectedRange(rows = []) {
+    const cutoff = Date.now() - (activeRange() * 24 * 60 * 60_000);
+    return rows.filter((visitor) => !visitor.lastSeenAt || Number(visitor.lastSeenAt) >= cutoff);
+  }
+
   function renderRecent(rows = []) {
     const tbody = document.getElementById("audienceRecentRows");
     if (!tbody) return;
     tbody.replaceChildren();
-    for (const visitor of rows.slice(0, 20)) {
+
+    const filtered = recentInSelectedRange(rows).slice(0, 20);
+    for (const visitor of filtered) {
       const tr = document.createElement("tr");
+      tr.className = "visitor-row";
+
       const id = make("td", "visitor-id", `#${visitor.id || "ANON"}`);
-      const location = make("td", "", visitor.location || "Unknown");
-      const source = make("td", "", visitor.source || "Direct / unknown");
+      id.dataset.label = "Visitor";
+      const location = make("td", "visitor-location", visitor.location || "Unknown");
+      location.dataset.label = "Location";
+      const source = make("td", "visitor-source", visitor.source || "Direct / unknown");
+      source.dataset.label = "Source";
       if (visitor.campaign) source.title = `Campaign: ${visitor.campaign}`;
-      const device = make("td", "", [visitor.device, visitor.browser].filter(Boolean).join(" · "));
-      const visits = make("td", "", fmt(visitor.visits));
-      const messages = make("td", "", visitor.messageStage || "0");
-      const journey = make("td");
-      journey.appendChild(make("span", "visitor-stage", visitor.stage || "Visited"));
-      const lastSeen = make("td", "", relativeTime(visitor.lastSeenAt));
+      const device = make("td", "visitor-device", [visitor.device, visitor.browser].filter(Boolean).join(" · "));
+      device.dataset.label = "Device";
+      const visits = make("td", "visitor-visits", fmt(visitor.visits));
+      visits.dataset.label = "Visits";
+      const messages = make("td", "visitor-messages", visitor.messageStage || "0");
+      messages.dataset.label = "Messages";
+      const journey = make("td", "visitor-journey");
+      journey.dataset.label = "Journey";
+      journey.appendChild(make("span", `visitor-stage stage-${stageTone(visitor.stage)}`, visitor.stage || "Visited"));
+      const lastSeen = make("td", "visitor-last-seen", relativeTime(visitor.lastSeenAt));
+      lastSeen.dataset.label = "Last seen";
+
       tr.append(id, location, source, device, visits, messages, journey, lastSeen);
       tbody.appendChild(tr);
     }
-    if (!rows.length) {
+
+    if (!filtered.length) {
       const tr = document.createElement("tr");
-      const td = make("td", "", "No visitor profiles yet.");
+      const td = make("td", "audience-table-empty", `No visitor profiles in the last ${activeRange()} days.`);
       td.colSpan = 8;
       tr.appendChild(td);
       tbody.appendChild(tr);
     }
+  }
+
+  function clearAudience() {
+    for (const id of ["audienceVisits", "audienceNew", "audienceReturning", "audienceRepeat"]) {
+      setText(id, "—");
+    }
+    setText("audienceRepeatNote", "Avg visit span —");
+    renderBreakdown("audienceLocations", []);
+    renderBreakdown("audienceDevices", []);
+    renderBreakdown("audienceBrowsers", []);
+    renderSources([]);
+    renderRecent([]);
   }
 
   function render(audience) {
@@ -188,26 +273,21 @@
     if (!buildShell()) return;
     const range = audience?.ranges?.[String(activeRange())];
     if (!range) {
-      for (const id of ["audienceVisits", "audienceNew", "audienceReturning", "audienceSpan"]) {
-        const element = document.getElementById(id);
-        if (element) element.textContent = "—";
-      }
-      renderBreakdown("audienceLocations", []);
-      renderBreakdown("audienceDevices", []);
-      renderBreakdown("audienceBrowsers", []);
-      renderSources([]);
-      renderRecent([]);
+      clearAudience();
       return;
     }
-    document.getElementById("audienceVisits").textContent = fmt(range.totalVisits);
-    document.getElementById("audienceNew").textContent = fmt(range.newVisitors);
-    document.getElementById("audienceReturning").textContent = fmt(range.returningVisitors);
-    document.getElementById("audienceSpan").textContent = duration(range.avgActiveSpanMs);
+
+    setText("audienceVisits", fmt(range.totalVisits));
+    setText("audienceNew", fmt(range.newVisitors));
+    setText("audienceReturning", fmt(range.returningVisitors));
+    setText("audienceRepeat", pct(range.repeatRate));
+    setText("audienceRepeatNote", `Avg visit span ${duration(range.avgActiveSpanMs)}`);
+
     renderBreakdown("audienceLocations", range.cities?.some((item) => item.label !== "Unknown") ? range.cities : range.countries);
     renderBreakdown("audienceDevices", range.devices);
     renderBreakdown("audienceBrowsers", range.browsers);
     renderSources(range.sources);
-    renderRecent(audience.recentVisitors);
+    renderRecent(audience.recentVisitors || []);
   }
 
   ensureStyle();
