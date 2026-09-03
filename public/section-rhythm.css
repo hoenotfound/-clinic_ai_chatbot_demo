@@ -45,6 +45,33 @@
   margin-bottom: 38px;
 }
 
+/*
+  The acquisition selector lives inside the channel grid. Its labels are longer
+  than the original channel cards, so explicitly allow the grid items to shrink
+  instead of increasing the intrinsic width of the whole Patient View.
+*/
+.page-shell #patientView .patient-layout,
+.page-shell #patientView .channel-panel,
+.page-shell #patientView [data-acquisition-selector],
+.page-shell #patientView [data-acquisition-selector] .suggestion-list,
+.page-shell #patientView [data-acquisition-selector] .suggestion-chip {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.page-shell #patientView [data-acquisition-selector] .suggestion-list {
+  width: 100%;
+  overflow: hidden;
+}
+
+.page-shell #patientView [data-acquisition-selector] .suggestion-chip > strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 900px) {
   .page-shell {
     --section-gap-major: 100px;
@@ -100,5 +127,24 @@
 
   .page-shell .capabilities-section .section-heading {
     margin-bottom: 30px;
+  }
+
+  /* A true 2x2 source grid that cannot push the phone preview off-screen. */
+  .page-shell #patientView [data-acquisition-selector] .suggestion-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+  }
+
+  .page-shell #patientView [data-acquisition-selector] .suggestion-chip {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .page-shell #patientView [data-acquisition-selector] .suggestion-chip > strong {
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
