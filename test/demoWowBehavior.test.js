@@ -112,6 +112,67 @@ test("budget objection keeps treatment context and stays low pressure", () => {
   assert.doesNotMatch(reply, /book now|limited slot|hurry/i);
 });
 
+test("a stated budget does not get mistaken for a rejection when the visitor is ready to book", () => {
+  const reply = ai.getFallbackReply([
+    { role: "user", content: "My budget is RM1500, can I book HIFU this Saturday at PJ?" },
+  ]);
+
+  assert.match(reply, /RM\s?1500/i);
+  assert.match(reply, /HIFU/i);
+  assert.match(reply, /Petaling Jaya/i);
+  assert.match(reply, /Saturday/i);
+  assert.match(reply, /\[\[HANDOFF\]\]/);
+  assert.doesNotMatch(reply, /no pressure|budget concern/i);
+});
+
+test("nervous visitors who still want to book get reassurance and booking progression", () => {
+  const reply = ai.getFallbackReply([
+    { role: "user", content: "I'm a bit scared about HIFU but I still want to come Saturday at PJ" },
+  ]);
+
+  assert.match(reply, /nervous|comfort|scared|normal/i);
+  assert.match(reply, /Petaling Jaya/i);
+  assert.match(reply, /Saturday/i);
+  assert.match(reply, /\[\[HANDOFF\]\]/);
+});
+
+test("promotion plus booking answers the promotion before handing off the booking details", () => {
+  const reply = ai.getFallbackReply([
+    { role: "user", content: "Any HIFU promo? I want to come Saturday at PJ." },
+  ]);
+
+  assert.match(reply, /HIFU Lifting Special/i);
+  assert.match(reply, /RM 888/i);
+  assert.match(reply, /Petaling Jaya/i);
+  assert.match(reply, /Saturday/i);
+  assert.match(reply, /\[\[HANDOFF\]\]/);
+});
+
+test("walk-in guidance can continue naturally when the visitor replies with branch and timing", () => {
+  const reply = ai.getFallbackReply([
+    { role: "user", content: "Do you accept walk-ins?" },
+    { role: "assistant", content: "Appointments are recommended. I can help collect your preferred branch and timing for the team to confirm." },
+    { role: "user", content: "PJ Saturday" },
+  ]);
+
+  assert.match(reply, /Petaling Jaya/i);
+  assert.match(reply, /Saturday/i);
+  assert.match(reply, /\[\[HANDOFF\]\]/);
+});
+
+test("ambiguous bare follow-up after comparing two treatments asks which treatment instead of guessing", () => {
+  const reply = ai.getFallbackReply([
+    { role: "user", content: "HIFU vs Pico, which one is better?" },
+    { role: "assistant", content: "They focus on different concerns." },
+    { role: "user", content: "how long?" },
+  ]);
+
+  assert.match(reply, /HIFU/i);
+  assert.match(reply, /Pico/i);
+  assert.match(reply, /mean|maksudkan|指/i);
+  assert.doesNotMatch(reply, /45.?75|20.?40/);
+});
+
 test("promotion response feels like a clinic reply instead of breaking the demo illusion", () => {
   const reply = ai.getFallbackReply([{ role: "user", content: "Any HIFU promo now?" }]);
   assert.match(reply, /HIFU Lifting Special/i);
@@ -157,7 +218,17 @@ test("unconfigured treatment questions stay honest without inventing a service",
     { role: "user", content: "Do you do lip filler?" },
   ]);
 
-  assert.match(reply, /don’t have confirmed details|don't have confirmed details/i);
+  assert.match(reply, /don’t have confirmed|don't have confirmed/i);
   assert.match(reply, /HIFU|Pico Laser/i);
   assert.doesNotMatch(reply, /RM\s?\d+.*filler|filler.*RM\s?\d+/i);
+});
+
+test("unconfigured treatment price questions do not fall through to unrelated configured prices", () => {
+  const reply = ai.getFallbackReply([
+    { role: "user", content: "How much is lip filler?" },
+  ]);
+
+  assert.match(reply, /don’t have confirmed|don't have confirmed/i);
+  assert.match(reply, /pricing|harga|价格/i);
+  assert.doesNotMatch(reply, /HIFU starts from RM 888|Pico Laser from RM 388|Skin Booster from RM 688/i);
 });
