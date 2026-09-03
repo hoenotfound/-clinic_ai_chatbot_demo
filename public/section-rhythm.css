@@ -94,6 +94,73 @@
   .page-shell .capabilities-section .section-heading {
     margin-bottom: 34px;
   }
+
+  /* Acquisition source cards need their own hierarchy on narrow screens. */
+  .page-shell #patientView [data-acquisition-selector] {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(148, 163, 184, .20);
+  }
+
+  .page-shell #patientView [data-acquisition-selector] .prompt-helper {
+    margin: 8px 0 13px;
+    text-align: left;
+    line-height: 1.5;
+  }
+
+  .page-shell #patientView [data-acquisition-selector] .suggestion-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+    width: 100%;
+    overflow: visible;
+  }
+
+  .page-shell #patientView [data-acquisition-selector] .suggestion-chip {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+    min-height: 84px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 6px;
+    padding: 13px 14px;
+    overflow: hidden;
+    text-align: left;
+  }
+
+  .page-shell #patientView [data-acquisition-selector] .suggestion-chip > span,
+  .page-shell #patientView [data-acquisition-selector] .suggestion-chip > strong {
+    position: static;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    transform: none;
+  }
+
+  .page-shell #patientView [data-acquisition-selector] .suggestion-chip > span {
+    color: var(--accent-blue, #2563eb);
+    font-size: 9px;
+    line-height: 1.2;
+    letter-spacing: .08em;
+  }
+
+  .page-shell #patientView [data-acquisition-selector] .suggestion-chip > strong {
+    overflow: visible;
+    color: var(--brand-blue, #0f172a);
+    font-size: 12px;
+    line-height: 1.28;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .page-shell #patientView [data-acquisition-selector] .suggestion-chip > b {
+    display: none;
+  }
 }
 
 @media (max-width: 600px) {
@@ -129,22 +196,69 @@
     margin-bottom: 30px;
   }
 
-  /* A true 2x2 source grid that cannot push the phone preview off-screen. */
+  .page-shell #patientView .channel-panel {
+    padding-bottom: 18px;
+  }
+
+  .page-shell #patientView [data-acquisition-selector] {
+    margin-top: 18px;
+    padding-top: 17px;
+  }
+
   .page-shell #patientView [data-acquisition-selector] .suggestion-list {
-    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    width: 100%;
+    gap: 10px;
   }
 
   .page-shell #patientView [data-acquisition-selector] .suggestion-chip {
-    width: 100%;
-    min-width: 0;
+    min-height: 88px;
+    padding: 13px 12px;
+    border-radius: 14px;
+  }
+
+  .page-shell #patientView [data-acquisition-selector] .suggestion-chip > span {
+    font-size: 9px;
   }
 
   .page-shell #patientView [data-acquisition-selector] .suggestion-chip > strong {
-    overflow: visible;
-    white-space: normal;
-    overflow-wrap: anywhere;
+    font-size: 12px;
+    line-height: 1.3;
+  }
+
+  /* Keep all core live-demo controls comfortable to tap. */
+  .page-shell #patientView .channel-button,
+  .page-shell #patientView .prompt-panel .suggestion-chip,
+  .page-shell #patientView [data-acquisition-selector] .suggestion-chip,
+  .page-shell .demo-reset-button,
+  .page-shell .experience-tab {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Long helper/status copy must not create page-level horizontal scroll. */
+  .page-shell .experience-toolbar,
+  .page-shell .experience-tabs,
+  .page-shell #patientView .guide-section,
+  .page-shell #patientView .device-stage,
+  .page-shell #patientView .prompt-panel,
+  .page-shell .capability-card,
+  .page-shell .sales-cta {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 370px) {
+  .page-shell #patientView [data-acquisition-selector] .suggestion-list {
+    gap: 8px;
+  }
+
+  .page-shell #patientView [data-acquisition-selector] .suggestion-chip {
+    min-height: 86px;
+    padding: 12px 10px;
+  }
+
+  .page-shell #patientView [data-acquisition-selector] .suggestion-chip > strong {
+    font-size: 11px;
   }
 }
