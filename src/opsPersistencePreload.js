@@ -210,14 +210,15 @@ async function durableState() {
   return durableCache.inFlight;
 }
 
-function invalidateDurableCache() {
-  durableCache.expiresAt = 0;
+function noteDurableWrite() {
+  // Intentionally do not invalidate a warm history cache on each telemetry write.
+  // This keeps /ops reads isolated from live chat traffic; history may lag by at most the configured cache window.
 }
 
 ops.recordCounter = function recordCounterPersistent(name, amount = 1) {
   const result = originals.recordCounter(name, amount);
   fireAndForget(store.incrementCounters(dayKey(), [[name, amount]]));
-  invalidateDurableCache();
+  noteDurableWrite();
   return result;
 };
 
@@ -228,14 +229,14 @@ ops.recordVisitor = function recordVisitorPersistent(payload = {}) {
   const normalizedEvent = safeCounterName(payload.event || "heartbeat");
   fireAndForget(store.recordVisitor({ day, ...payload }));
   if (normalizedEvent !== "heartbeat") fireAndForget(store.incrementCounters(day, [[normalizedEvent, 1]]));
-  invalidateDurableCache();
+  noteDurableWrite();
   return result;
 };
 
 ops.recordLatency = function recordLatencyPersistent(metric, durationMs) {
   const result = originals.recordLatency(metric, durationMs);
   fireAndForget(store.incrementCounters(dayKey(), latencyEntries(metric, durationMs)));
-  invalidateDurableCache();
+  noteDurableWrite();
   return result;
 };
 
@@ -244,7 +245,7 @@ ops.recordGeminiAttempt = function recordGeminiAttemptPersistent(payload = {}) {
   const day = dayKey();
   fireAndForget(store.incrementCounters(day, [["gemini_api_attempts", 1]]));
   fireAndForget(store.recordGeminiAttempt({ day, ...payload }));
-  invalidateDurableCache();
+  noteDurableWrite();
   return result;
 };
 
@@ -265,7 +266,7 @@ ops.recordGeminiSuccess = function recordGeminiSuccessPersistent(payload = {}) {
   fireAndForget(store.incrementCounters(day, entries));
   fireAndForget(store.setMeta(day, "gemini_last_success_at", now));
   fireAndForget(store.recordGeminiSuccess({ day, ...payload, usage, now }));
-  invalidateDurableCache();
+  noteDurableWrite();
   return result;
 };
 
@@ -290,7 +291,7 @@ ops.recordGeminiFailure = function recordGeminiFailurePersistent(payload = {}) {
     fireAndForget(store.setMeta(day, "gemini_last_quota_message", message));
   }
   fireAndForget(store.recordGeminiFailure({ day, ...payload, quotaHit, status, message, now }));
-  invalidateDurableCache();
+  noteDurableWrite();
   return result;
 };
 
@@ -301,7 +302,7 @@ ops.recordDeterministicFallback = function recordDeterministicFallbackPersistent
   fireAndForget(store.incrementCounters(day, [["deterministic_fallbacks", 1]]));
   fireAndForget(store.setMeta(day, "last_deterministic_fallback_at", now));
   fireAndForget(store.setMeta(day, "last_deterministic_fallback_reason", String(reason || "unknown").slice(0, 240)));
-  invalidateDurableCache();
+  noteDurableWrite();
   return result;
 };
 
@@ -332,7 +333,11 @@ ops.getSnapshot = async function getSnapshotPersistent() {
 
   return {
     ...base,
-    storage: shared.enabled ? "neon+redis" : "neon",
+    // Keep the legacy value so the existing UI correctly shows "History saved".
+    // durableStorage identifies the actual long-term backend for future UI/API consumers.
+    storage: "redis",
+    durableStorage: "neon",
+    liveStorage: shared.enabled ? "redis" : "memory",
     visitors: {
       ...base.visitors,
       uniqueToday: visitorCount,
