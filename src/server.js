@@ -1,6 +1,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const clinic = require("./clinicConfig");
 
 function loadDotEnv() {
@@ -24,6 +25,7 @@ function loadDotEnv() {
 loadDotEnv();
 const state = require("./demoState");
 const shared = require("./sharedState");
+const opsStats = require("./opsStats");
 const ai = require("./aiService");
 
 const PORT = Number.parseInt(process.env.PORT || "3000", 10);
@@ -64,9 +66,23 @@ const MAX_CONCURRENT_AI_REQUESTS = intEnv("DEMO_MAX_CONCURRENT_AI_REQUESTS", 8);
 const MAX_TOTAL_MESSAGES_PER_SESSION = intEnv("DEMO_MAX_TOTAL_MESSAGES_PER_SESSION", 60);
 const MAX_STAFF_MESSAGES_PER_SESSION = intEnv("DEMO_MAX_STAFF_MESSAGES_PER_SESSION", 20);
 const MIN_STAFF_MESSAGE_INTERVAL_MS = intEnv("DEMO_MIN_STAFF_MESSAGE_INTERVAL_MS", 700);
+const OPS_USERNAME = String(process.env.DEMO_OPS_USERNAME || "").trim();
+const OPS_PASSWORD = String(process.env.DEMO_OPS_PASSWORD || "");
+const PUBLIC_TELEMETRY_EVENTS = new Set([
+  "heartbeat",
+  "patient_view",
+  "demo_started",
+  "message_1",
+  "message_3",
+  "dashboard_view",
+  "human_takeover",
+  "journey_complete",
+  "sales_cta_clicks",
+]);
 let activeAiRequests = 0;
 
 function demoBusyError() {
+  opsStats.recordCounter("demo_busy_errors");
   const err = new Error("The live demo is busy right now. Please try your message again in a moment.");
   err.statusCode = 429;
   return err;
@@ -205,6 +221,59 @@ function clientIp(req) {
   return req.socket.remoteAddress || "unknown";
 }
 
+function safeEqual(left, right) {
+  const leftBuffer = Buffer.from(String(left || ""));
+  const rightBuffer = Buffer.from(String(right || ""));
+  if (leftBuffer.length !== rightBuffer.length) return false;
+  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function opsAuthConfigured() {
+  return Boolean(OPS_USERNAME && OPS_PASSWORD);
+}
+
+function opsAuthorized(req) {
+  if (!opsAuthConfigured()) return false;
+  const header = String(req.headers.authorization || "");
+  if (!header.startsWith("Basic ")) return false;
+  let decoded = "";
+  try {
+    decoded = Buffer.from(header.slice(6), "base64").toString("utf8");
+  } catch {
+    return false;
+  }
+  const separator = decoded.indexOf(":");
+  if (separator < 0) return false;
+  const username = decoded.slice(0, separator);
+  const password = decoded.slice(separator + 1);
+  return safeEqual(username, OPS_USERNAME) && safeEqual(password, OPS_PASSWORD);
+}
+
+function requireOpsAuth(req, res) {
+  if (!opsAuthConfigured()) {
+    securityHeaders(res);
+    const payload = Buffer.from("Demo operations dashboard is not configured.");
+    res.writeHead(503, {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Content-Length": payload.length,
+      "Cache-Control": "no-store",
+    });
+    res.end(payload);
+    return false;
+  }
+  if (opsAuthorized(req)) return true;
+  securityHeaders(res);
+  const payload = Buffer.from("Authentication required.");
+  res.writeHead(401, {
+    "WWW-Authenticate": 'Basic realm="Demo Operations", charset="UTF-8"',
+    "Content-Type": "text/plain; charset=utf-8",
+    "Content-Length": payload.length,
+    "Cache-Control": "no-store",
+  });
+  res.end(payload);
+  return false;
+}
+
 async function requireDemoSession(id) {
   let session = state.getSession(id);
   if (!session && shared.enabled) {
@@ -244,6 +313,25 @@ async function handleApi(req, res, url) {
       configured: ai.configured,
     });
   }
+  if (req.method === "POST" && url.pathname === "/api/telemetry") {
+    const body = await readJson(req);
+    const event = String(body.event || "heartbeat").toLowerCase();
+    if (!PUBLIC_TELEMETRY_EVENTS.has(event)) {
+      const err = new Error("Unsupported telemetry event.");
+      err.statusCode = 400;
+      throw err;
+    }
+    const accepted = opsStats.recordVisitor({
+      visitorId: body.visitorId,
+      event,
+      surface: body.surface,
+    });
+    return sendJson(res, accepted ? 202 : 400, accepted ? { ok: true } : { error: "Invalid visitor id." });
+  }
+  if (req.method === "GET" && url.pathname === "/api/ops/stats") {
+    if (!requireOpsAuth(req, res)) return true;
+    return sendJson(res, 200, await opsStats.getSnapshot());
+  }
   if (req.method === "GET" && url.pathname === "/api/demo/config") {
     return sendJson(res, 200, publicConfig());
   }
@@ -253,6 +341,7 @@ async function handleApi(req, res, url) {
     await shared.enforceSessionCreationLimit(ip, state.limits.maxSessionsPerIpDay);
     const session = state.createSession({ channel: body.channel, ip });
     await persistSession(session);
+    opsStats.recordCounter("sessions_started");
     return sendJson(res, 201, { session: state.publicSession(session) });
   }
 
@@ -268,13 +357,18 @@ async function handleApi(req, res, url) {
   const body = await readJson(req);
 
   if (action === "channel") {
+    const previousChannel = session.channel;
     state.setChannel(session, body.channel);
     await persistSession(session);
+    if (session.channel !== previousChannel) opsStats.recordCounter("channel_switches");
     return sendJson(res, 200, { session: state.publicSession(session) });
   }
   if (action === "mode") {
+    const previousMode = session.mode;
     state.setMode(session, body.mode);
     await persistSession(session);
+    if (previousMode !== "human" && session.mode === "human") opsStats.recordCounter("human_takeovers");
+    if (previousMode === "human" && session.mode !== "human") opsStats.recordCounter("human_releases");
     return sendJson(res, 200, { session: state.publicSession(session) });
   }
   if (action === "staff-message") {
@@ -282,6 +376,7 @@ async function handleApi(req, res, url) {
     enforceStaffMessageLimit(session);
     state.addStaffMessage(session, body.message);
     await persistSession(session);
+    opsStats.recordCounter("staff_messages");
     return sendJson(res, 200, { session: state.publicSession(session) });
   }
   if (action === "message") {
@@ -293,6 +388,7 @@ async function handleApi(req, res, url) {
       await shared.enforceDailyMessageLimit(state.limits.maxTotalMessagesPerDay);
       state.addCustomerMessage(session, body.message);
       await persistSession(session);
+      opsStats.recordCounter("customer_messages");
       if (session.mode === "human") {
         return sendJson(res, 200, { session: state.publicSession(session), aiReplied: false });
       }
@@ -333,6 +429,83 @@ async function handleApi(req, res, url) {
     }
   }
   return false;
+}
+
+function buildOpsPage() {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow,noarchive" />
+  <title>Demo Operations</title>
+  <link rel="stylesheet" href="./ops.css" />
+</head>
+<body>
+  <main class="ops-shell">
+    <header class="ops-header">
+      <div><p class="eyebrow">Private admin view</p><h1>Demo Operations</h1><p class="subtitle">Live usage, interactions and Gemini health for the public clinic chatbot demo.</p></div>
+      <div class="header-meta"><span id="todayLabel">Today</span><span id="storageLabel">Loading storage status…</span><span id="updatedAt">Loading…</span></div>
+    </header>
+
+    <section class="grid metric-grid" aria-label="Visitor metrics">
+      <article class="metric"><span>Active now</span><strong id="activeVisitors">0</strong></article>
+      <article class="metric"><span>Unique today</span><strong id="uniqueVisitors">0</strong></article>
+      <article class="metric"><span>Patient view opens</span><strong id="patientViews">0</strong></article>
+      <article class="metric"><span>Dashboard opens</span><strong id="dashboardViews">0</strong></article>
+      <article class="metric"><span>Demo sessions</span><strong id="sessionsStarted">0</strong></article>
+      <article class="metric"><span>Patient messages</span><strong id="customerMessages">0</strong></article>
+    </section>
+
+    <section class="section">
+      <div class="section-heading"><div><h2>Demo interactions</h2><p>Actual actions performed on the public demo today.</p></div></div>
+      <div class="grid activity-grid">
+        <article class="mini"><span>Channel switches</span><strong id="channelSwitches">0</strong></article>
+        <article class="mini"><span>Human takeovers</span><strong id="humanTakeovers">0</strong></article>
+        <article class="mini"><span>Staff replies</span><strong id="staffReplies">0</strong></article>
+        <article class="mini"><span>Sales CTA clicks</span><strong id="ctaClicks">0</strong></article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-heading"><div><h2>Gemini usage</h2><p>Counts come from the Gemini API responses and the demo failover chain.</p></div></div>
+      <div class="grid gemini-grid">
+        <article class="mini"><span>API attempts</span><strong id="geminiAttempts">0</strong></article>
+        <article class="mini"><span>Successful calls</span><strong id="geminiSuccesses">0</strong></article>
+        <article class="mini"><span>Failed calls</span><strong id="geminiFailures">0</strong></article>
+        <article class="mini"><span>Fallback model wins</span><strong id="fallbackModel">0</strong></article>
+        <article class="mini"><span>Deterministic fallbacks</span><strong id="deterministicFallback">0</strong></article>
+      </div>
+      <div class="grid token-grid">
+        <article class="mini"><span>Prompt tokens</span><strong id="promptTokens">0</strong></article>
+        <article class="mini"><span>Output tokens</span><strong id="outputTokens">0</strong></article>
+        <article class="mini"><span>Thinking tokens</span><strong id="thoughtTokens">0</strong></article>
+        <article class="mini"><span>Total tokens</span><strong id="totalTokens">0</strong></article>
+      </div>
+      <div class="quota-box"><div id="quotaStatus" class="quota-state">Checking Gemini quota events…</div><p id="quotaDetail">Loading…</p></div>
+      <div class="table-wrap">
+        <table><thead><tr><th>API key</th><th>Health</th><th>Attempts</th><th>Successes</th><th>Failures</th><th>Quota hits</th><th>Total tokens</th><th>Last model</th><th>Last activity</th></tr></thead><tbody id="keyRows"></tbody></table>
+      </div>
+      <div class="note">Gemini quota is enforced at the Google Cloud project level. If both API keys belong to the same project, rotating between them does not create a second independent quota. This page reports real rate-limit responses seen by the demo rather than guessing a remaining quota percentage.</div>
+    </section>
+  </main>
+  <script src="./ops.js" defer></script>
+</body>
+</html>`;
+}
+
+function serveOps(req, res) {
+  if (!requireOpsAuth(req, res)) return true;
+  securityHeaders(res);
+  const payload = Buffer.from(buildOpsPage());
+  res.writeHead(200, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Content-Length": payload.length,
+    "Cache-Control": "no-store",
+  });
+  if (req.method === "HEAD") return res.end(), true;
+  res.end(payload);
+  return true;
 }
 
 function safeDashboardPath(pathname) {
@@ -430,7 +603,12 @@ function buildEnhancedIndex(filePath) {
   if (!html.includes('/portal-data.js')) {
     html = html.replace(
       '  <script src="/app.js" defer></script>',
-      '  <script src="/subpath-bootstrap.js" defer></script>\n  <script src="/portal-data.js" defer></script>\n  <script src="/app.js" defer></script>\n  <script src="/portal-demo.js" defer></script>\n  <script src="/portal-fidelity.js" defer></script>'
+      '  <script src="/subpath-bootstrap.js" defer></script>\n  <script src="/portal-data.js" defer></script>\n  <script src="/funnel-telemetry.js" defer></script>\n  <script src="/app.js" defer></script>\n  <script src="/portal-demo.js" defer></script>\n  <script src="/portal-fidelity.js" defer></script>'
+    );
+  } else if (!html.includes('/funnel-telemetry.js')) {
+    html = html.replace(
+      '  <script src="/app.js" defer></script>',
+      '  <script src="/funnel-telemetry.js" defer></script>\n  <script src="/app.js" defer></script>'
     );
   }
 
@@ -515,6 +693,10 @@ const server = http.createServer(async (req, res) => {
 
     url.pathname = stripPublicMountPath(url.pathname);
 
+    if ((req.method === "GET" || req.method === "HEAD") && (url.pathname === "/ops" || url.pathname === "/ops/")) {
+      return serveOps(req, res);
+    }
+
     const handled = await handleApi(req, res, url);
     if (handled !== false) return;
     if (url.pathname.startsWith("/api/")) {
@@ -535,4 +717,5 @@ setInterval(state.cleanupExpiredSessions, 10 * 60_000).unref();
 server.listen(PORT, () => {
   console.log(`Clinic AI demo running on port ${PORT}`);
   console.log("AI provider configured:", ai.configured);
+  console.log("Demo operations dashboard configured:", opsAuthConfigured());
 });

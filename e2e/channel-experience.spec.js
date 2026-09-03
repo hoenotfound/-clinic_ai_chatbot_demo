@@ -15,7 +15,7 @@ async function selectChannel(page, channel, experience) {
 test("Patient View renders recognisable channel-specific messaging chrome", async ({ page }) => {
   ensureDir();
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
   const phone = page.locator("#phone");
   await expect(phone).toHaveClass(/native-channel-ui/);
@@ -60,7 +60,7 @@ test("Patient View renders recognisable channel-specific messaging chrome", asyn
 test("channel experience stays inside a narrow mobile viewport", async ({ page }) => {
   ensureDir();
   await page.setViewportSize({ width: 360, height: 800 });
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
   const phone = page.locator("#phone");
   await expect(phone).toHaveClass(/native-channel-ui/);
@@ -107,7 +107,7 @@ test("all channels paint the first outgoing bubble before the AI reply", async (
     });
   });
 
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
   for (const [channel, experience] of [
     ["whatsapp", "whatsapp"],

@@ -47,9 +47,16 @@ function enhanceIndex(html) {
       '  <script src="/subpath-bootstrap.js" defer></script>\n' +
       '  <script src="/backend-readiness.js" defer></script>\n' +
       '  <script src="/portal-data.js" defer></script>\n' +
+      '  <script src="/funnel-telemetry.js" defer></script>\n' +
       '  <script src="/app.js" defer></script>\n' +
       '  <script src="/portal-demo.js" defer></script>\n' +
       '  <script src="/portal-fidelity.js" defer></script>'
+    );
+  } else if (!html.includes('/funnel-telemetry.js')) {
+    html = html.replace(
+      '  <script src="/app.js" defer></script>',
+      '  <script src="/funnel-telemetry.js" defer></script>\n' +
+      '  <script src="/app.js" defer></script>'
     );
   }
 

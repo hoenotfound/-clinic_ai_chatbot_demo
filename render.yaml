@@ -27,6 +27,14 @@ services:
         value: 15000
       - key: REDIS_URL
         sync: false
+      - key: DEMO_OPS_USERNAME
+        sync: false
+      - key: DEMO_OPS_PASSWORD
+        sync: false
+      - key: DEMO_STATS_TIMEZONE
+        value: Asia/Kuala_Lumpur
+      - key: DEMO_SLOW_RESPONSE_MS
+        value: 4000
       - key: DEMO_SESSION_MINUTES
         value: 60
       - key: DEMO_MAX_MESSAGES
@@ -39,6 +47,8 @@ services:
         value: 10
       - key: DEMO_MAX_MESSAGES_PER_IP_DAY
         value: 60
+      - key: DEMO_MAX_TELEMETRY_PER_IP_MINUTE
+        value: 120
       - key: DEMO_AI_HISTORY_MAX_MESSAGES
         value: 16
       - key: DEMO_AI_HISTORY_MAX_CHARS

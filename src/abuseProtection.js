@@ -10,11 +10,13 @@ function intEnv(name, fallback) {
 const limits = {
   messagesPerIpMinute: intEnv("DEMO_MAX_MESSAGES_PER_IP_MINUTE", 10),
   messagesPerIpDay: intEnv("DEMO_MAX_MESSAGES_PER_IP_DAY", 60),
+  telemetryPerIpMinute: intEnv("DEMO_MAX_TELEMETRY_PER_IP_MINUTE", 120),
   aiHistoryMaxMessages: intEnv("DEMO_AI_HISTORY_MAX_MESSAGES", 16),
   aiHistoryMaxChars: intEnv("DEMO_AI_HISTORY_MAX_CHARS", 12000),
 };
 
 const MESSAGE_PATH = /^\/(?:ai-chatbot\/)?api\/demo\/sessions\/[^/]+\/message$/;
+const TELEMETRY_PATH = /^\/(?:ai-chatbot\/)?api\/telemetry$/;
 const localCounters = new Map();
 let redis = null;
 let redisWarned = false;
@@ -127,15 +129,33 @@ async function enforceIpMessageLimits(ip, now = Date.now()) {
   });
 }
 
-function isCustomerMessageRequest(req) {
-  if (req?.method !== "POST") return false;
-  let pathname;
+async function enforceIpTelemetryLimit(ip, now = Date.now()) {
+  const identity = ipKey(ip);
+  const minute = minuteWindow(now);
+  return incrementWithFallback({
+    redisKey: `demo:telemetry-ip-minute:${identity}:${minute}`,
+    localKey: `telemetry-minute:${identity}:${minute}`,
+    limit: limits.telemetryPerIpMinute,
+    redisTtlSeconds: 120,
+    localTtlMs: 120000,
+    message: "Telemetry rate limit exceeded.",
+  });
+}
+
+function requestPath(req) {
   try {
-    pathname = new URL(req.url || "/", "http://localhost").pathname;
+    return new URL(req?.url || "/", "http://localhost").pathname;
   } catch {
-    return false;
+    return "";
   }
-  return MESSAGE_PATH.test(pathname);
+}
+
+function isCustomerMessageRequest(req) {
+  return req?.method === "POST" && MESSAGE_PATH.test(requestPath(req));
+}
+
+function isTelemetryRequest(req) {
+  return req?.method === "POST" && TELEMETRY_PATH.test(requestPath(req));
 }
 
 function sendRateLimit(res, error) {
@@ -191,8 +211,13 @@ function installHttpRateLimit() {
     if (listenerIndex >= 0) {
       const listener = args[listenerIndex];
       args[listenerIndex] = function protectedRequestListener(req, res) {
-        if (!isCustomerMessageRequest(req)) return listener.call(this, req, res);
-        enforceIpMessageLimits(clientIp(req))
+        let guard = null;
+        const ip = clientIp(req);
+        if (isCustomerMessageRequest(req)) guard = enforceIpMessageLimits(ip);
+        else if (isTelemetryRequest(req)) guard = enforceIpTelemetryLimit(ip);
+        if (!guard) return listener.call(this, req, res);
+
+        guard
           .then(() => listener.call(this, req, res))
           .catch((error) => {
             if (error?.statusCode === 429) return sendRateLimit(res, error);
@@ -220,7 +245,9 @@ module.exports = {
   limits,
   clientIp,
   isCustomerMessageRequest,
+  isTelemetryRequest,
   enforceIpMessageLimits,
+  enforceIpTelemetryLimit,
   trimAiHistory,
   installAbuseProtection,
   resetForTests,

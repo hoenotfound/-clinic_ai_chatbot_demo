@@ -10,7 +10,7 @@ function renderOrigin() {
 
 function forwardedHeaders(req) {
   const headers = new Headers();
-  for (const name of ["accept", "content-type", "user-agent"]) {
+  for (const name of ["accept", "content-type", "user-agent", "authorization"]) {
     const value = req.headers.get(name);
     if (value) headers.set(name, value);
   }
@@ -33,8 +33,12 @@ export default async (req) => {
   }
 
   const incoming = new URL(req.url);
+  if (incoming.pathname === "/ai-chatbot/ops/") {
+    return Response.redirect(new URL("/ai-chatbot/ops", incoming.origin), 308);
+  }
+
   const apiPath = incoming.pathname.replace(/^\/ai-chatbot/, "");
-  if (!apiPath.startsWith("/api/") && apiPath !== "/health") {
+  if (!apiPath.startsWith("/api/") && apiPath !== "/health" && apiPath !== "/ops") {
     return Response.json({ error: "API route not found." }, { status: 404 });
   }
 
@@ -49,8 +53,18 @@ export default async (req) => {
       redirect: "manual",
     });
     const headers = new Headers();
-    const contentType = upstream.headers.get("content-type");
-    if (contentType) headers.set("content-type", contentType);
+    for (const name of [
+      "content-type",
+      "www-authenticate",
+      "content-security-policy",
+      "x-content-type-options",
+      "x-robots-tag",
+      "referrer-policy",
+      "permissions-policy",
+    ]) {
+      const value = upstream.headers.get(name);
+      if (value) headers.set(name, value);
+    }
     headers.set("cache-control", "no-store");
     return new Response(req.method === "HEAD" ? null : upstream.body, {
       status: upstream.status,
@@ -63,5 +77,5 @@ export default async (req) => {
 };
 
 export const config = {
-  path: ["/ai-chatbot/api/*", "/ai-chatbot/health"],
+  path: ["/ai-chatbot/api/*", "/ai-chatbot/health", "/ai-chatbot/ops", "/ai-chatbot/ops/"],
 };

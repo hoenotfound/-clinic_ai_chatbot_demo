@@ -8,7 +8,7 @@ function ensureDir() {
 test("capture and verify demo-first desktop layout", async ({ page }) => {
   ensureDir();
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
   const demo = await page.locator("#live-demo").boundingBox();
   const journey = await page.locator("#how-it-works").boundingBox();
@@ -166,7 +166,7 @@ test("capture and verify polished mobile demo at 360, 390 and 430px", async ({ p
 
   for (const width of [360, 390, 430]) {
     await page.setViewportSize({ width, height: 844 });
-    await page.goto("/", { waitUntil: "networkidle" });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
 
     const channels = await page.locator(".channel-panel").boundingBox();
     const prompts = await page.locator(".prompt-panel").boundingBox();

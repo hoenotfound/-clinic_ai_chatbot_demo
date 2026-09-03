@@ -9,7 +9,7 @@ async function openDashboard(page) {
 
 test("Contacts, Settings and Team & Access work as real dashboard pages", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
   const frame = await openDashboard(page);
 
   await frame.getByRole("link", { name: "Contacts" }).click();
@@ -44,7 +44,7 @@ test("Contacts, Settings and Team & Access work as real dashboard pages", async 
 
 test("dashboard ignores an old session poll after a new demo starts", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await page.getByRole("button", { name: "How much is HIFU?" }).click();
   await expect(page.locator("#messages")).toContainText("RM 888");

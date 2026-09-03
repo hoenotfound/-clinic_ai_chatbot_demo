@@ -68,6 +68,14 @@ test("message matcher protects both direct Render and mounted /ai-chatbot API pa
   assert.equal(protection.isCustomerMessageRequest(request("POST", "/api/demo/sessions")), false);
 });
 
+test("telemetry matcher protects direct Render and mounted /ai-chatbot telemetry POSTs only", () => {
+  const request = (method, url) => ({ method, url });
+  assert.equal(protection.isTelemetryRequest(request("POST", "/api/telemetry")), true);
+  assert.equal(protection.isTelemetryRequest(request("POST", "/ai-chatbot/api/telemetry")), true);
+  assert.equal(protection.isTelemetryRequest(request("GET", "/api/telemetry")), false);
+  assert.equal(protection.isTelemetryRequest(request("POST", "/api/demo/sessions")), false);
+});
+
 test("per-IP burst limiter allows 10 messages in a minute and rejects the 11th", async () => {
   protection.resetForTests();
   const now = Date.UTC(2026, 8, 2, 2, 0, 0);
@@ -93,6 +101,19 @@ test("per-IP daily limiter allows 60 messages across separate minutes and reject
   );
 });
 
+test("telemetry limiter leaves normal heartbeats alone and rejects abusive bursts", async () => {
+  protection.resetForTests();
+  const now = Date.UTC(2026, 8, 2, 2, 0, 0);
+  for (let index = 0; index < protection.limits.telemetryPerIpMinute; index += 1) {
+    await protection.enforceIpTelemetryLimit("198.51.100.30", now);
+  }
+  await assert.rejects(
+    protection.enforceIpTelemetryLimit("198.51.100.30", now),
+    (error) => error?.statusCode === 429 && /telemetry/i.test(error.message)
+  );
+  await protection.enforceIpTelemetryLimit("198.51.100.31", now);
+});
+
 test("HTTP preload guard blocks the 11th rapid customer-message request before the app listener", async () => {
   protection.resetForTests();
   let appCalls = 0;
@@ -113,6 +134,31 @@ test("HTTP preload guard blocks the 11th rapid customer-message request before t
     assert.equal(blocked.status, 429);
     assert.match(blocked.body, /too quickly/i);
     assert.equal(appCalls, 10, "blocked request must not reach the application handler");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("HTTP preload guard blocks abusive telemetry before the app listener", async () => {
+  protection.resetForTests();
+  let appCalls = 0;
+  const server = http.createServer((req, res) => {
+    appCalls += 1;
+    res.writeHead(204);
+    res.end();
+  });
+
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = server.address().port;
+  try {
+    for (let index = 0; index < protection.limits.telemetryPerIpMinute; index += 1) {
+      const response = await sendRequest(port, { path: "/api/telemetry", ip: "203.0.113.77" });
+      assert.equal(response.status, 204);
+    }
+    const blocked = await sendRequest(port, { path: "/api/telemetry", ip: "203.0.113.77" });
+    assert.equal(blocked.status, 429);
+    assert.match(blocked.body, /telemetry/i);
+    assert.equal(appCalls, protection.limits.telemetryPerIpMinute, "blocked telemetry must not reach the application handler");
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
