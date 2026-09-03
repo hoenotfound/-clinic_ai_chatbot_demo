@@ -27,7 +27,7 @@ const DEFAULT_CONCERN_MAPPINGS = [
   },
   {
     concern: "dry / dehydrated / dull skin",
-    aliases: ["dry skin", "dehydrated", "dehydration", "dull skin", "hydration", "kusam", "kering", "干燥", "乾燥", "缺水", "暗沉"],
+    aliases: ["dry skin", "dry", "dehydrated", "dehydration", "dull skin", "dull", "hydration", "kusam", "kering", "干燥", "乾燥", "缺水", "暗沉"],
     services: ["Skin Booster"],
     note: "Discuss Skin Booster as a hydration/skin-quality category. Product choice and suitability remain clinician decisions.",
   },
