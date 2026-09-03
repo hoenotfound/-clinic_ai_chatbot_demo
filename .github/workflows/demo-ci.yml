@@ -24,11 +24,14 @@ jobs:
         run: npm test
       - name: Check JavaScript syntax
         run: |
+          node --check src/loadEnv.js
           node --check src/server.js
           node --check src/demoState.js
           node --check src/aiService.js
           node --check src/sharedState.js
           node --check src/opsStats.js
+          node --check src/opsNeonStore.js
+          node --check src/opsPersistencePreload.js
           node --check public/app.js
           node --check public/funnel-telemetry.js
           node --check public/ops.js
@@ -38,6 +41,7 @@ jobs:
           node --check playwright.config.js
           node --check e2e/demo.spec.js
           node --check e2e/dashboard-ux.spec.js
+          node --check e2e/ops-dashboard.spec.js
           node --check e2e/public-visual.spec.js
           node --check e2e/subpath.spec.js
       - name: Run browser E2E tests

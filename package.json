@@ -9,8 +9,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "start": "node -r ./src/publicFontPolicy.js -r ./src/abuseProtectionPreload.js src/server.js",
-    "dev": "node --watch -r ./src/publicFontPolicy.js -r ./src/abuseProtectionPreload.js src/server.js",
+    "start": "node -r ./src/loadEnv.js -r ./src/publicFontPolicy.js -r ./src/abuseProtectionPreload.js -r ./src/opsPersistencePreload.js src/server.js",
+    "dev": "node --watch -r ./src/loadEnv.js -r ./src/publicFontPolicy.js -r ./src/abuseProtectionPreload.js -r ./src/opsPersistencePreload.js src/server.js",
     "build:dashboard": "npm install --prefix portal-react --include=dev --no-audit --no-fund && npm --prefix portal-react run build",
     "build:netlify": "npm run build:dashboard && node scripts/build-netlify.js",
     "postinstall": "npm run build:dashboard",
@@ -21,6 +21,7 @@
     "@playwright/test": "^1.55.0"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "ioredis": "^6.0.0"
   }
 }
