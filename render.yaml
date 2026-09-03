@@ -27,6 +27,12 @@ services:
         value: 15000
       - key: REDIS_URL
         sync: false
+      - key: DEMO_OPS_USERNAME
+        sync: false
+      - key: DEMO_OPS_PASSWORD
+        sync: false
+      - key: DEMO_STATS_TIMEZONE
+        value: Asia/Kuala_Lumpur
       - key: DEMO_SESSION_MINUTES
         value: 60
       - key: DEMO_MAX_MESSAGES
