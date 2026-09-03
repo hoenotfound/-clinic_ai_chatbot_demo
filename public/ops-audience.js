@@ -126,10 +126,10 @@
     for (const row of rows.slice(0, 6)) {
       const item = make("div", "audience-row");
       item.append(make("span", "audience-row-label", row.label || "Unknown"), make("strong", "audience-row-value", fmt(row.count)));
-      const bar = make("div", "audience-bar");
-      const fill = make("i");
-      fill.style.width = `${Math.max(4, ((Number(row.count) || 0) / max) * 100)}%`;
-      bar.appendChild(fill);
+      const bar = make("progress", "audience-progress");
+      bar.max = max;
+      bar.value = Number(row.count) || 0;
+      bar.setAttribute("aria-label", `${row.label || "Unknown"}: ${fmt(row.count)}`);
       item.appendChild(bar);
       root.appendChild(item);
     }
