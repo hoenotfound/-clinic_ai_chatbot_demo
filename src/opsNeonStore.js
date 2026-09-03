@@ -176,10 +176,9 @@ async function recordVisitor({ day, visitorId, event = "heartbeat", surface = "p
   }
   const seenKey = `${hash}:${normalizedSurface}`;
   const firstSurfaceWrite = !seenVisitorSurfaces.has(seenKey);
-  if (firstSurfaceWrite) seenVisitorSurfaces.add(seenKey);
   if (normalizedEvent === "heartbeat" && !firstSurfaceWrite) return true;
 
-  return withDatabase(async (db) => {
+  const persisted = await withDatabase(async (db) => {
     const rows = [
       { surface: "all", event: "__visitor__" },
       { surface: normalizedSurface, event: "__surface__" },
@@ -195,6 +194,8 @@ async function recordVisitor({ day, visitorId, event = "heartbeat", surface = "p
     `;
     return true;
   }, false);
+  if (persisted) seenVisitorSurfaces.add(seenKey);
+  return persisted;
 }
 
 async function recordGeminiAttempt({ day, keyIndex, model, phase }) {
