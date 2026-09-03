@@ -5,7 +5,9 @@ const store = require("./visitorAnalyticsStore");
 
 const requestContext = new AsyncLocalStorage();
 const CACHE_MS = Math.max(5_000, Number.parseInt(process.env.DEMO_OPS_HISTORY_CACHE_MS || "60000", 10) || 60_000);
+const AUDIENCE_HEARTBEAT_PERSIST_MS = 5 * 60_000;
 const audienceCache = { value: null, expiresAt: 0, inFlight: null };
+const audienceLastPersistedAt = new Map();
 
 function header(req, name) {
   const value = req?.headers?.[name.toLowerCase()];
@@ -151,19 +153,50 @@ async function audienceState() {
   return audienceCache.inFlight;
 }
 
+function audienceWriteKey(day, visitorId) {
+  return `${day}:${String(visitorId || "")}`;
+}
+
+function heartbeatDue(lastPersistedAt, now = Date.now()) {
+  return !lastPersistedAt || now - lastPersistedAt >= AUDIENCE_HEARTBEAT_PERSIST_MS;
+}
+
+function shouldPersistAudienceEvent(payload, day, now) {
+  const event = String(payload?.event || "heartbeat").toLowerCase();
+  if (event !== "heartbeat") return true;
+  return heartbeatDue(audienceLastPersistedAt.get(audienceWriteKey(day, payload?.visitorId)), now);
+}
+
+function noteAudiencePersisted(payload, day, now) {
+  audienceLastPersistedAt.set(audienceWriteKey(day, payload?.visitorId), now);
+  if (audienceLastPersistedAt.size <= 5_000) return;
+  const cutoff = now - (2 * 24 * 60 * 60_000);
+  for (const [key, timestamp] of audienceLastPersistedAt) {
+    if (timestamp < cutoff) audienceLastPersistedAt.delete(key);
+  }
+}
+
 installRequestContext();
 
 const originalRecordVisitor = ops.recordVisitor;
 ops.recordVisitor = function recordVisitorWithAudience(payload = {}) {
   const result = originalRecordVisitor(payload);
   if (!result || !store.enabled) return result;
+
+  const day = ops._test.localDayKey();
+  const now = Date.now();
+  if (!shouldPersistAudienceEvent(payload, day, now)) return result;
+
   const req = requestContext.getStore()?.req;
-  void store.recordAudienceEvent({
-    day: ops._test.localDayKey(),
+  Promise.resolve(store.recordAudienceEvent({
+    day,
     visitorId: payload.visitorId,
     event: payload.event || "heartbeat",
+    now,
     context: marketingContext(req),
-  });
+  }))
+    .then((saved) => { if (saved) noteAudiencePersisted(payload, day, now); })
+    .catch(() => {});
   return result;
 };
 
@@ -175,5 +208,5 @@ ops.getSnapshot = async function getSnapshotWithAudience() {
 };
 
 module.exports = {
-  _test: { parseDevice, marketingContext, isOpsPage },
+  _test: { parseDevice, marketingContext, isOpsPage, heartbeatDue },
 };
