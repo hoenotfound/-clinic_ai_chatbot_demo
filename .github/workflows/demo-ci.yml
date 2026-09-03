@@ -28,7 +28,9 @@ jobs:
           node --check src/demoState.js
           node --check src/aiService.js
           node --check src/sharedState.js
+          node --check src/opsStats.js
           node --check public/app.js
+          node --check public/ops.js
           node --check public/subpath-bootstrap.js
           node --check playwright.config.js
           node --check e2e/demo.spec.js
