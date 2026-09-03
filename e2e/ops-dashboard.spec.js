@@ -65,12 +65,10 @@ test("ops dashboard uses compact KPI and visitor layouts on mobile", async ({ br
   await expect(page.locator(".audience-privacy-chip")).toBeVisible();
   await expect(page.locator(".audience-recent-table thead")).toHaveCSS("display", "none");
 
-  const firstTwoKpis = page.locator(".kpi-card").nth(0).and(page.locator(".kpi-card").nth(0));
   const boxes = await Promise.all([
     page.locator(".kpi-card").nth(0).boundingBox(),
     page.locator(".kpi-card").nth(1).boundingBox(),
   ]);
-  expect(firstTwoKpis).toBeTruthy();
   expect(boxes[0]).not.toBeNull();
   expect(boxes[1]).not.toBeNull();
   expect(Math.abs(boxes[0].y - boxes[1].y)).toBeLessThanOrEqual(2);
