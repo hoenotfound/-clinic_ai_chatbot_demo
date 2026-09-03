@@ -1,5 +1,6 @@
 const { buildSystemPrompt } = require("./systemPrompt");
 const { buildFallbackReply } = require("./clinicFallback");
+const { buildConcernFallback } = require("./concernFallback");
 const { enforceBookingRules } = require("./bookingRules");
 const { concernGuidanceForPrompt, bookingRulesForPrompt } = require("./clinicKnowledge");
 
@@ -40,6 +41,8 @@ function enhancedSystemPrompt(isFirstMessage) {
 function getFallbackReply(messages) {
   const ruleReply = enforceBookingRules(messages);
   if (ruleReply) return ruleReply;
+  const concernReply = buildConcernFallback(messages);
+  if (concernReply) return concernReply;
   return buildFallbackReply(messages);
 }
 
