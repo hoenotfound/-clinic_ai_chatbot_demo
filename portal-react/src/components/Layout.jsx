@@ -7,7 +7,7 @@ export default function Layout({ children }) {
       <Sidebar />
       <main className="flex h-[calc(100dvh-4.5rem)] min-w-0 flex-1 flex-col overflow-hidden md:h-screen">
         <LiveAcquisitionBar />
-        <div className="min-h-0 flex-1 overflow-hidden">
+        <div className="h-full min-h-0 flex-1 overflow-hidden">
           {children}
         </div>
       </main>
