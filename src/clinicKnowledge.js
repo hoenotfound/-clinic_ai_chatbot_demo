@@ -1,5 +1,49 @@
 const clinic = require("./clinicConfig");
 
+const DEFAULT_CONCERN_MAPPINGS = [
+  {
+    concern: "double chin / jawline definition",
+    aliases: ["double chin", "jawline", "v shape", "v-shape", "双下巴", "雙下巴", "下颌线", "下顎線"],
+    services: ["HIFU Skin Lifting"],
+    note: "Discuss HIFU as a common non-surgical tightening/contouring option. Do not promise fat loss or suitability.",
+  },
+  {
+    concern: "wide jaw / jaw slimming",
+    aliases: ["wide jaw", "square jaw", "jaw slimming", "face slimming", "masseter", "瘦脸", "瘦臉", "国字脸", "國字臉"],
+    services: ["Botulinum Toxin", "HIFU Skin Lifting"],
+    note: "Explain that muscle-related jaw width and skin/contour concerns are different. A clinician must identify the cause before choosing treatment.",
+  },
+  {
+    concern: "pigmentation / melasma / dark spots",
+    aliases: ["pigmentation", "melasma", "dark spot", "dark spots", "jeragat", "bintik hitam", "色斑", "黑斑", "晒斑", "曬斑"],
+    services: ["Pico Laser"],
+    note: "Discuss Pico Laser as a commonly used option for pigmentation concerns without diagnosing the type of pigmentation.",
+  },
+  {
+    concern: "acne marks / uneven tone",
+    aliases: ["acne marks", "acne mark", "uneven tone", "parut jerawat", "痘印", "肤色不均", "膚色不均"],
+    services: ["Pico Laser"],
+    note: "Use the configured Pico Laser description. Do not promise scar removal or a specific number of sessions.",
+  },
+  {
+    concern: "dry / dehydrated / dull skin",
+    aliases: ["dry skin", "dehydrated", "dehydration", "dull skin", "hydration", "kusam", "kering", "干燥", "乾燥", "缺水", "暗沉"],
+    services: ["Skin Booster"],
+    note: "Discuss Skin Booster as a hydration/skin-quality category. Product choice and suitability remain clinician decisions.",
+  },
+  {
+    concern: "expression lines / wrinkles",
+    aliases: ["wrinkles", "frown lines", "crow's feet", "expression lines", "皱纹", "皺紋", "鱼尾纹", "魚尾紋"],
+    services: ["Botulinum Toxin"],
+    note: "Discuss Botulinum Toxin for selected expression-line or muscle-related concerns. Never recommend units or dosage.",
+  },
+];
+
+const DEFAULT_BOOKING_RULES = {
+  openDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+  closedDays: ["Sunday"],
+};
+
 function normalise(text) {
   return String(text || "").toLowerCase();
 }
@@ -9,7 +53,17 @@ function unique(values) {
 }
 
 function configuredConcernMappings() {
-  return Array.isArray(clinic.concernMappings) ? clinic.concernMappings : [];
+  return Array.isArray(clinic.concernMappings) && clinic.concernMappings.length
+    ? clinic.concernMappings
+    : DEFAULT_CONCERN_MAPPINGS;
+}
+
+function configuredBookingRules() {
+  const rules = clinic.bookingRules || {};
+  return {
+    openDays: Array.isArray(rules.openDays) && rules.openDays.length ? rules.openDays : DEFAULT_BOOKING_RULES.openDays,
+    closedDays: Array.isArray(rules.closedDays) && rules.closedDays.length ? rules.closedDays : DEFAULT_BOOKING_RULES.closedDays,
+  };
 }
 
 function matchesAny(text, terms = []) {
@@ -38,13 +92,11 @@ function concernGuidanceForPrompt() {
 }
 
 function openingDays() {
-  const rules = clinic.bookingRules || {};
-  return Array.isArray(rules.openDays) ? rules.openDays.map((day) => normalise(day)) : [];
+  return configuredBookingRules().openDays.map((day) => normalise(day));
 }
 
 function closedDays() {
-  const rules = clinic.bookingRules || {};
-  return Array.isArray(rules.closedDays) ? rules.closedDays.map((day) => normalise(day)) : [];
+  return configuredBookingRules().closedDays.map((day) => normalise(day));
 }
 
 function extractRequestedDay(text) {
@@ -85,12 +137,10 @@ function bookingRuleViolation(text) {
 }
 
 function bookingRulesForPrompt() {
-  const rules = clinic.bookingRules || {};
-  const open = Array.isArray(rules.openDays) ? rules.openDays.join(", ") : "Use configured clinic hours";
-  const closed = Array.isArray(rules.closedDays) && rules.closedDays.length ? rules.closedDays.join(", ") : "None specified";
+  const rules = configuredBookingRules();
   return [
-    `- Open days: ${open}`,
-    `- Closed days: ${closed}`,
+    `- Open days: ${rules.openDays.join(", ")}`,
+    `- Closed days: ${rules.closedDays.join(", ")}`,
     `- Never accept, suggest or hand off a requested appointment on a configured closed day as if it were valid.`,
     `- If a visitor requests a closed day, explain the clinic is closed that day and ask for an open-day alternative.`,
     `- Never invent an exact available time. Staff confirms actual availability.`,
