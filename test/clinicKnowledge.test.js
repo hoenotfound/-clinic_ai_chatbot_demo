@@ -5,6 +5,12 @@ const knowledge = require("../src/clinicKnowledge");
 test("concern mapping returns configured services", () => {
   assert.deepEqual(knowledge.treatmentsForConcern("I have pigmentation and acne marks"), ["Pico Laser"]);
   assert.ok(knowledge.treatmentsForConcern("double chin").includes("HIFU Skin Lifting"));
+  assert.deepEqual(knowledge.treatmentsForConcern("My skin is very dry and dull"), ["Skin Booster"]);
+});
+
+test("skin-quality aliases do not misread unrelated dry or dull wording", () => {
+  assert.deepEqual(knowledge.treatmentsForConcern("I have dry eyes"), []);
+  assert.deepEqual(knowledge.treatmentsForConcern("I have a dull pain near my jaw"), []);
 });
 
 test("closed clinic days are detected deterministically", () => {
