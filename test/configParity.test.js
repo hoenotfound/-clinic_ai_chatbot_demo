@@ -55,18 +55,24 @@ test("production-style prompt consumes the configurable behaviour sections", () 
   assert.match(prompt, /first reply/i);
 });
 
-test("aesthetic clinic prompt prioritizes realistic front-desk behaviour", () => {
+test("aesthetic clinic prompt prioritizes realistic and intelligent front-desk behaviour", () => {
   const prompt = buildSystemPrompt({ isFirstMessage: false });
 
-  assert.match(prompt, /answer the visitor's direct question first/i);
-  assert.match(prompt, /Never ask again for a concern, branch, timing preference/i);
+  assert.match(prompt, /Understand what the visitor is actually asking and answer that first/i);
+  assert.match(prompt, /Never ask again for a concern, treatment, branch, timing preference/i);
   assert.match(prompt, /give the price immediately/i);
+  assert.match(prompt, /Identify EVERY clear question or request/i);
+  assert.match(prompt, /Answer all clear parts of a multi-part message/i);
+  assert.match(prompt, /SILENT CONVERSATION MEMORY/i);
+  assert.match(prompt, /newest explicit correction wins/i);
+  assert.match(prompt, /INTENT-AWARE CONVERSION BEHAVIOUR/i);
+  assert.match(prompt, /OBJECTION HANDLING/i);
   assert.match(prompt, /BOOKING FLOW:/);
   assert.match(prompt, /GENERAL TREATMENT INFORMATION VS MEDICAL HANDOFF:/);
   assert.match(prompt, /does not automatically require a handoff/i);
-  assert.match(prompt, /do NOT repeat that disclaimer in normal service, pricing, branch or FAQ answers/i);
+  assert.match(prompt, /do NOT repeat that disclaimer in normal service, pricing, promotion, branch, consultation or FAQ answers/i);
   assert.match(prompt, /Use normal "you\/your" by default/i);
-  assert.match(prompt, /commercially helpful, medically cautious/i);
+  assert.match(prompt, /commercially intelligent, medically cautious/i);
 });
 
 test("public demo config remains fictional and does not copy the supplied real clinic identity", () => {
