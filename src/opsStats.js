@@ -5,6 +5,7 @@ const ACTIVE_WINDOW_MS = 2 * 60_000;
 const RETENTION_DAYS = 400;
 const RETENTION_SECONDS = RETENTION_DAYS * 24 * 60 * 60;
 const HISTORY_DAYS = 90;
+const HISTORY_CACHE_MS = Math.max(5_000, Number.parseInt(process.env.DEMO_OPS_HISTORY_CACHE_MS || "60000", 10) || 60_000);
 const KEY_STATUS_WINDOW_MS = 15 * 60_000;
 const SLOW_RESPONSE_MS = Math.max(500, Number.parseInt(process.env.DEMO_SLOW_RESPONSE_MS || "4000", 10) || 4000);
 const LATENCY_BUCKETS_MS = [250, 500, 750, 1000, 1500, 2000, 3000, 4000, 6000, 8000, 12000, 16000, 20000, 30000, 60000];
@@ -28,6 +29,12 @@ const memory = {
   activeBySurface: new Map(),
   keyByDay: new Map(),
   metaByDay: new Map(),
+};
+
+const historyCache = {
+  value: null,
+  expiresAt: 0,
+  inFlight: null,
 };
 
 function localDayKey(now = new Date()) {
@@ -670,7 +677,7 @@ function publicHistoryRow(row) {
   return publicRow;
 }
 
-async function getHistory() {
+async function buildHistory() {
   const days = recentDayKeys(HISTORY_DAYS);
   const persistentRows = await redisHistory(days);
   const rows = persistentRows || days.map((day) => {
@@ -690,6 +697,24 @@ async function getHistory() {
     daily: rows.map(publicHistoryRow),
     ranges,
   };
+}
+
+async function getHistory() {
+  if (!shared.enabled) return buildHistory();
+  const now = Date.now();
+  if (historyCache.value && historyCache.expiresAt > now) return historyCache.value;
+  if (historyCache.inFlight) return historyCache.inFlight;
+
+  historyCache.inFlight = buildHistory()
+    .then((value) => {
+      historyCache.value = value;
+      historyCache.expiresAt = Date.now() + HISTORY_CACHE_MS;
+      return value;
+    })
+    .finally(() => {
+      historyCache.inFlight = null;
+    });
+  return historyCache.inFlight;
 }
 
 async function getSnapshot() {
