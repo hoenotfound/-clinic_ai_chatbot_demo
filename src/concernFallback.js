@@ -11,7 +11,7 @@ function latestUserText(messages) {
 }
 
 function shouldDeferToNormalFallback(text) {
-  return /\bprice\b|how much|\bcost\b|harga|berapa|多少钱|多少錢|\bbook(?:ing)?\b|appointment|slot|预约|預約|hifu|pico|botox|botulinum|skin ?booster|rejuran|profhilo/i.test(text);
+  return /\bprice\b|how much|\bcost\b|harga|berapa|多少钱|多少錢|\bbook(?:ing)?\b|appointment|slot|预约|預約|hifu|pico|botox|botulinum|skin ?booster|rejuran|profhilo|pregnan|breastfeed|hamil|menyusu|怀孕|懷孕|哺乳|medication|medicine|ubat|药|藥|accutane|isotretinoin|blood thinner|antibiotic|allerg|infection|open wound|side effects?|reaction|risk|pain|swelling|rash|complain|refund|human|staff|doctor/i.test(text);
 }
 
 function buildConcernFallback(messages) {
