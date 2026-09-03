@@ -27,6 +27,8 @@ services:
         value: 15000
       - key: REDIS_URL
         sync: false
+      - key: DATABASE_URL
+        sync: false
       - key: DEMO_OPS_USERNAME
         sync: false
       - key: DEMO_OPS_PASSWORD
@@ -35,6 +37,8 @@ services:
         value: Asia/Kuala_Lumpur
       - key: DEMO_SLOW_RESPONSE_MS
         value: 4000
+      - key: DEMO_OPS_HISTORY_CACHE_MS
+        value: 60000
       - key: DEMO_SESSION_MINUTES
         value: 60
       - key: DEMO_MAX_MESSAGES
