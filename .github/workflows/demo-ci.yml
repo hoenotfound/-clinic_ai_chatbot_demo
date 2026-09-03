@@ -33,6 +33,7 @@ jobs:
           node --check public/funnel-telemetry.js
           node --check public/ops.js
           node --check public/subpath-bootstrap.js
+          node --check scripts/build-netlify.js
           node --check netlify/functions/render-proxy.mjs
           node --check playwright.config.js
           node --check e2e/demo.spec.js
