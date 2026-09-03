@@ -1,7 +1,7 @@
 const { test, expect } = require("@playwright/test");
 
 test("selected Meta ad source follows the live visitor into the clinic dashboard", async ({ page }) => {
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
   const hifuAd = page.locator('[data-acquisition-key="hifu-facebook"]');
   await expect(hifuAd).toBeVisible();
@@ -26,7 +26,7 @@ test("selected Meta ad source follows the live visitor into the clinic dashboard
 });
 
 test("acquisition source cannot be changed after the patient conversation has started", async ({ page }) => {
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await page.locator('[data-acquisition-key="organic-whatsapp"]').click();
   await page.getByRole("button", { name: "How much is HIFU?" }).click();
