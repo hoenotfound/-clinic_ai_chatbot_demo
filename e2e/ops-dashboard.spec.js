@@ -25,6 +25,7 @@ test("ops dashboard keeps a clear hierarchy on desktop", async ({ browser }) => 
   await page.goto("/ops");
 
   await expect(page.getByRole("heading", { name: "AI Chatbot Performance" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Visitor analytics" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Demo funnel" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "AI health" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Performance over time" })).toBeVisible();
@@ -43,7 +44,9 @@ test("ops dashboard stays usable on mobile", async ({ browser }) => {
   await page.goto("/ops");
 
   await expect(page.getByRole("heading", { name: "AI Chatbot Performance" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Visitor analytics" })).toBeVisible();
   await expect(page.locator(".kpi-card")).toHaveCount(4);
+  await expect(page.locator(".audience-kpi")).toHaveCount(4);
   await expect(page.locator(".funnel-row").first()).toBeVisible();
 
   const hasOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
