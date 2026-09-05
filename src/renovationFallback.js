@@ -6,9 +6,14 @@ const QUOTE_INTENT_PATTERN = /exact\s+(?:price|quote|quotation)|proper\s+(?:quot
 const TECHNICAL_PATTERN = /load[- ]?bearing|structural|hack(?:ing)?\s+(?:wall|beam|column)|electrical|rewir(?:e|ing)|plumb(?:ing)?|waterproof(?:ing)?|gas\s+(?:pipe|line)|permit|authority|approval|承重墙|承重牆|敲墙|敲牆|电线|電線|水管|防水|kelulusan|struktur|pendawaian|paip/i;
 const COMPLAINT_PATTERN = /complaint|refund|defect|damage|poor workmanship|wrong colour|wrong color|not happy|very disappointed|投诉|投訴|退款|瑕疵|做坏|做壞|rosak|aduan/i;
 const PRICE_PATTERN = /price|how much|cost|quotation|quote|budget|harga|berapa|kos|sebut harga|多少钱|多少錢|价格|價格|价钱|價錢|报价|報價|预算|預算/i;
-const BUDGET_PROMPT_PATTERN = /budget|bajet|预算|預算/i;
+const BUDGET_QUESTION_PATTERN = /(?:do you (?:already )?have|what(?:'s| is)|how much).{0,30}\bbudget\b|\bbudget\b.{0,30}(?:range|in mind|roughly|approximately|around how much)|\bbudget\s*\?|\bbajet\b.{0,24}(?:berapa|range|anggaran)|(?:berapa|anggaran).{0,24}\bbajet\b|\bbajet\s*\?|(?:预算|預算).{0,12}(?:多少|几|幾|范围|範圍)|(?:多少|几|幾).{0,12}(?:预算|預算)|(?:预算|預算)\s*[?？]/i;
 const MEASUREMENT_PATTERN = /\b\d+(?:\.\d+)?\s*(?:ft|feet|foot|mm|cm|m|meter|metre)s?\b|floor\s*plan|layout\s*plan|尺寸|平面图|平面圖|ukuran|pelan/i;
 const TIMELINE_PATTERN = /move\s*in|moving|collect(?:ed|ing)?\s+keys?|handover|complete\s+by|finish\s+by|next\s+(?:week|month)|this\s+(?:week|month)|within\s+\d+\s+(?:week|weeks|month|months)|baru\s+dapat\s+kunci|dapat\s+kunci|nak\s+siap|pindah|拿钥匙|拿鑰匙|交房|入住|搬家|完工/i;
+const ENGLISH_SIGNAL_WORDS = new Set([
+  "i", "we", "you", "my", "our", "your", "want", "need", "can", "could", "please",
+  "how", "much", "what", "where", "when", "why", "is", "are", "do", "does", "have",
+  "has", "price", "quote", "quotation", "budget", "english",
+]);
 
 function userTexts(messages) {
   return (messages || []).filter((message) => message.role === "user").map((message) => String(message.content || "").trim()).filter(Boolean);
@@ -25,9 +30,16 @@ function conversationText(messages) {
 function languageOf(text) {
   const value = String(text || "").trim();
   if (!value) return null;
+  if (/\benglish\b/i.test(value)) return "en";
+  if (/(?:中文|华语|華語|mandarin)/i.test(value)) return "zh";
+  if (/\b(?:bahasa malaysia|bahasa melayu|malay)\b/i.test(value)) return "ms";
   if (/[一-鿿]/.test(value)) return "zh";
   if (/\b(?:saya|nak|mahu|boleh|berapa|harga|rumah|kabinet|dapur|ukur|bajet|baru dapat kunci)\b/i.test(value)) return "ms";
-  if (/[a-z]/i.test(value)) return "en";
+
+  const words = value.toLowerCase().match(/[a-z]+(?:'[a-z]+)?/g) || [];
+  if (!words.length) return null;
+  const signalCount = words.filter((word) => ENGLISH_SIGNAL_WORDS.has(word)).length;
+  if (signalCount >= 2 || words.length >= 4) return "en";
   return null;
 }
 
@@ -69,7 +81,7 @@ function parseBareBudget(text) {
 
 function detectContextualBudget(messages) {
   const previousAssistant = previousAssistantText(messages);
-  if (!BUDGET_PROMPT_PATTERN.test(previousAssistant)) return null;
+  if (!BUDGET_QUESTION_PATTERN.test(previousAssistant)) return null;
   return parseBareBudget(latestUserText(messages));
 }
 
