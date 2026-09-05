@@ -15,12 +15,18 @@
 
   if (!phone || !messages || !composer || !input || !sendButton) return;
 
-  const acquisitionPresets = [
-    { key: "hifu-facebook", label: "HIFU Facebook Ad", source: "Meta Ads", campaign: "HIFU Jawline Demo Campaign", treatment: "HIFU Skin Lifting", channel: "facebook" },
-    { key: "pico-instagram", label: "Pico Instagram Ad", source: "Meta Ads", campaign: "Pico Pigmentation Demo Campaign", treatment: "Pico Laser", channel: "instagram" },
+  const demoConfig = window.demoIndustryConfig || {};
+  const defaultAcquisitionPresets = [
+    { key: "hifu-facebook", label: "HIFU Facebook Ad", source: "Meta Ads", campaign: "HIFU Demo Campaign", treatment: "HIFU Skin Lifting", channel: "facebook" },
+    { key: "pico-instagram", label: "Pico Instagram Ad", source: "Meta Ads", campaign: "Pico Demo Campaign", treatment: "Pico Laser", channel: "instagram" },
     { key: "organic-whatsapp", label: "Organic WhatsApp", source: "Organic", campaign: null, treatment: null, channel: "whatsapp" },
     { key: "referral", label: "Referral", source: "Referral", campaign: null, treatment: null, channel: "whatsapp" },
   ];
+  const configuredPresets = Object.values(demoConfig.acquisitionPresets || {});
+  const acquisitionPresets = configuredPresets.length ? configuredPresets : defaultAcquisitionPresets;
+  const customerLabel = demoConfig.labels?.customer || "Patient";
+  const acquisitionHelper = demoConfig.publicExperience?.acquisitionHelper || "This source follows the live visitor into the Clinic Dashboard.";
+  const businessInitial = String(demoConfig.businessName || demoConfig.clinicName || "Nova").charAt(0).toUpperCase();
 
   const svg = {
     video: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="3"></rect><path d="m16 10 5-3v10l-5-3z"></path></svg>`,
@@ -80,14 +86,14 @@
   function storedAcquisition() {
     try {
       const parsed = JSON.parse(sessionStorage.getItem("clinicDemoAcquisition") || "null");
-      return parsed && parsed.key ? parsed : acquisitionPresets.find((item) => item.key === "organic-whatsapp");
+      return parsed && acquisitionPresets.some((item) => item.key === parsed.key) ? parsed : acquisitionPresets.find((item) => item.key === "organic-whatsapp") || acquisitionPresets[0];
     } catch {
-      return acquisitionPresets.find((item) => item.key === "organic-whatsapp");
+      return acquisitionPresets.find((item) => item.key === "organic-whatsapp") || acquisitionPresets[0];
     }
   }
 
   function renderAcquisitionSelection(container) {
-    const selected = storedAcquisition().key;
+    const selected = storedAcquisition()?.key;
     container.querySelectorAll("[data-acquisition-key]").forEach((button) => {
       const active = button.dataset.acquisitionKey === selected;
       button.setAttribute("aria-pressed", String(active));
@@ -122,7 +128,7 @@
 
     const helper = document.createElement("p");
     helper.className = "prompt-helper";
-    helper.textContent = "This source follows the live visitor into the Clinic Dashboard.";
+    helper.textContent = acquisitionHelper;
 
     const list = document.createElement("div");
     list.className = "suggestion-list";
@@ -229,7 +235,7 @@
       } else if (channel === "facebook") {
         const seenAvatar = document.createElement("span");
         seenAvatar.className = "channel-seen-avatar";
-        seenAvatar.textContent = "N";
+        seenAvatar.textContent = businessInitial;
         seenAvatar.setAttribute("aria-label", "Seen");
         seenRow.appendChild(seenAvatar);
       }
@@ -284,7 +290,7 @@
     const config = channelConfig[channel];
     if (!phone.classList.contains("native-channel-ui")) phone.classList.add("native-channel-ui");
     phone.dataset.channelExperience = channel;
-    phone.setAttribute("aria-label", `${config.label} patient messaging preview`);
+    phone.setAttribute("aria-label", `${config.label} ${customerLabel.toLowerCase()} messaging preview`);
     ensureHeader(config);
     ensureComposer(config);
     ensureEmptyState(config);
