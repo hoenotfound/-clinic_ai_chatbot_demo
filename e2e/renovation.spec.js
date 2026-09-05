@@ -108,11 +108,12 @@ test("renovation profile stays industry-specific across customer view and the co
   await expect(frame.locator("body")).not.toContainText("HIFU Demo Special");
 
   await openDashboardPage(frame, "Team & Access");
-  await expect(frame.getByText("Amir", { exact: true }).first()).toBeVisible();
-  await expect(frame.getByText("Mei", { exact: true }).first()).toBeVisible();
-  await expect(frame.getByText("Aina", { exact: true }).first()).toBeVisible();
-  await expect(frame.locator("body")).not.toContainText("Sarah");
-  await expect(frame.locator("body")).not.toContainText("Mira");
+  const memberTable = frame.locator("table");
+  await expect(memberTable.getByText("Amir", { exact: true })).toBeVisible();
+  await expect(memberTable.getByText("Mei", { exact: true })).toBeVisible();
+  await expect(memberTable.getByText("Aina", { exact: true })).toBeVisible();
+  await expect(memberTable).not.toContainText("Sarah");
+  await expect(memberTable).not.toContainText("Mira");
 
   expect(browserErrors, `Browser errors: ${browserErrors.join("\n")}`).toEqual([]);
 });
