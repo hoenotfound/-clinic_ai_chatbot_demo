@@ -1,69 +1,18 @@
 const selectedIndustry = String(process.env.DEMO_INDUSTRY || "clinic").trim().toLowerCase();
+const isRenovation = ["renovation", "home-renovation", "carpentry"].includes(selectedIndustry);
 
-if (selectedIndustry === "renovation" || selectedIndustry === "home-renovation" || selectedIndustry === "carpentry") {
+// Transitional compatibility only.
+//
+// AI behaviour and lead/session behaviour are now selected directly through
+// src/industryProfile.js. This preload no longer monkey-patches prompts, rules,
+// fallbacks or demoState. It only keeps the legacy server/public shell, which
+// still imports clinicConfig directly, pointed at the active renovation business
+// until that static shell is converted to the same explicit profile API.
+if (isRenovation) {
   const clinicConfig = require("./clinicConfig");
   const renovationConfig = require("./renovationConfig");
-  const renovationPrompt = require("./renovationSystemPrompt");
-  const renovationFallback = require("./renovationFallback");
-
-  // Keep the existing clinic implementation as the default. For an explicitly
-  // selected renovation deployment, reuse the same stable demo server/session
-  // stack while swapping only the business knowledge and conversation rules.
   for (const key of Object.keys(clinicConfig)) delete clinicConfig[key];
   Object.assign(clinicConfig, renovationConfig);
-
-  const systemPromptModule = require("./systemPrompt");
-  systemPromptModule.buildSystemPrompt = renovationPrompt.buildSystemPrompt;
-
-  const clinicFallbackModule = require("./clinicFallback");
-  clinicFallbackModule.buildFallbackReply = renovationFallback.buildFallbackReply;
-
-  // These clinic-specific deterministic layers are intentionally bypassed for
-  // renovation mode. The renovation prompt/fallback owns quotation, site-visit
-  // and technical handoff behaviour instead.
-  const safetyRulesModule = require("./safetyRules");
-  safetyRulesModule.enforceSafetyRules = () => null;
-
-  const bookingRulesModule = require("./bookingRules");
-  bookingRulesModule.enforceBookingRules = () => null;
-
-  const concernFallbackModule = require("./concernFallback");
-  concernFallbackModule.buildConcernFallback = () => null;
-
-  const clinicKnowledgeModule = require("./clinicKnowledge");
-  clinicKnowledgeModule.concernGuidanceForPrompt = () => [
-    "- Qualify renovation leads gradually: project scope, property type, area, measurements/floor plan, budget and timeline.",
-    "- Exact quotations require sufficient measurements/material details or staff follow-up.",
-    "- Site measurement requests and site-specific technical questions should be handed to staff.",
-  ].join("\n");
-  clinicKnowledgeModule.bookingRulesForPrompt = () => [
-    "- Treat site-measurement and detailed-quotation requests as high intent.",
-    "- Never invent availability or claim a real site visit is booked.",
-    "- Once staff can continue, recap known project details and append [[HANDOFF]].",
-  ].join("\n");
-
-  // The base session engine is deliberately shared with the clinic demo, but
-  // renovation needs different commercial intent signals. Wrap the exported
-  // customer-message and restore paths so live dashboard state is recalculated
-  // using renovation project, budget, area and site-measurement logic.
-  const demoState = require("./demoState");
-  const { updateRenovationLead } = require("./renovationLeadState");
-  const baseAddCustomerMessage = demoState.addCustomerMessage;
-  const baseRestoreSession = demoState.restoreSession;
-
-  demoState.addCustomerMessage = function addRenovationCustomerMessage(session, rawText) {
-    const message = baseAddCustomerMessage(session, rawText);
-    updateRenovationLead(session);
-    return message;
-  };
-
-  demoState.restoreSession = function restoreRenovationSession(session) {
-    const restored = baseRestoreSession(session);
-    if (restored) updateRenovationLead(restored);
-    return restored;
-  };
-
-  demoState.shouldShowPromotion = () => false;
 
   if (!process.env.SALES_CTA_LABEL || process.env.SALES_CTA_LABEL === "Set up my clinic") {
     process.env.SALES_CTA_LABEL = "Set up my renovation chatbot";
