@@ -109,12 +109,17 @@ test("site measurement intent is tracked separately and never invents availabili
 });
 
 test("proper quotation intent is distinct from site measurement", () => {
+  const message = "New condo in Cheras. Kitchen 12ft, budget RM15k. Can you prepare a proper quotation?";
   const leadSession = session("quote-intent");
-  add(leadSession, "New condo in Cheras. Kitchen 12ft, budget RM15k. Can you prepare a proper quotation?");
+  add(leadSession, message);
   assert.equal(leadSession.lead.quotationIntent, true);
   assert.equal(leadSession.lead.siteMeasurementIntent, false);
   assert.equal(leadSession.lead.bookingIntent, true);
   assert.equal(leadSession.lead.temperature, "hot");
+
+  const reply = ai.getFallbackReply([{ role: "user", content: message }]);
+  assert.match(reply, /\[\[HANDOFF\]\]/);
+  assert.doesNotMatch(reply, /confirmed|booked/i);
 });
 
 test("technical renovation questions are escalated and marked separately", () => {
