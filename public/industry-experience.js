@@ -19,6 +19,18 @@
     }
   }
 
+  function installHeroShowcaseLayout() {
+    if (document.querySelector('link[data-hero-showcase-layout="true"]')) return;
+    const currentSource = document.currentScript?.src ||
+      [...document.scripts].find((script) => /industry-experience\.js(?:\?|$)/.test(script.src))?.src;
+    if (!currentSource) return;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = new URL("hero-showcase-layout.css", currentSource).href;
+    link.dataset.heroShowcaseLayout = "true";
+    document.head.appendChild(link);
+  }
+
   function renderHero(experience) {
     const badge = document.querySelector(".scaling-pill");
     if (badge) badge.innerHTML = `<span class="status-dot"></span>${experience.badge}`;
@@ -177,6 +189,7 @@
     } catch {}
   }
 
+  installHeroShowcaseLayout();
   window.applyDemoIndustryExperience = applyConfig;
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", loadConfig, { once: true });
   else loadConfig();

@@ -26,9 +26,37 @@ async function openDashboardPage(frame, name, heading = name) {
 test("renovation profile stays industry-specific across customer view and the complete dashboard", async ({ page }) => {
   test.skip(process.env.DEMO_INDUSTRY !== "renovation", "Renovation profile only");
   const browserErrors = collectBrowserErrors(page);
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/");
 
   await expect(page.getByText("Oakline Demo Renovation & Carpentry").first()).toBeVisible();
+
+  const leadCard = page.locator(".hero-lead-card");
+  const journeyCaption = page.locator(".hero-product-caption");
+  await expect(leadCard).toContainText("SITE MEASUREMENT INTENT");
+  await expect(leadCard).toContainText("Hot lead · Kitchen Cabinets · Puchong · Saturday");
+  await expect(journeyCaption).toContainText("AI-POWERED CUSTOMER JOURNEY");
+  await expect(journeyCaption).toContainText("Reply. Qualify. Hand off.");
+  await expect(page.locator('link[data-hero-showcase-layout="true"]')).toHaveCount(1);
+  await expect(journeyCaption).toHaveCSS("position", "relative");
+
+  const heroLayout = await page.locator(".hero-product-card").evaluate((card) => {
+    const lead = card.querySelector(".hero-lead-card").getBoundingClientRect();
+    const captionLabel = card.querySelector(".hero-product-caption span").getBoundingClientRect();
+    const captionHeading = card.querySelector(".hero-product-caption strong").getBoundingClientRect();
+    const product = card.getBoundingClientRect();
+    return {
+      leadBottom: lead.bottom,
+      captionLabelTop: captionLabel.top,
+      captionLabelBottom: captionLabel.bottom,
+      captionHeadingTop: captionHeading.top,
+      captionHeadingBottom: captionHeading.bottom,
+      productBottom: product.bottom,
+    };
+  });
+  expect(heroLayout.captionLabelTop - heroLayout.leadBottom).toBeGreaterThanOrEqual(20);
+  expect(heroLayout.captionHeadingTop - heroLayout.captionLabelBottom).toBeGreaterThanOrEqual(5);
+  expect(heroLayout.productBottom - heroLayout.captionHeadingBottom).toBeGreaterThanOrEqual(20);
 
   const facebookAcquisition = page.locator('[data-acquisition-key="hifu-facebook"]');
   await expect(facebookAcquisition).toContainText("Kitchen Cabinets Facebook Ad");

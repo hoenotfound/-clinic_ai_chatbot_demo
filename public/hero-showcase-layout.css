@@ -1,0 +1,52 @@
+/*
+  Keep the hero product preview adaptive to industry-specific copy.
+  Renovation uses longer lead summaries than the clinic profile, so the
+  customer-journey caption must stay in normal flow instead of overlapping it.
+*/
+
+.hero-product-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.hero-lead-card > div:nth-child(2) {
+  min-width: 0;
+}
+
+.hero-lead-card span {
+  line-height: 1.35;
+}
+
+.hero-lead-card strong {
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.hero-lead-card b {
+  align-self: center;
+  white-space: nowrap;
+}
+
+.hero-product-caption {
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  margin-top: auto;
+  padding-top: 26px;
+}
+
+html[data-demo-industry="renovation"] .hero-chat-flow {
+  margin-top: 46px;
+}
+
+html[data-demo-industry="renovation"] .hero-product-caption strong {
+  font-size: clamp(27px, 2.15vw, 34px);
+  line-height: 1.08;
+}
+
+@media (max-width: 900px) {
+  .hero-product-caption {
+    padding-top: 22px;
+  }
+}
