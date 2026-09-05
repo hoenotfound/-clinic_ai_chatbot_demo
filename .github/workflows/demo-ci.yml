@@ -30,6 +30,7 @@ jobs:
           node --check src/server.js
           node --check src/demoState.js
           node --check src/aiService.js
+          node --check src/industryProfile.js
           node --check src/sharedState.js
           node --check src/opsStats.js
           node --check src/opsNeonStore.js
@@ -85,7 +86,9 @@ jobs:
         run: node --test test/renovationDemo.test.js
       - name: Check renovation-specific JavaScript syntax
         run: |
+          node --check src/industryProfile.js
           node --check src/industryDemoPreload.js
+          node --check src/demoState.js
           node --check src/renovationConfig.js
           node --check src/renovationFallback.js
           node --check src/renovationLeadState.js
