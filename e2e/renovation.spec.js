@@ -61,7 +61,9 @@ test("renovation profile stays industry-specific across customer view and dashbo
   await expect(liveLead).toBeVisible();
   await liveLead.click();
   await expect(frame.getByText("RM 10,000", { exact: true }).first()).toBeVisible();
-  await frame.getByRole("button", { name: "Close lead drawer" }).click();
+  const closeDrawer = frame.getByRole("button", { name: "Close lead drawer" });
+  await closeDrawer.click({ force: true });
+  await expect(closeDrawer).toHaveCount(0);
 
   await frame.getByRole("link", { name: "Analytics" }).click();
   await expect(frame.getByRole("heading", { name: "Analytics" })).toBeVisible();
