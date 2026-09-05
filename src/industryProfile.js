@@ -91,4 +91,13 @@ function renovationProfile() {
 
 const active = key === "renovation" ? renovationProfile() : clinicProfile();
 
+// .env.example intentionally carries the clinic CTA for the default profile.
+// When another profile is selected and that untouched clinic default is still
+// present, promote it to the active profile's default while preserving any
+// genuinely custom CTA label supplied by the deployer.
+const configuredSalesCtaLabel = String(process.env.SALES_CTA_LABEL || "").trim();
+if (active.key !== "clinic" && configuredSalesCtaLabel === "Set up my clinic") {
+  process.env.SALES_CTA_LABEL = active.salesCtaDefault;
+}
+
 module.exports = active;
