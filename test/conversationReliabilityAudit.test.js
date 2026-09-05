@@ -5,7 +5,7 @@ const path = require("node:path");
 const { languageSignal, establishedConversationLanguage } = require("../src/conversationLanguage");
 const { runWithConversationContext } = require("../src/aiMemoryContext");
 const industry = require("../src/industryProfile");
-const { updateRenovationLead, detectBudget, detectPropertyType } = require("../src/renovationLeadState");
+const { updateRenovationLead, detectBudget, detectPropertyType, detectArea } = require("../src/renovationLeadState");
 const abuse = require("../src/abuseProtection");
 
 function message(role, content) {
@@ -73,6 +73,8 @@ test("renovation lead corrections use the newest explicit value", () => {
 
 test("same-message corrections and measurements do not corrupt renovation budget/property memory", () => {
   assert.equal(detectPropertyType("不是 landed，是 condo"), "Condo / apartment");
+  assert.equal(detectPropertyType("landed, sorry condo, actually landed"), "Landed house");
+  assert.equal(detectArea("Puchong, actually PJ, sorry Puchong"), "Cheras / Kajang / Puchong");
   assert.equal(detectBudget("budget RM10k, kitchen size 3000mm"), "RM10,000");
 });
 
