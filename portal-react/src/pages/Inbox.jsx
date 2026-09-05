@@ -13,6 +13,7 @@ import {
   UserIcon,
 } from "../components/InboxIcons";
 import { SAMPLE_LEADS, portalMessages } from "../demoData";
+import { industryProfile, isRenovationDemo } from "../config/industryProfile";
 
 const STATUS_FILTERS = [
   ["all", "All"],
@@ -53,7 +54,7 @@ function sampleConversation(lead) {
     mode: lead.messages.some((m) => m[0] === "staff") ? "human" : "ai",
     takeover_by: lead.messages.some((m) => m[0] === "staff") ? lead.owner : null,
     needs_attention: lead.attention,
-    attention_reason: lead.attention ? "Patient requested staff assistance." : null,
+    attention_reason: lead.attention ? `${industryProfile.terms.customer} requested staff assistance.` : null,
     needs_follow_up: lead.followUp,
     is_unread: lead.unread,
     has_unreplied: lead.noReply,
@@ -122,10 +123,11 @@ export default function Inbox() {
   const liveConversation = useMemo(() => {
     if (!live) return null;
     const last = live.messages?.at(-1);
+    const demoName = isRenovationDemo ? "Demo Customer" : "Demo Patient";
     return {
       contact_id: "live",
-      display_name: "Demo Patient",
-      whatsapp_name: "Demo Patient",
+      display_name: demoName,
+      whatsapp_name: demoName,
       whatsapp_number: "Live browser visitor",
       channel: live.channel || "whatsapp",
       mode: live.mode || "ai",
@@ -141,10 +143,21 @@ export default function Inbox() {
       sample: false,
       lead: {
         temperature: live.lead?.temperature || "cold",
-        treatment: live.lead?.interests?.[0] || "Not detected",
+        treatment: live.lead?.interests?.[0] || `${industryProfile.terms.service} not selected`,
         summary: live.lead?.summary || "Live prospect conversation",
         branch: live.lead?.preferredBranch || "Unassigned",
         timing: live.lead?.preferredTiming || "Not specified",
+        intent: isRenovationDemo
+          ? live.lead?.siteMeasurementIntent
+            ? "Site measurement requested"
+            : live.lead?.quotationIntent
+              ? "Proper quotation requested"
+              : live.lead?.humanRequest
+                ? "Human/designer requested"
+                : live.lead?.technicalHandoff
+                  ? "Technical handoff required"
+                  : "No high-intent action yet"
+          : live.lead?.bookingIntent ? "Appointment requested" : "No appointment intent",
         messages: (live.messages || []).map((message) => [message.source, message.content]),
       },
     };
@@ -423,7 +436,7 @@ function Thread({ contact, messages, sending, onBack, mobileThreadOpen, onDetail
       <div className="inbox-thread-bg min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-5 sm:py-6">
         <div className="mx-auto w-full max-w-4xl space-y-3">
           {messages.length === 0 ? (
-            <div className="py-16 text-center"><ChatOutlineIcon className="mx-auto h-8 w-8 text-[var(--color-primary)]" /><p className="mt-3 text-sm font-semibold">No messages yet</p><p className="mt-1 text-xs text-[var(--color-text-muted)]">Send a message from Patient View.</p></div>
+            <div className="py-16 text-center"><ChatOutlineIcon className="mx-auto h-8 w-8 text-[var(--color-primary)]" /><p className="mt-3 text-sm font-semibold">No messages yet</p><p className="mt-1 text-xs text-[var(--color-text-muted)]">Send a message from {industryProfile.terms.customer} View.</p></div>
           ) : messages.map((message) => <Message key={message.id} message={message} />)}
         </div>
       </div>
@@ -432,10 +445,10 @@ function Thread({ contact, messages, sending, onBack, mobileThreadOpen, onDetail
           {!isLive ? (
             <div className="rounded-xl bg-[var(--color-bg)] px-4 py-3 text-center text-xs text-[var(--color-text-muted)]">Historical sample conversations are read only.</div>
           ) : contact.mode !== "human" ? (
-            <div className="rounded-xl bg-[var(--color-primary-light)] px-4 py-3 text-center text-xs font-medium text-[var(--color-primary)]">AI is handling this conversation. Take over to reply as clinic staff.</div>
+            <div className="rounded-xl bg-[var(--color-primary-light)] px-4 py-3 text-center text-xs font-medium text-[var(--color-primary)]">AI is handling this conversation. Take over to reply as {industryProfile.terms.staff.toLowerCase()}.</div>
           ) : (
             <div className="flex items-end gap-2 rounded-2xl border border-[var(--color-border)] bg-white p-2 shadow-sm focus-within:border-[var(--color-primary)]">
-              <textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows="1" placeholder="Reply to patient…" className="min-h-10 max-h-32 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none" />
+              <textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows="1" placeholder={`Reply to ${industryProfile.terms.customerLower}…`} className="min-h-10 max-h-32 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none" />
               <button aria-label="Send staff reply" disabled={sending || !draft.trim()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-primary)] text-white disabled:opacity-40"><SendIcon className="h-4 w-4" /></button>
             </div>
           )}
@@ -452,7 +465,7 @@ function Message({ message }) {
       <div className={`relative max-w-[82%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-5 shadow-sm sm:max-w-[72%] ${outgoing ? "bubble-out rounded-br-md bg-[var(--color-primary)] text-white" : "bubble-in rounded-bl-md border border-[var(--color-border)] bg-white text-[var(--color-text)]"}`}>
         <p className="whitespace-pre-wrap">{message.content}</p>
         <div className={`mt-1 flex items-center justify-end gap-1 text-[9px] ${outgoing ? "text-white/65" : "text-[var(--color-text-muted)]"}`}>
-          {message.source === "staff" && <span>Clinic staff · </span>}
+          {message.source === "staff" && <span>{industryProfile.terms.staff} · </span>}
           <span>{new Date(message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
         </div>
       </div>
@@ -462,6 +475,14 @@ function Message({ message }) {
 
 function Details({ open, contact, onClose }) {
   if (!open || !contact) return null;
+  const rows = [
+    ["Lead temperature", contact.lead?.temperature?.toUpperCase()],
+    [industryProfile.terms.service, contact.lead?.treatment],
+    [industryProfile.terms.location, contact.lead?.branch],
+    [industryProfile.terms.timing, contact.lead?.timing],
+    ...(contact.lead?.intent ? [["Current intent", contact.lead.intent]] : []),
+    ["Conversation summary", contact.lead?.summary],
+  ];
   return (
     <>
       <button aria-label="Close details" onClick={onClose} className="fixed inset-0 z-40 bg-black/15" />
@@ -472,7 +493,7 @@ function Details({ open, contact, onClose }) {
         </div>
         <div className="mt-6 flex items-center gap-3"><ContactAvatar channel={contact.channel} size={52} /><div><strong className="text-sm">{displayName(contact)}</strong><p className="mt-1 text-xs text-[var(--color-text-muted)]">{contact.whatsapp_number}</p></div></div>
         <div className="mt-6 space-y-4">
-          {[["Lead temperature", contact.lead?.temperature?.toUpperCase()], ["Treatment", contact.lead?.treatment], ["Branch", contact.lead?.branch], ["Timing", contact.lead?.timing], ["Conversation summary", contact.lead?.summary]].map(([label, value]) => (
+          {rows.map(([label, value]) => (
             <div key={label} className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4"><p className="text-[10px] font-semibold uppercase tracking-[.1em] text-[var(--color-text-muted)]">{label}</p><p className="mt-2 text-sm leading-6">{value || "—"}</p></div>
           ))}
         </div>

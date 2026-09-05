@@ -7,14 +7,16 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  clinic:
     runs-on: ubuntu-latest
+    env:
+      DEMO_INDUSTRY: clinic
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 20
-      - name: Install dependencies and build React dashboard
+      - name: Install dependencies and build clinic React dashboard
         run: npm ci
       - name: Verify React dashboard build exists
         run: test -f portal-react/dist/index.html
@@ -28,14 +30,22 @@ jobs:
           node --check src/server.js
           node --check src/demoState.js
           node --check src/aiService.js
+          node --check src/industryProfile.js
+          node --check src/publicExperienceProfiles.js
           node --check src/sharedState.js
           node --check src/opsStats.js
           node --check src/opsNeonStore.js
           node --check src/opsPersistencePreload.js
           node --check src/visitorAnalyticsStore.js
           node --check src/visitorAnalyticsPreload.js
+          node --check src/renovationConfig.js
+          node --check src/renovationFallback.js
+          node --check src/renovationLeadState.js
+          node --check src/renovationSystemPrompt.js
           node --check public/app.js
+          node --check public/channel-experience.js
           node --check public/funnel-telemetry.js
+          node --check public/industry-experience.js
           node --check public/ops.js
           node --check public/ops-audience.js
           node --check public/subpath-bootstrap.js
@@ -47,12 +57,55 @@ jobs:
           node --check e2e/ops-dashboard.spec.js
           node --check e2e/public-visual.spec.js
           node --check e2e/subpath.spec.js
-      - name: Run browser E2E tests
+          node --check e2e/renovation.spec.js
+      - name: Run clinic browser E2E tests
         run: npm run test:e2e
-      - name: Upload public demo visual QA
+      - name: Upload clinic public demo visual QA
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: public-demo-visual-qa
+          name: public-demo-visual-qa-clinic
+          path: visual-artifacts/*.png
+          if-no-files-found: ignore
+
+  renovation:
+    runs-on: ubuntu-latest
+    env:
+      DEMO_INDUSTRY: renovation
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+      - name: Install dependencies and build renovation React dashboard
+        run: npm ci
+      - name: Verify renovation React dashboard build exists
+        run: test -f portal-react/dist/index.html
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run renovation regression tests
+        run: node --test test/renovationDemo.test.js
+      - name: Check renovation-specific JavaScript syntax
+        run: |
+          node --check src/server.js
+          node --check src/industryProfile.js
+          node --check src/publicExperienceProfiles.js
+          node --check src/demoState.js
+          node --check src/renovationConfig.js
+          node --check src/renovationFallback.js
+          node --check src/renovationLeadState.js
+          node --check src/renovationSystemPrompt.js
+          node --check src/aiService.js
+          node --check public/app.js
+          node --check public/channel-experience.js
+          node --check public/industry-experience.js
+          node --check e2e/renovation.spec.js
+      - name: Run renovation browser E2E test
+        run: npx playwright test e2e/renovation.spec.js
+      - name: Upload renovation visual QA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-demo-visual-qa-renovation
           path: visual-artifacts/*.png
           if-no-files-found: ignore

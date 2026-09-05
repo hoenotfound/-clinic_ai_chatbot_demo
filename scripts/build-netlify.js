@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const industryProfile = require("../src/industryProfile");
 
 const ROOT = path.join(__dirname, "..");
 const PUBLIC_DIR = path.join(ROOT, "public");
@@ -21,10 +22,12 @@ function enhanceIndex(html) {
   const proofStartToken = '      <section class="proof-grid">';
   const dashboardStart = html.indexOf(dashboardStartToken);
   const proofStart = html.indexOf(proofStartToken, dashboardStart + dashboardStartToken.length);
+  const businessName = industryProfile.config.businessName || industryProfile.config.clinicName || "Demo Business";
+  const startupLabel = industryProfile.key === "clinic" ? "STARTING LIVE AI RECEPTIONIST…" : "STARTING LIVE AI RENOVATION CHATBOT…";
 
   if (dashboardStart >= 0 && proofStart > dashboardStart && PORTAL_DASHBOARD_PARTS.every((part) => fs.existsSync(part))) {
     const portalDashboard = PORTAL_DASHBOARD_PARTS.map((part) => fs.readFileSync(part, "utf8")).join("");
-    const replacement = `${dashboardStartToken}\n          <iframe id="reactDashboardFrame" class="react-dashboard-frame" src="/dashboard/inbox" title="Nova Demo Clinic staff portal"></iframe>\n          <div class="legacy-dashboard-hooks" aria-hidden="true">\n${portalDashboard}\n          </div>\n        </div>\n      </section>\n\n`;
+    const replacement = `${dashboardStartToken}\n          <iframe id="reactDashboardFrame" class="react-dashboard-frame" src="/dashboard/inbox" title="${businessName} staff portal"></iframe>\n          <div class="legacy-dashboard-hooks" aria-hidden="true">\n${portalDashboard}\n          </div>\n        </div>\n      </section>\n\n`;
     html = html.slice(0, dashboardStart) + replacement + html.slice(proofStart);
   }
 
@@ -62,7 +65,7 @@ function enhanceIndex(html) {
 
   html = html.replace(
     '<div class="experience-status">\n              <span class="status-dot"></span>\n              <div><small>LIVE PRODUCT DEMO</small><strong>Nova Demo Aesthetic Clinic</strong></div>',
-    '<div class="experience-status" aria-live="polite">\n              <span id="backendStatusDot" class="status-dot backend-starting"></span>\n              <div><small id="backendStatusLabel">STARTING LIVE AI RECEPTIONIST…</small><strong>Nova Demo Aesthetic Clinic</strong></div>'
+    `<div class="experience-status" aria-live="polite">\n              <span id="backendStatusDot" class="status-dot backend-starting"></span>\n              <div><small id="backendStatusLabel">${startupLabel}</small><strong>${businessName}</strong></div>`
   );
 
   // Convert local root-relative assets first, then add an absolute base tag.

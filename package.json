@@ -2,7 +2,7 @@
   "name": "clinic-ai-chatbot-demo",
   "version": "1.0.0",
   "private": true,
-  "description": "Standalone public demo for a multi-channel AI clinic receptionist",
+  "description": "Standalone public demo for configurable multi-channel AI business chatbots",
   "main": "src/server.js",
   "type": "commonjs",
   "engines": {
