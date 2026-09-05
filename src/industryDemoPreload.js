@@ -42,6 +42,29 @@ if (selectedIndustry === "renovation" || selectedIndustry === "home-renovation" 
     "- Once staff can continue, recap known project details and append [[HANDOFF]].",
   ].join("\n");
 
+  // The base session engine is deliberately shared with the clinic demo, but
+  // renovation needs different commercial intent signals. Wrap the exported
+  // customer-message and restore paths so live dashboard state is recalculated
+  // using renovation project, budget, area and site-measurement logic.
+  const demoState = require("./demoState");
+  const { updateRenovationLead } = require("./renovationLeadState");
+  const baseAddCustomerMessage = demoState.addCustomerMessage;
+  const baseRestoreSession = demoState.restoreSession;
+
+  demoState.addCustomerMessage = function addRenovationCustomerMessage(session, rawText) {
+    const message = baseAddCustomerMessage(session, rawText);
+    updateRenovationLead(session);
+    return message;
+  };
+
+  demoState.restoreSession = function restoreRenovationSession(session) {
+    const restored = baseRestoreSession(session);
+    if (restored) updateRenovationLead(restored);
+    return restored;
+  };
+
+  demoState.shouldShowPromotion = () => false;
+
   if (!process.env.SALES_CTA_LABEL || process.env.SALES_CTA_LABEL === "Set up my clinic") {
     process.env.SALES_CTA_LABEL = "Set up my renovation chatbot";
   }
