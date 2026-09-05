@@ -51,12 +51,20 @@ function previousAssistantAskedForBudget(session) {
   return false;
 }
 
+function lastPatternIndex(value, pattern) {
+  const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+  const globalPattern = new RegExp(pattern.source, flags);
+  let lastIndex = -1;
+  for (const match of value.matchAll(globalPattern)) lastIndex = match.index;
+  return lastIndex;
+}
+
 function latestPatternLabel(text, entries) {
   const value = String(text || "");
   let winner = null;
   let winnerIndex = -1;
   for (const [pattern, label] of entries) {
-    const index = value.search(pattern);
+    const index = lastPatternIndex(value, pattern);
     if (index >= winnerIndex && index >= 0) {
       winner = label;
       winnerIndex = index;
