@@ -279,13 +279,25 @@ async function requireDemoSession(id) {
   let session = state.getSession(id);
   if (!session && shared.enabled) {
     const stored = await shared.loadSession(id);
-    if (stored) session = state.restoreSession(stored);
+    if (stored) {
+      session = await industryProfile.runWithIndustry(
+        stored.industryKey || process.env.DEMO_INDUSTRY || "clinic",
+        () => state.restoreSession(stored)
+      );
+    }
   }
   return session || state.requireSession(id);
 }
 
 async function persistSession(session) {
   await shared.saveSession(session);
+}
+
+function configuredSalesCtaLabel() {
+  const configured = String(process.env.SALES_CTA_LABEL || "").trim();
+  if (!configured) return industryProfile.salesCtaDefault;
+  if (industryProfile.key !== "clinic" && configured === "Set up my clinic") return industryProfile.salesCtaDefault;
+  return configured;
 }
 
 function publicConfig() {
@@ -296,6 +308,8 @@ function publicConfig() {
     businessName,
     clinicName: businessName,
     assistantName: business.assistantName,
+    selector: industryProfile.selector,
+    availableIndustries: industryProfile.listIndustryProfiles(),
     labels: industryProfile.labels,
     highIntentFields: industryProfile.highIntentFields,
     locations,
@@ -305,7 +319,7 @@ function publicConfig() {
     acquisitionPresets: industryProfile.acquisitionPresets,
     publicExperience: industryProfile.publicExperience,
     salesCta: {
-      label: process.env.SALES_CTA_LABEL || industryProfile.salesCtaDefault,
+      label: configuredSalesCtaLabel(),
       url: process.env.SALES_CTA_URL || "",
     },
     limits: {
@@ -314,6 +328,88 @@ function publicConfig() {
       maxStaffMessagesPerSession: MAX_STAFF_MESSAGES_PER_SESSION,
     },
   };
+}
+
+async function handleSessionAction(req, res, session, action) {
+  return industryProfile.runWithIndustry(session.industryKey || process.env.DEMO_INDUSTRY || "clinic", async () => {
+    if (req.method === "GET" && !action) {
+      return sendJson(res, 200, { session: state.publicSession(session) });
+    }
+    if (req.method !== "POST" || !action) return false;
+    const body = await readJson(req);
+
+    if (action === "channel") {
+      const previousChannel = session.channel;
+      state.setChannel(session, body.channel);
+      await persistSession(session);
+      if (session.channel !== previousChannel) opsStats.recordCounter("channel_switches");
+      return sendJson(res, 200, { session: state.publicSession(session) });
+    }
+    if (action === "mode") {
+      const previousMode = session.mode;
+      state.setMode(session, body.mode);
+      await persistSession(session);
+      if (previousMode !== "human" && session.mode === "human") opsStats.recordCounter("human_takeovers");
+      if (previousMode === "human" && session.mode !== "human") opsStats.recordCounter("human_releases");
+      return sendJson(res, 200, { session: state.publicSession(session) });
+    }
+    if (action === "staff-message") {
+      preflightStaffMessage(body.message);
+      enforceStaffMessageLimit(session);
+      state.addStaffMessage(session, body.message);
+      await persistSession(session);
+      opsStats.recordCounter("staff_messages");
+      return sendJson(res, 200, { session: state.publicSession(session) });
+    }
+    if (action === "message") {
+      const willUseAi = session.mode === "ai";
+      const releaseAiSlot = willUseAi ? acquireAiSlot() : null;
+      try {
+        enforceSessionMessageCapacity(session, willUseAi ? 2 : 1);
+        preflightCustomerMessage(session, body.message);
+        await shared.enforceDailyMessageLimit(state.limits.maxTotalMessagesPerDay);
+        state.addCustomerMessage(session, body.message);
+        await persistSession(session);
+        opsStats.recordCounter("customer_messages");
+        if (session.mode === "human") {
+          return sendJson(res, 200, { session: state.publicSession(session), aiReplied: false });
+        }
+        const history = session.messages.map((message) => ({ role: message.role, content: message.content }));
+        const isFirstMessage = session.customerMessageCount === 1;
+        let reply;
+        let degraded = false;
+        try {
+          reply = await ai.getReply(history, isFirstMessage);
+        } catch (aiError) {
+          console.error("AI service escaped its fallback boundary; using deterministic demo fallback:", aiError);
+          reply = ai.getFallbackReply(history);
+        }
+
+        if (session.mode === "human") {
+          return sendJson(res, 200, {
+            session: state.publicSession(session),
+            aiReplied: false,
+            cancelledByTakeover: true,
+          });
+        }
+
+        if (isFirstMessage) reply = `${business.introMessage}\n\n${reply}`;
+        const assistantMessage = state.addAssistantMessage(session, reply);
+        const showPromotion = !degraded && !session.needsAttention && state.shouldShowPromotion(session);
+        if (showPromotion) state.markPromotionShown(session, assistantMessage.id);
+        await persistSession(session);
+        return sendJson(res, 200, {
+          session: state.publicSession(session),
+          aiReplied: !degraded,
+          degraded,
+          promotion: showPromotion ? (business.promotion || null) : null,
+        });
+      } finally {
+        releaseAiSlot?.();
+      }
+    }
+    return false;
+  });
 }
 
 async function handleApi(req, res, url) {
@@ -342,103 +438,38 @@ async function handleApi(req, res, url) {
     if (!requireOpsAuth(req, res)) return true;
     return sendJson(res, 200, await opsStats.getSnapshot());
   }
+  if (req.method === "GET" && url.pathname === "/api/demo/industries") {
+    return sendJson(res, 200, {
+      industries: industryProfile.listIndustryProfiles(),
+      defaultIndustry: industryProfile.normalizeIndustryKey(process.env.DEMO_INDUSTRY || "clinic"),
+    });
+  }
   if (req.method === "GET" && url.pathname === "/api/demo/config") {
-    return sendJson(res, 200, publicConfig());
+    const requestedIndustry = industryProfile.normalizeIndustryKey(
+      url.searchParams.get("industry") || process.env.DEMO_INDUSTRY || "clinic"
+    );
+    return industryProfile.runWithIndustry(requestedIndustry, () => sendJson(res, 200, publicConfig()));
   }
   if (req.method === "POST" && url.pathname === "/api/demo/sessions") {
     const body = await readJson(req);
     const ip = clientIp(req);
-    await shared.enforceSessionCreationLimit(ip, state.limits.maxSessionsPerIpDay);
-    const session = state.createSession({ channel: body.channel, ip });
-    await persistSession(session);
-    opsStats.recordCounter("sessions_started");
-    return sendJson(res, 201, { session: state.publicSession(session) });
+    const requestedIndustry = industryProfile.normalizeIndustryKey(
+      body.industry || process.env.DEMO_INDUSTRY || "clinic"
+    );
+    return industryProfile.runWithIndustry(requestedIndustry, async () => {
+      await shared.enforceSessionCreationLimit(ip, state.limits.maxSessionsPerIpDay);
+      const session = state.createSession({ channel: body.channel, ip });
+      session.industryKey = requestedIndustry;
+      await persistSession(session);
+      opsStats.recordCounter("sessions_started");
+      return sendJson(res, 201, { session: state.publicSession(session) });
+    });
   }
 
   const match = url.pathname.match(/^\/api\/demo\/sessions\/([^/]+)(?:\/(channel|mode|staff-message|message))?$/);
   if (!match) return false;
   const session = await requireDemoSession(decodeURIComponent(match[1]));
-  const action = match[2] || null;
-
-  if (req.method === "GET" && !action) {
-    return sendJson(res, 200, { session: state.publicSession(session) });
-  }
-  if (req.method !== "POST" || !action) return false;
-  const body = await readJson(req);
-
-  if (action === "channel") {
-    const previousChannel = session.channel;
-    state.setChannel(session, body.channel);
-    await persistSession(session);
-    if (session.channel !== previousChannel) opsStats.recordCounter("channel_switches");
-    return sendJson(res, 200, { session: state.publicSession(session) });
-  }
-  if (action === "mode") {
-    const previousMode = session.mode;
-    state.setMode(session, body.mode);
-    await persistSession(session);
-    if (previousMode !== "human" && session.mode === "human") opsStats.recordCounter("human_takeovers");
-    if (previousMode === "human" && session.mode !== "human") opsStats.recordCounter("human_releases");
-    return sendJson(res, 200, { session: state.publicSession(session) });
-  }
-  if (action === "staff-message") {
-    preflightStaffMessage(body.message);
-    enforceStaffMessageLimit(session);
-    state.addStaffMessage(session, body.message);
-    await persistSession(session);
-    opsStats.recordCounter("staff_messages");
-    return sendJson(res, 200, { session: state.publicSession(session) });
-  }
-  if (action === "message") {
-    const willUseAi = session.mode === "ai";
-    const releaseAiSlot = willUseAi ? acquireAiSlot() : null;
-    try {
-      enforceSessionMessageCapacity(session, willUseAi ? 2 : 1);
-      preflightCustomerMessage(session, body.message);
-      await shared.enforceDailyMessageLimit(state.limits.maxTotalMessagesPerDay);
-      state.addCustomerMessage(session, body.message);
-      await persistSession(session);
-      opsStats.recordCounter("customer_messages");
-      if (session.mode === "human") {
-        return sendJson(res, 200, { session: state.publicSession(session), aiReplied: false });
-      }
-      const history = session.messages.map((message) => ({ role: message.role, content: message.content }));
-      const isFirstMessage = session.customerMessageCount === 1;
-      let reply;
-      let degraded = false;
-      try {
-        reply = await ai.getReply(history, isFirstMessage);
-      } catch (aiError) {
-        console.error("AI service escaped its fallback boundary; using deterministic demo fallback:", aiError);
-        reply = ai.getFallbackReply(history);
-      }
-
-      // Staff may take over while the model request is still in flight. In that
-      // case, discard the generated reply so human ownership is respected.
-      if (session.mode === "human") {
-        return sendJson(res, 200, {
-          session: state.publicSession(session),
-          aiReplied: false,
-          cancelledByTakeover: true,
-        });
-      }
-
-      if (isFirstMessage) reply = `${business.introMessage}\n\n${reply}`;
-      const assistantMessage = state.addAssistantMessage(session, reply);
-      const showPromotion = !degraded && !session.needsAttention && state.shouldShowPromotion(session);
-      if (showPromotion) state.markPromotionShown(session, assistantMessage.id);
-      await persistSession(session);
-      return sendJson(res, 200, {
-        session: state.publicSession(session),
-        aiReplied: !degraded,
-        degraded,
-        promotion: showPromotion ? (business.promotion || null) : null,
-      });
-    } finally {
-      releaseAiSlot?.();
-    }
-  }
-  return false;
+  return handleSessionAction(req, res, session, match[2] || null);
 }
 
 function buildOpsPage() {
@@ -599,14 +630,10 @@ function buildEnhancedIndex(filePath) {
 
   if (dashboardStart >= 0 && proofStart > dashboardStart && PORTAL_DASHBOARD_PARTS.every((part) => fs.existsSync(part))) {
     const portalDashboard = PORTAL_DASHBOARD_PARTS.map((part) => fs.readFileSync(part, "utf8")).join("");
-    const businessName = business.businessName || business.clinicName || "Demo Business";
-    const replacement = `${dashboardStartToken}\n          <iframe id="reactDashboardFrame" class="react-dashboard-frame" src="/dashboard/inbox" title="${businessName} staff portal"></iframe>\n          <div class="legacy-dashboard-hooks" aria-hidden="true">\n${portalDashboard}\n          </div>\n        </div>\n      </section>\n\n`;
+    const replacement = `${dashboardStartToken}\n          <iframe id="reactDashboardFrame" class="react-dashboard-frame" src="/dashboard/inbox" title="AI chatbot staff portal"></iframe>\n          <div class="legacy-dashboard-hooks" aria-hidden="true">\n${portalDashboard}\n          </div>\n        </div>\n      </section>\n\n`;
     html = html.slice(0, dashboardStart) + replacement + html.slice(proofStart);
   }
 
-  // Keep the strict style CSP. The dashboard uses CSS classes instead of inline
-  // style attributes, and this guard prevents a future sample fragment from
-  // accidentally reintroducing CSP-blocked inline styling.
   html = html.replace(/\sstyle="[^"]*"/g, "");
 
   if (!html.includes('/portal-demo.css')) {
@@ -624,8 +651,6 @@ function buildEnhancedIndex(filePath) {
     );
   }
 
-  // Use document-relative local assets so the same HTML works at both `/` on
-  // Render and `/ai-chatbot/` when reverse-proxied through the company domain.
   html = html.replace(/\b(href|src)="\/(?!\/)/g, '$1="./');
   return html;
 }
@@ -727,7 +752,7 @@ const server = http.createServer(async (req, res) => {
 setInterval(state.cleanupExpiredSessions, 10 * 60_000).unref();
 
 server.listen(PORT, () => {
-  console.log(`AI chatbot demo (${industryProfile.key}) running on port ${PORT}`);
+  console.log(`AI chatbot demo running on port ${PORT}; default industry: ${industryProfile.normalizeIndustryKey(process.env.DEMO_INDUSTRY || "clinic")}`);
   console.log("AI provider configured:", ai.configured);
   console.log("Demo operations dashboard configured:", opsAuthConfigured());
 });
