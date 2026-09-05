@@ -4,6 +4,7 @@ const { buildConcernFallback } = require("./concernFallback");
 const { enforceBookingRules } = require("./bookingRules");
 const { enforceSafetyRules } = require("./safetyRules");
 const { concernGuidanceForPrompt, bookingRulesForPrompt } = require("./clinicKnowledge");
+const clinic = require("./clinicConfig");
 const opsStats = require("./opsStats");
 
 const provider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
@@ -37,7 +38,11 @@ const GEMINI_FAILOVER_BUDGET_MS = Number.isFinite(parsedFailoverBudget) && parse
   : 12000;
 
 function enhancedSystemPrompt(isFirstMessage) {
-  return `${buildSystemPrompt({ isFirstMessage })}\n\nSTRUCTURED CONCERN-TO-TREATMENT KNOWLEDGE:\nUse these mappings as general front-desk guidance, never as a diagnosis or guarantee. If more than one service is mapped, explain why the categories differ and let a clinician decide suitability.\n${concernGuidanceForPrompt()}\n\nDETERMINISTIC BOOKING RULES:\n${bookingRulesForPrompt()}`;
+  const basePrompt = buildSystemPrompt({ isFirstMessage });
+  if (clinic.industryKey === "renovation") {
+    return `${basePrompt}\n\nSTRUCTURED RENOVATION SALES KNOWLEDGE:\nUse these mappings only as business sales guidance. Never invent an exact quotation, site condition, material suitability, availability, structural conclusion, electrical/plumbing conclusion or guarantee. When site-specific judgement is required, hand the enquiry to staff.\n${concernGuidanceForPrompt()}\n\nDETERMINISTIC RENOVATION HANDOFF RULES:\n${bookingRulesForPrompt()}`;
+  }
+  return `${basePrompt}\n\nSTRUCTURED CONCERN-TO-TREATMENT KNOWLEDGE:\nUse these mappings as general front-desk guidance, never as a diagnosis or guarantee. If more than one service is mapped, explain why the categories differ and let a clinician decide suitability.\n${concernGuidanceForPrompt()}\n\nDETERMINISTIC BOOKING RULES:\n${bookingRulesForPrompt()}`;
 }
 
 function getFallbackReply(messages) {
