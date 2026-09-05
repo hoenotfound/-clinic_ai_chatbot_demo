@@ -10,6 +10,7 @@ const config = require("../src/clinicConfig");
 const { buildSystemPrompt } = require("../src/systemPrompt");
 const ai = require("../src/aiService");
 const state = require("../src/demoState");
+const { detectBudget } = require("../src/renovationLeadState");
 
 test("renovation mode swaps the public business configuration without changing clinic default code", () => {
   assert.equal(config.industryKey, "renovation");
@@ -55,6 +56,10 @@ test("existing session lead detection recognizes renovation services", () => {
   state.addCustomerMessage(session, "I want kitchen cabinet, how much?");
   assert.ok(session.lead.interests.includes("Kitchen Cabinets"));
   assert.equal(session.lead.temperature, "warm");
+});
+
+test("budget extraction ignores nearby cabinet measurements", () => {
+  assert.equal(detectBudget("Kitchen cabinet around 12ft. Budget RM10k."), "RM10,000");
 });
 
 test("live renovation lead remembers project, property, area and budget", () => {
