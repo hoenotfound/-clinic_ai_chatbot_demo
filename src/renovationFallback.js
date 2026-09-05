@@ -1,19 +1,26 @@
 const renovation = require("./renovationConfig");
 
-const HUMAN_PATTERN = /human|person|staff|designer|sales(?:person)?|contractor|project manager|speak to someone|talk to someone|真人|人工|设计师|設計師|顾问|顧問|orang|staff|designer/i;
+const HUMAN_REQUEST_PATTERN = /(?:speak|talk|chat|connect)\s+(?:me\s+)?(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:can|could)\s+i\s+(?:speak|talk)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:need|want)\s+(?:a\s+)?(?:human|designer|salesperson|project manager)|human\s+(?:please|pls)|真人|人工|转人工|轉人工|找设计师|找設計師|联系顾问|聯繫顧問|nak\s+cakap\s+dengan\s+(?:staff|designer|sales)|mahu\s+cakap\s+dengan\s+(?:staff|designer|sales)/i;
 const SITE_VISIT_PATTERN = /site\s*(?:visit|measurement|measure)|come\s+(?:and\s+)?measure|come\s+measure|measure\s+(?:my|the)\s+(?:house|home|unit|place)|arrange\s+(?:a\s+)?measurement|quotation\s+appointment|home\s+visit|上门量尺|上門量尺|量尺|现场测量|現場測量|datang\s+ukur|site\s+measurement|ukur\s+rumah/i;
-const TECHNICAL_PATTERN = /load[- ]?bearing|structural|hack(?:ing)?\s+(?:wall|beam|column)|electrical|rewir(?:e|ing)|plumb(?:ing)?|waterproof(?:ing)?|gas\s+(?:pipe|line)|permit|authority|approval|承重墙|承重牆|敲墙|敲牆|电线|電線|水管|防水|permit|kelulusan|struktur|pendawaian|paip/i;
-const COMPLAINT_PATTERN = /complaint|refund|defect|damage|poor workmanship|wrong colour|wrong color|not happy|very disappointed|投诉|投訴|退款|瑕疵|做坏|做壞|rosak|aduan|refund/i;
+const TECHNICAL_PATTERN = /load[- ]?bearing|structural|hack(?:ing)?\s+(?:wall|beam|column)|electrical|rewir(?:e|ing)|plumb(?:ing)?|waterproof(?:ing)?|gas\s+(?:pipe|line)|permit|authority|approval|承重墙|承重牆|敲墙|敲牆|电线|電線|水管|防水|kelulusan|struktur|pendawaian|paip/i;
+const COMPLAINT_PATTERN = /complaint|refund|defect|damage|poor workmanship|wrong colour|wrong color|not happy|very disappointed|投诉|投訴|退款|瑕疵|做坏|做壞|rosak|aduan/i;
 const PRICE_PATTERN = /price|how much|cost|quotation|quote|budget|harga|berapa|kos|sebut harga|多少钱|多少錢|价格|價格|价钱|價錢|报价|報價|预算|預算/i;
 
+function userTexts(messages) {
+  return (messages || []).filter((message) => message.role === "user").map((message) => String(message.content || "").trim()).filter(Boolean);
+}
+
 function latestUserText(messages) {
-  const latest = [...(messages || [])].reverse().find((message) => message.role === "user");
-  return String(latest?.content || "").trim();
+  return userTexts(messages).at(-1) || "";
+}
+
+function conversationText(messages) {
+  return userTexts(messages).join(" \n");
 }
 
 function languageOf(text) {
   if (/[一-鿿]/.test(text)) return "zh";
-  if (/\b(?:saya|nak|mahu|boleh|berapa|harga|rumah|kabinet|dapur|ukur|bajet|bajet|baru dapat kunci)\b/i.test(text)) return "ms";
+  if (/\b(?:saya|nak|mahu|boleh|berapa|harga|rumah|kabinet|dapur|ukur|bajet|baru dapat kunci)\b/i.test(text)) return "ms";
   return "en";
 }
 
@@ -24,36 +31,68 @@ function detectService(text) {
   ) || null;
 }
 
+function detectKnownService(messages) {
+  const texts = userTexts(messages);
+  for (let index = texts.length - 1; index >= 0; index -= 1) {
+    const service = detectService(texts[index]);
+    if (service) return service;
+  }
+  return null;
+}
+
+function hasPropertyType(text) {
+  return /condo|minium|apartment|service\s+residence|flat|landed|terrace|semi[- ]?d|bungalow|commercial|office|shop|retail|公寓|排屋|独立屋|獨立屋|rumah\s+landed/i.test(String(text || ""));
+}
+
+function hasArea(text) {
+  return /puchong|cheras|kajang|petaling\s+jaya|\bpj\b|subang|shah\s+alam|kuala\s+lumpur|\bkl\b|mont\s+kiara|bukit\s+jalil|setapak|old\s+klang\s+road|蒲种|蒲種|蕉赖|蕉賴|加影|八打灵再也|八打靈再也|吉隆坡/i.test(String(text || ""));
+}
+
 function handoffReply(language, reason = "quote") {
   if (language === "zh") {
     if (reason === "technical") return "这个需要团队看实际现场后才能给准确意见，我不应该在聊天里猜。让我转给团队继续帮你。 [[HANDOFF]]";
     if (reason === "complaint") return "明白，这种情况需要由团队直接跟进会比较合适。我帮你转给他们处理。 [[HANDOFF]]";
+    if (reason === "human") return "可以，我帮你转给装修团队，让设计或销售人员直接继续跟你聊。 [[HANDOFF]]";
     return "可以，我帮你把这个询问转给装修团队，让他们继续跟进实际报价或量尺安排。 [[HANDOFF]]";
   }
   if (language === "ms") {
     if (reason === "technical") return "Yang ini team perlu tengok keadaan site sebenar dulu, jadi saya tak patut agak dari chat. Saya pass kepada team untuk sambung dengan anda. [[HANDOFF]]";
     if (reason === "complaint") return "Faham. Untuk isu macam ini lebih baik team sendiri follow up terus. Saya pass conversation ini kepada mereka. [[HANDOFF]]";
+    if (reason === "human") return "Boleh. Saya pass kepada team renovation supaya designer atau sales boleh sambung terus dengan anda. [[HANDOFF]]";
     return "Boleh. Saya pass kepada team renovation untuk sambung quotation atau arrangement site measurement sebenar dengan anda. [[HANDOFF]]";
   }
   if (reason === "technical") return "That needs the team to check the actual site, so I shouldn't guess from chat. I'll pass this to them for proper advice. [[HANDOFF]]";
   if (reason === "complaint") return "Understood. This is better handled directly by the team, so I'll pass the conversation to them. [[HANDOFF]]";
+  if (reason === "human") return "Sure. I'll pass this to the renovation team so a designer or salesperson can continue with you directly. [[HANDOFF]]";
   return "Sure. I'll pass this to the renovation team so they can continue with the actual quotation or site-measurement arrangement. [[HANDOFF]]";
 }
 
-function servicePriceReply(service, language) {
-  if (language === "zh") {
-    return `${service.name} 的示范价格是 ${service.priceRange}。最后报价会看实际尺寸、材料、五金和设计细节。你的房子是 condo 还是 landed？`;
-  }
-  if (language === "ms") {
-    return `${service.name} dalam demo ini ${service.priceRange}. Harga akhir bergantung pada ukuran, material, hardware dan design. Ini untuk condo atau landed house?`;
-  }
-  return `${service.name} ${service.priceRange}. The final quote depends on actual measurements, materials, hardware and design details. Is this for a condo or landed house?`;
+function servicePriceReply(service, language, contextText) {
+  const nextQuestion = hasPropertyType(contextText)
+    ? hasArea(contextText)
+      ? null
+      : language === "zh" ? "项目在哪个地区？" : language === "ms" ? "Project ini area mana?" : "Which area is the project in?"
+    : language === "zh" ? "你的房子是 condo 还是 landed？" : language === "ms" ? "Ini untuk condo atau landed house?" : "Is this for a condo or landed house?";
+
+  if (language === "zh") return `${service.name} 的示范价格是 ${service.priceRange}。最后报价会看实际尺寸、材料、五金和设计细节。${nextQuestion || "如果你有大概尺寸或 floor plan，也可以告诉我。"}`;
+  if (language === "ms") return `${service.name} dalam demo ini ${service.priceRange}. Harga akhir bergantung pada ukuran, material, hardware dan design. ${nextQuestion || "Kalau ada rough measurement atau floor plan, boleh share detail itu juga."}`;
+  return `${service.name} ${service.priceRange}. The final quote depends on actual measurements, materials, hardware and design details. ${nextQuestion || "If you have rough measurements or a floor plan, that would be the next useful detail."}`;
 }
 
-function genericServiceReply(service, language) {
-  if (language === "zh") return `可以，${service.name} 是这个示范装修公司的项目之一。你现在是新屋、subsale，还是已经住着的单位？`;
-  if (language === "ms") return `Boleh, ${service.name} memang termasuk dalam servis demo ini. Rumah anda unit baru, subsale atau dah duduk?`;
-  return `Yes, ${service.name} is one of the configured services here. Is the property a new unit, subsale, or an existing home?`;
+function genericServiceReply(service, language, contextText) {
+  if (!hasPropertyType(contextText)) {
+    if (language === "zh") return `可以，${service.name} 是这个示范装修公司的项目之一。你的房子是 condo、landed 还是 commercial？`;
+    if (language === "ms") return `Boleh, ${service.name} memang termasuk dalam servis demo ini. Property anda condo, landed atau commercial?`;
+    return `Yes, ${service.name} is one of the configured services here. Is the property a condo, landed home, or commercial unit?`;
+  }
+  if (!hasArea(contextText)) {
+    if (language === "zh") return `可以做 ${service.name}。项目在哪个地区？`;
+    if (language === "ms") return `Boleh buat ${service.name}. Project ini area mana?`;
+    return `Yes, ${service.name} is within the carpentry scope. Which area is the project in?`;
+  }
+  if (language === "zh") return `可以做 ${service.name}。如果有大概尺寸或 floor plan，可以告诉我，我会继续帮你整理报价需要的资料。`;
+  if (language === "ms") return `Boleh buat ${service.name}. Kalau ada rough measurement atau floor plan, bagi saya detail itu dan saya boleh bantu susun maklumat untuk quotation.`;
+  return `Yes, ${service.name} is within the carpentry scope. If you have rough measurements or a floor plan, that's the next useful detail for quotation planning.`;
 }
 
 function genericReply(language) {
@@ -64,16 +103,18 @@ function genericReply(language) {
 
 function buildFallbackReply(messages) {
   const text = latestUserText(messages);
-  const language = languageOf(text);
+  const contextText = conversationText(messages);
+  const language = languageOf(text || contextText);
 
   if (!text) return genericReply(language);
   if (COMPLAINT_PATTERN.test(text)) return handoffReply(language, "complaint");
   if (TECHNICAL_PATTERN.test(text)) return handoffReply(language, "technical");
-  if (HUMAN_PATTERN.test(text) || SITE_VISIT_PATTERN.test(text)) return handoffReply(language, "quote");
+  if (SITE_VISIT_PATTERN.test(text)) return handoffReply(language, "quote");
+  if (HUMAN_REQUEST_PATTERN.test(text)) return handoffReply(language, "human");
 
-  const service = detectService(text);
-  if (service && PRICE_PATTERN.test(text)) return servicePriceReply(service, language);
-  if (service) return genericServiceReply(service, language);
+  const service = detectService(text) || detectKnownService(messages);
+  if (service && PRICE_PATTERN.test(text)) return servicePriceReply(service, language, contextText);
+  if (detectService(text)) return genericServiceReply(service, language, contextText);
 
   if (PRICE_PATTERN.test(text)) {
     if (language === "zh") return "可以先给你价格方向，不过木工最后报价需要看项目、尺寸和材料。你主要想做哪一个区域？";
