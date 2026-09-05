@@ -10,6 +10,15 @@
     return `${basePath}${value}`;
   }
 
+  function loadIndustrySwitcherStyles() {
+    if (document.querySelector('link[data-industry-switcher="true"]')) return;
+    const stylesheet = document.createElement("link");
+    stylesheet.rel = "stylesheet";
+    stylesheet.href = withBase("/industry-switcher.css");
+    stylesheet.dataset.industrySwitcher = "true";
+    document.head.appendChild(stylesheet);
+  }
+
   function loadIndustryExperience() {
     if (document.querySelector('script[data-industry-experience="true"]')) return;
     const script = document.createElement("script");
@@ -21,6 +30,7 @@
 
   window.clinicDemoBasePath = basePath;
   window.clinicDemoUrl = withBase;
+  loadIndustrySwitcherStyles();
 
   if (!basePath) {
     loadIndustryExperience();
