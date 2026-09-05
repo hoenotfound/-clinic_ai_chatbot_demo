@@ -3,7 +3,8 @@ const renovation = require("./renovationConfig");
 const PRICE_PATTERN = /price|how much|cost|quotation|quote|budget|harga|berapa|kos|sebut harga|多少钱|多少錢|价格|價格|价钱|價錢|报价|報價|预算|預算/i;
 const SITE_PATTERN = /site\s*(?:visit|measurement|measure)|come\s+(?:and\s+)?measure|come\s+measure|arrange\s+(?:a\s+)?measurement|home\s+visit|datang\s+ukur|ukur\s+rumah|上门量尺|上門量尺|现场测量|現場測量|量尺/i;
 const QUOTE_INTENT_PATTERN = /exact\s+(?:price|quote|quotation)|proper\s+(?:quote|quotation)|send\s+(?:me\s+)?(?:a\s+)?quote|prepare\s+(?:a\s+)?quotation|can\s+(?:you\s+)?quote|nak\s+quotation|mahu\s+quotation|buat\s+quotation|正式报价|正式報價|给我报价|給我報價|出报价|出報價/i;
-const HUMAN_PATTERN = /speak\s+to\s+(?:a\s+)?(?:human|staff|designer|sales|contractor)|talk\s+to\s+(?:a\s+)?(?:human|staff|designer|sales|contractor)|human\s+(?:please|pls)|designer|project manager|salesperson|真人|人工|设计师|設計師|顾问|顧問|staff|orang/i;
+const HUMAN_REQUEST_PATTERN = /(?:speak|talk|chat|connect)\s+(?:me\s+)?(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:can|could)\s+i\s+(?:speak|talk)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:need|want)\s+(?:a\s+)?(?:human|designer|salesperson|project manager)|human\s+(?:please|pls)|真人|人工|转人工|轉人工|找设计师|找設計師|联系顾问|聯繫顧問|nak\s+cakap\s+dengan\s+(?:staff|designer|sales)|mahu\s+cakap\s+dengan\s+(?:staff|designer|sales)/i;
+const TECHNICAL_PATTERN = /load[- ]?bearing|structural|hack(?:ing)?\s+(?:wall|beam|column)|electrical|rewir(?:e|ing)|plumb(?:ing)?|waterproof(?:ing)?|gas\s+(?:pipe|line)|permit|authority|approval|承重墙|承重牆|敲墙|敲牆|电线|電線|水管|防水|kelulusan|struktur|pendawaian|paip/i;
 const NEGATIVE_PATTERN = /not interested|no longer interested|never ?mind|don['’]t want|do not want|cancel|no thanks|tak berminat|tidak berminat|tak nak|tidak mahu|tak jadi|tidak jadi|batal|不要了|不想做|没兴趣|沒興趣|算了|取消/i;
 const MEASUREMENT_PATTERN = /\b\d+(?:\.\d+)?\s*(?:ft|feet|foot|mm|cm|m|meter|metre)s?\b|floor\s*plan|layout\s*plan|尺寸|尺|平面图|平面圖|ukuran|pelan/i;
 const TIMELINE_PATTERN = /move\s*in|moving|collect(?:ed|ing)?\s+keys?|get(?:ting)?\s+keys?|handover|complete\s+by|finish\s+by|next\s+(?:week|month)|this\s+(?:week|month)|within\s+\d+\s+(?:week|weeks|month|months)|baru\s+dapat\s+kunci|dapat\s+kunci|nak\s+siap|pindah|拿钥匙|拿鑰匙|交房|入住|搬家|完工/i;
@@ -38,16 +39,21 @@ function detectPropertyType(text) {
   const value = String(text || "");
   if (/landed|terrace|semi[- ]?d|bungalow|link\s+house|rumah\s+landed|排屋|双层|雙層|独立屋|獨立屋/i.test(value)) return "Landed house";
   if (/commercial|office|shop|retail|办公|辦公|店面|pejabat|kedai/i.test(value)) return "Commercial / office";
+  if (/condo|minium|apartment|service\s+residence|flat|公寓|condominium/i.test(value)) return "Condo / apartment";
+  return null;
+}
+
+function detectPropertyStatus(text) {
+  const value = String(text || "");
   if (/subsale|existing\s+home|existing\s+unit|old\s+house|rumah\s+lama|二手房|旧屋|舊屋/i.test(value)) return "Subsale / existing home";
   if (/new\s+(?:condo|unit|project|home|house)|newly\s+completed|just\s+(?:got|collected)\s+keys|baru\s+dapat\s+kunci|新房|新屋|新公寓/i.test(value)) return "New project";
-  if (/condo|minium|apartment|service\s+residence|flat|公寓|condominium/i.test(value)) return "Condo / apartment";
   return null;
 }
 
 function detectArea(text) {
   const value = String(text || "");
   if (/puchong|cheras|kajang|蒲种|蒲種|蕉赖|蕉賴|加影/i.test(value)) return "Cheras / Kajang / Puchong";
-  if (/petaling\s+jaya|\bpj\b|subang|shah\s+alam|八打灵再也|八打靈再也|梳邦|莎阿南/i.test(value)) return "Petaling Jaya / Subang / Shah Alam";
+  if (/petaling\s+jaya|\bpj\b|subang|shah\s+alam|ara\s+damansara|damansara|八打灵再也|八打靈再也|梳邦|莎阿南/i.test(value)) return "Petaling Jaya / Subang / Shah Alam";
   if (/kuala\s+lumpur|\bkl\b|mont\s+kiara|bukit\s+bintang|bukit\s+jalil|setapak|old\s+klang\s+road|吉隆坡/i.test(value)) return "Kuala Lumpur";
   return null;
 }
@@ -71,16 +77,19 @@ function hasRenewedInterest(messages, negativeIndex) {
   });
 }
 
-function buildSummary({ services, bookingIntent, area, propertyType, budget, measurementsKnown, timing, negative }) {
+function buildSummary({ services, siteMeasurementIntent, quotationIntent, humanRequest, area, propertyType, propertyStatus, budget, measurementsKnown, timing, negative }) {
   if (negative) return "The customer has paused or declined the renovation enquiry for now.";
   const parts = [];
   if (services.length) parts.push(`Interested in ${services.join(" and ")}`);
   if (propertyType) parts.push(propertyType.toLowerCase());
+  if (propertyStatus) parts.push(propertyStatus.toLowerCase());
   if (area) parts.push(`project area: ${area}`);
   if (budget) parts.push(`budget around ${budget}`);
   if (measurementsKnown) parts.push("measurements/floor-plan context provided");
   if (timing) parts.push(`timing preference: ${timing}`);
-  if (bookingIntent) parts.push("wants a proper quotation or site measurement and is ready for staff follow-up");
+  if (siteMeasurementIntent) parts.push("requested site measurement");
+  else if (quotationIntent) parts.push("requested a proper quotation");
+  else if (humanRequest) parts.push("asked to speak with the renovation team");
   if (!parts.length) return "Early-stage renovation enquiry. No specific carpentry scope or quotation intent detected yet.";
   return `${parts.join("; ")}.`;
 }
@@ -105,10 +114,15 @@ function updateRenovationLead(session) {
   const activeServices = detectServices(activeText);
   const services = activeServices.length ? activeServices : Array.from(historical);
 
-  const bookingIntent = !negative && (SITE_PATTERN.test(activeText) || QUOTE_INTENT_PATTERN.test(activeText) || HUMAN_PATTERN.test(activeText));
+  const siteMeasurementIntent = !negative && SITE_PATTERN.test(activeText);
+  const quotationIntent = !negative && QUOTE_INTENT_PATTERN.test(activeText);
+  const humanRequest = !negative && HUMAN_REQUEST_PATTERN.test(activeText);
+  const technicalHandoff = !negative && TECHNICAL_PATTERN.test(activeText);
+  const bookingIntent = siteMeasurementIntent || quotationIntent;
   const askedPrice = !negative && PRICE_PATTERN.test(activeText);
   const budget = !negative ? detectBudget(activeText) || session.lead?.budget || null : session.lead?.budget || null;
   const propertyType = !negative ? detectPropertyType(activeText) || session.lead?.propertyType || null : session.lead?.propertyType || null;
+  const propertyStatus = !negative ? detectPropertyStatus(activeText) || session.lead?.propertyStatus || null : session.lead?.propertyStatus || null;
   const area = !negative ? detectArea(activeText) || session.lead?.preferredBranch || null : session.lead?.preferredBranch || null;
   const measurementsKnown = !negative && (MEASUREMENT_PATTERN.test(activeText) || Boolean(session.lead?.measurementsKnown));
   const timelineMentioned = !negative && (TIMELINE_PATTERN.test(activeText) || Boolean(session.lead?.timelineMentioned));
@@ -122,12 +136,16 @@ function updateRenovationLead(session) {
   if (budget) score += 2;
   if (area) score += 1;
   if (propertyType) score += 1;
+  if (propertyStatus) score += 1;
   if (measurementsKnown) score += 2;
   if (timelineMentioned) score += 1;
-  if (bookingIntent) score += 5;
+  if (siteMeasurementIntent) score += 5;
+  if (quotationIntent) score += 4;
+  if (humanRequest) score += 2;
   if (negative) score = 0;
 
-  const temperature = bookingIntent || score >= 8 ? "hot" : score >= 3 ? "warm" : "cold";
+  const highIntent = bookingIntent || (humanRequest && Boolean(services.length || budget || area));
+  const temperature = highIntent || score >= 8 ? "hot" : score >= 3 ? "warm" : "cold";
   session.lead = {
     ...session.lead,
     temperature,
@@ -138,13 +156,24 @@ function updateRenovationLead(session) {
     preferredTiming: timing,
     preferredBranch: area,
     propertyType,
+    propertyStatus,
     budget,
     measurementsKnown,
     timelineMentioned,
-    quotationIntent: bookingIntent,
-    summary: buildSummary({ services, bookingIntent, area, propertyType, budget, measurementsKnown, timing, negative }),
+    siteMeasurementIntent,
+    quotationIntent,
+    humanRequest,
+    technicalHandoff,
+    summary: buildSummary({ services, siteMeasurementIntent, quotationIntent, humanRequest, area, propertyType, propertyStatus, budget, measurementsKnown, timing, negative }),
   };
   return session.lead;
 }
 
-module.exports = { updateRenovationLead, detectServices, detectArea, detectPropertyType, detectBudget };
+module.exports = {
+  updateRenovationLead,
+  detectServices,
+  detectArea,
+  detectPropertyType,
+  detectPropertyStatus,
+  detectBudget,
+};
