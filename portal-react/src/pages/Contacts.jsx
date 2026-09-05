@@ -1,11 +1,20 @@
 import { useMemo, useState } from "react";
 import ContactAvatar from "../components/ContactAvatar";
 import { SAMPLE_LEADS } from "../demoData";
+import { industryProfile, isRenovationDemo } from "../config/industryProfile";
+
+function normalizedLocation(contact) {
+  if (!isRenovationDemo) return contact.branch;
+  const text = `${contact.branch || ""} ${contact.summary || ""}`;
+  if (/puchong|cheras|kajang/i.test(text)) return "Cheras / Kajang / Puchong";
+  if (/petaling jaya|\bpj\b|subang|shah alam|ara damansara|damansara/i.test(text)) return "Petaling Jaya / Subang / Shah Alam";
+  return "Kuala Lumpur";
+}
 
 export default function Contacts() {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(null);
-  const contacts = useMemo(() => SAMPLE_LEADS.filter((lead) => [lead.name, lead.phone, lead.treatment, lead.summary].join(" ").toLowerCase().includes(query.trim().toLowerCase())), [query]);
+  const contacts = useMemo(() => SAMPLE_LEADS.filter((lead) => [lead.name, lead.phone, lead.treatment, normalizedLocation(lead), lead.summary].join(" ").toLowerCase().includes(query.trim().toLowerCase())), [query]);
   const selected = SAMPLE_LEADS.find((lead) => lead.id === selectedId);
 
   return (
@@ -16,7 +25,7 @@ export default function Contacts() {
             <div><h1 className="font-display text-lg font-bold">Contacts</h1><p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{contacts.length} contacts · sample demo data</p></div>
             <button disabled title="Available in production" className="inline-flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3 py-2 text-xs font-medium text-white opacity-60">+ Add · Production</button>
           </div>
-          <input className="mt-3 w-full rounded-xl border border-[var(--color-border)] bg-white px-3.5 py-2.5 text-xs leading-relaxed outline-none focus:ring-2 focus:ring-[var(--color-primary)]" placeholder="Search by name, number or social ID…" value={query} onChange={(event) => setQuery(event.target.value)} />
+          <input className="mt-3 w-full rounded-xl border border-[var(--color-border)] bg-white px-3.5 py-2.5 text-xs leading-relaxed outline-none focus:ring-2 focus:ring-[var(--color-primary)]" placeholder="Search by name, number, social ID or project…" value={query} onChange={(event) => setQuery(event.target.value)} />
         </div>
         {contacts.map((contact) => (
           <button key={contact.id} onClick={() => setSelectedId(contact.id)} className={`relative w-full border-b border-[var(--color-border)] px-4 py-3.5 text-left transition sm:px-5 ${contact.id === selectedId ? "bg-[var(--color-primary-light)]" : contact.attention ? "bg-[var(--color-danger-light)]" : "hover:bg-[var(--color-bg)]"}`}>
@@ -40,6 +49,8 @@ function Profile({ contact, back }) {
     setNote("");
   }
 
+  const location = normalizedLocation(contact);
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
       <button onClick={back} className="mb-4 rounded-lg px-2 py-1 text-xs font-semibold text-[var(--color-primary)] md:hidden">← Back to contacts</button>
@@ -47,7 +58,10 @@ function Profile({ contact, back }) {
         <div className="flex items-center gap-4"><ContactAvatar channel={contact.channel} size={64} /><div><h1 className="font-display text-2xl font-bold">{contact.name}</h1><p className="mt-1 text-sm text-[var(--color-text-muted)]">{contact.phone}</p><div className="mt-2 flex gap-2"><span className="rounded-full bg-[var(--color-primary-light)] px-2 py-1 text-[9px] font-semibold text-[var(--color-primary)]">{contact.channel}</span><span className="rounded-full bg-[var(--color-accent-light)] px-2 py-1 text-[9px] font-semibold">{contact.language}</span></div></div></div>
         <button disabled title="Available in production" className="cursor-not-allowed rounded-xl border border-[var(--color-border)] bg-white px-4 py-2 text-xs font-semibold text-[var(--color-text-muted)] opacity-60">Edit contact · Production</button>
       </div>
-      <div className="mt-6 grid gap-4 lg:grid-cols-2"><section className="rounded-2xl border border-[var(--color-border)] bg-white p-5 shadow-sm"><h2 className="font-display text-sm font-bold">Contact details</h2><Facts rows={[["Treatment", contact.treatment], ["Branch", contact.branch], ["Timing", contact.timing], ["Source", contact.source], ["Owner", contact.owner], ["Language", contact.language]]} /></section><section className="rounded-2xl border border-[var(--color-border)] bg-white p-5 shadow-sm"><h2 className="font-display text-sm font-bold">AI insights</h2><div className="mt-4"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${contact.temperature === "hot" ? "bg-[var(--color-danger-light)] text-[var(--color-danger)]" : contact.temperature === "warm" ? "bg-[var(--color-accent-light)] text-[#8a641f]" : "bg-slate-100 text-slate-600"}`}>{contact.temperature}</span><p className="mt-4 text-sm leading-6">{contact.summary}</p></div></section></div>
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <section className="rounded-2xl border border-[var(--color-border)] bg-white p-5 shadow-sm"><h2 className="font-display text-sm font-bold">Contact details</h2><Facts rows={[[industryProfile.terms.service, contact.treatment], [industryProfile.terms.location, location], [industryProfile.terms.timing, contact.timing], ["Source", contact.source], ["Owner", contact.owner], ["Language", contact.language]]} /></section>
+        <section className="rounded-2xl border border-[var(--color-border)] bg-white p-5 shadow-sm"><h2 className="font-display text-sm font-bold">AI insights</h2><div className="mt-4"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${contact.temperature === "hot" ? "bg-[var(--color-danger-light)] text-[var(--color-danger)]" : contact.temperature === "warm" ? "bg-[var(--color-accent-light)] text-[#8a641f]" : "bg-slate-100 text-slate-600"}`}>{contact.temperature}</span><p className="mt-4 text-sm leading-6">{contact.summary}</p></div></section>
+      </div>
       <section className="mt-4 rounded-2xl border border-[var(--color-border)] bg-white p-5 shadow-sm">
         <div className="flex justify-between"><h2 className="font-display text-sm font-bold">Notes</h2><span className="text-[10px] text-[var(--color-text-muted)]">Demo workspace · local only</span></div>
         <textarea placeholder="Add an internal note…" rows="3" value={note} onChange={(event) => setNote(event.target.value)} className="mt-4 w-full resize-none rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3 text-sm outline-none focus:border-[var(--color-primary)]" />
