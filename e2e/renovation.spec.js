@@ -18,7 +18,12 @@ async function sendCustomerMessage(page, message) {
   await expect(input).toBeEnabled();
 }
 
-test("renovation profile stays industry-specific across customer view and dashboard", async ({ page }) => {
+async function openDashboardPage(frame, name, heading = name) {
+  await frame.getByRole("link", { name, exact: true }).click();
+  await expect(frame.getByRole("heading", { name: heading, exact: true }).first()).toBeVisible();
+}
+
+test("renovation profile stays industry-specific across customer view and the complete dashboard", async ({ page }) => {
   test.skip(process.env.DEMO_INDUSTRY !== "renovation", "Renovation profile only");
   const browserErrors = collectBrowserErrors(page);
   await page.goto("/");
@@ -49,27 +54,24 @@ test("renovation profile stays industry-specific across customer view and dashbo
   const frame = page.frameLocator("#reactDashboardFrame");
   await expect(frame.getByRole("heading", { name: "Inbox", exact: true })).toBeVisible();
 
-  // Industry presentation copy must never rewrite customer-authored text.
+  // Customer-authored text must stay literal even when it contains a clinic word.
   await expect(frame.getByText(literalCustomerMessage, { exact: true }).first()).toBeVisible();
   await expect(frame.getByText("Kitchen Cabinets Demo Campaign", { exact: true }).first()).toBeVisible();
 
-  await frame.getByRole("link", { name: "Pipeline" }).click();
-  await expect(frame.getByRole("heading", { name: "Lead Pipeline" })).toBeVisible();
+  await openDashboardPage(frame, "Pipeline", "Lead Pipeline");
   await expect(frame.getByText("Cheras / Kajang / Puchong", { exact: true }).first()).toBeVisible();
 
   const liveLead = frame.getByRole("button", { name: /Demo Customer/ }).first();
   await expect(liveLead).toBeVisible();
   await liveLead.click();
   await expect(frame.getByText("RM 10,000", { exact: true }).first()).toBeVisible();
+  await expect(frame.getByText("Project", { exact: true }).first()).toBeVisible();
+  await expect(frame.getByText("Area", { exact: true }).first()).toBeVisible();
   const closeDrawer = frame.getByRole("button", { name: "Close lead drawer" });
-  // The dashboard runs inside an iframe that can be below the top-level viewport.
-  // Dispatching the DOM click here avoids treating top-level scroll geometry as
-  // a product failure while still exercising the real React close handler.
   await closeDrawer.evaluate((button) => button.click());
   await expect(closeDrawer).toHaveCount(0);
 
-  await frame.getByRole("link", { name: "Analytics" }).click();
-  await expect(frame.getByRole("heading", { name: "Analytics" })).toBeVisible();
+  await openDashboardPage(frame, "Analytics");
   await frame.getByRole("button", { name: "Filters", exact: true }).click();
 
   const projectSelect = frame.locator("label").filter({ hasText: /^Project/ }).locator("select");
@@ -82,8 +84,34 @@ test("renovation profile stays industry-specific across customer view and dashbo
   await expect(ownerSelect.locator('option[value="Aina"]')).toHaveText("Aina");
 
   const areaSelect = frame.locator("label").filter({ hasText: /^Area/ }).locator("select");
-  await expect(areaSelect.locator('option[value="Kuala Lumpur"]')).toHaveText("KL / Cheras / Kajang");
-  await expect(areaSelect.locator('option[value="Petaling Jaya"]')).toHaveText("PJ / Subang / Puchong / Shah Alam");
+  await expect(areaSelect.locator('option[value="Kuala Lumpur"]')).toHaveText("Kuala Lumpur");
+  await expect(areaSelect.locator('option[value="Petaling Jaya / Subang / Shah Alam"]')).toHaveText("PJ / Subang / Shah Alam");
+  await expect(areaSelect.locator('option[value="Cheras / Kajang / Puchong"]')).toHaveText("Cheras / Kajang / Puchong");
+  await expect(frame.getByText("Site Measurements", { exact: true }).first()).toBeVisible();
+  await expect(frame.getByText("Quotations / Design", { exact: true }).first()).toBeVisible();
+
+  await openDashboardPage(frame, "Tools");
+  await expect(frame.getByText("Nur Izzati · Built-in Wardrobes", { exact: true })).toBeVisible();
+  await expect(frame.getByText("Customer chat preview", { exact: true })).toBeVisible();
+  await expect(frame.getByText("Site-measurement reminders", { exact: true })).toBeVisible();
+  await expect(frame.locator("body")).not.toContainText("Pico Laser");
+  await expect(frame.locator("body")).not.toContainText("Patient chat preview");
+
+  await openDashboardPage(frame, "Settings");
+  await expect(frame.getByText("Renovation business profile", { exact: true })).toBeVisible();
+  await expect(frame.getByDisplayValue("Oakline Demo Renovation & Carpentry")).toBeVisible();
+  await expect(frame.getByDisplayValue("Aiden")).toBeVisible();
+  await expect(frame.getByText("Quotation & measurement intent", { exact: true })).toBeVisible();
+  await frame.getByRole("button", { name: "Promotions", exact: true }).click();
+  await expect(frame.getByText("No active demo promotion", { exact: true })).toBeVisible();
+  await expect(frame.locator("body")).not.toContainText("HIFU Demo Special");
+
+  await openDashboardPage(frame, "Team & Access");
+  await expect(frame.getByText("Amir", { exact: true }).first()).toBeVisible();
+  await expect(frame.getByText("Mei", { exact: true }).first()).toBeVisible();
+  await expect(frame.getByText("Aina", { exact: true }).first()).toBeVisible();
+  await expect(frame.locator("body")).not.toContainText("Sarah");
+  await expect(frame.locator("body")).not.toContainText("Mira");
 
   expect(browserErrors, `Browser errors: ${browserErrors.join("\n")}`).toEqual([]);
 });
