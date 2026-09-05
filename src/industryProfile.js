@@ -1,8 +1,11 @@
 const { publicExperienceFor } = require("./publicExperienceProfiles");
 
-const selected = String(process.env.DEMO_INDUSTRY || "clinic").trim().toLowerCase();
 const renovationAliases = new Set(["renovation", "home-renovation", "carpentry"]);
-const key = renovationAliases.has(selected) ? "renovation" : "clinic";
+
+function normalizeIndustryKey(value) {
+  const selected = String(value || "clinic").trim().toLowerCase();
+  return renovationAliases.has(selected) ? "renovation" : "clinic";
+}
 
 function clinicProfile() {
   const config = require("./clinicConfig");
@@ -16,6 +19,13 @@ function clinicProfile() {
   return {
     key: "clinic",
     config,
+    selector: {
+      label: "Aesthetic Clinic",
+      eyebrow: "APPOINTMENTS & TREATMENTS",
+      description: "Treatment enquiries, pricing, appointment intent, multilingual replies and human takeover.",
+      highlights: ["Treatment enquiries", "Appointment intent", "Patient handoff"],
+      icon: "clinic",
+    },
     labels: {
       customer: "Patient",
       service: "Treatment",
@@ -52,6 +62,13 @@ function renovationProfile() {
   return {
     key: "renovation",
     config,
+    selector: {
+      label: "Home Renovation & Carpentry",
+      eyebrow: "QUOTATIONS & SITE MEASUREMENT",
+      description: "Kitchen cabinets, wardrobes, renovation qualification, quotation intent and site-measurement handoff.",
+      highlights: ["Cabinet enquiries", "Quotation intent", "Site measurement"],
+      icon: "home",
+    },
     labels: {
       customer: "Customer",
       service: "Project",
@@ -89,15 +106,33 @@ function renovationProfile() {
   };
 }
 
-const active = key === "renovation" ? renovationProfile() : clinicProfile();
+const profileFactories = { clinic: clinicProfile, renovation: renovationProfile };
+const profileCache = new Map();
 
-// .env.example intentionally carries the clinic CTA for the default profile.
-// When another profile is selected and that untouched clinic default is still
-// present, promote it to the active profile's default while preserving any
-// genuinely custom CTA label supplied by the deployer.
+function getIndustryProfile(value = process.env.DEMO_INDUSTRY || "clinic") {
+  const key = normalizeIndustryKey(value);
+  if (!profileCache.has(key)) profileCache.set(key, profileFactories[key]());
+  return profileCache.get(key);
+}
+
+function listIndustryProfiles() {
+  return ["clinic", "renovation"].map((key) => {
+    const profile = getIndustryProfile(key);
+    return { key: profile.key, ...profile.selector };
+  });
+}
+
+const active = getIndustryProfile();
+
+// Keep the existing deployment-level CTA behaviour for backwards compatibility.
+// Runtime-selected profiles use their own default in server publicConfig().
 const configuredSalesCtaLabel = String(process.env.SALES_CTA_LABEL || "").trim();
 if (active.key !== "clinic" && configuredSalesCtaLabel === "Set up my clinic") {
   process.env.SALES_CTA_LABEL = active.salesCtaDefault;
 }
 
-module.exports = active;
+module.exports = Object.assign(active, {
+  normalizeIndustryKey,
+  getIndustryProfile,
+  listIndustryProfiles,
+});
