@@ -58,6 +58,10 @@
     return next;
   }
 
+  function setText(element, value) {
+    if (element && element.textContent !== value) element.textContent = value;
+  }
+
   function adaptText(root) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const nodes = [];
@@ -87,11 +91,9 @@
     chips.forEach((chip, index) => {
       const item = suggestions[index];
       if (!item) return;
-      chip.dataset.message = item.message;
-      const kind = chip.querySelector("span");
-      const strong = chip.querySelector("strong");
-      if (kind) kind.textContent = item.kind;
-      if (strong) strong.textContent = item.label;
+      if (chip.dataset.message !== item.message) chip.dataset.message = item.message;
+      setText(chip.querySelector("span"), item.kind);
+      setText(chip.querySelector("strong"), item.label);
     });
   }
 
@@ -106,18 +108,17 @@
     values.forEach((element, index) => {
       const row = rows[index];
       if (!row) return;
-      const small = element.querySelector("small");
-      const strong = element.querySelector("strong");
-      if (small) small.textContent = row[0];
-      if (strong) strong.textContent = row[1];
+      setText(element.querySelector("small"), row[0]);
+      setText(element.querySelector("strong"), row[1]);
     });
   }
 
   function configureBranding() {
     document.title = "AI Renovation Chatbot Demo | DA Smarketing";
     const description = document.querySelector('meta[name="description"]');
-    if (description) description.content = "Try DA Smarketing's live AI renovation and carpentry chatbot demo across WhatsApp, Instagram and Messenger, from first enquiry to quotation qualification and human takeover.";
-    document.querySelectorAll(".clinic-avatar, .empty-logo, .hero-product-avatar").forEach((element) => { element.textContent = "O"; });
+    const metaText = "Try DA Smarketing's live AI renovation and carpentry chatbot demo across WhatsApp, Instagram and Messenger, from first enquiry to quotation qualification and human takeover.";
+    if (description && description.content !== metaText) description.content = metaText;
+    document.querySelectorAll(".clinic-avatar, .empty-logo, .hero-product-avatar").forEach((element) => setText(element, "O"));
     configureSuggestions();
     configureCapturePreview();
     adaptText(document.body);
@@ -131,10 +132,16 @@
       if (!/Oakline Demo Renovation/i.test(String(config.clinicName || ""))) return;
       document.documentElement.dataset.demoIndustry = "renovation";
       configureBranding();
+      let queued = false;
       const observer = new MutationObserver(() => {
-        adaptText(document.body);
-        configureSuggestions();
-        configureCapturePreview();
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => {
+          queued = false;
+          adaptText(document.body);
+          configureSuggestions();
+          configureCapturePreview();
+        });
       });
       observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["aria-label", "title", "placeholder"] });
     } catch {}
