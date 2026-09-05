@@ -42,7 +42,7 @@ if (selectedIndustry === "renovation" || selectedIndustry === "home-renovation" 
     "- Once staff can continue, recap known project details and append [[HANDOFF]].",
   ].join("\n");
 
-  if (!process.env.SALES_CTA_LABEL) {
+  if (!process.env.SALES_CTA_LABEL || process.env.SALES_CTA_LABEL === "Set up my clinic") {
     process.env.SALES_CTA_LABEL = "Set up my renovation chatbot";
   }
 }
