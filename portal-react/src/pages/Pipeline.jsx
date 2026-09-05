@@ -4,6 +4,9 @@ import ContactAvatar from "../components/ContactAvatar";
 import { SAMPLE_LEADS, STAGES } from "../demoData";
 import { formatMoney } from "../components/pipeline/pipelineUtils";
 import { CloseIcon } from "../components/InboxIcons";
+import { isRenovationDemo } from "../config/demoIndustry";
+
+const DEMO_CAMPAIGN_NAME = isRenovationDemo ? "Demo Renovation Campaign" : "Demo Clinic Campaign";
 
 const CATEGORY_OPTIONS = [
   ["all", "All leads"],
@@ -20,6 +23,12 @@ const CATEGORY_OPTIONS = [
 
 function stageByKey(key) {
   return STAGES.find((stage) => stage.key === key) || STAGES[0];
+}
+
+function estimatedBudget(value) {
+  const match = String(value || "").replace(/,/g, "").match(/\d+(?:\.\d+)?/);
+  const numeric = match ? Number(match[0]) : 0;
+  return Number.isFinite(numeric) ? numeric : 0;
 }
 
 function mapLead(lead) {
@@ -39,7 +48,7 @@ function mapLead(lead) {
     treatment_interest: lead.treatment,
     estimated_value: lead.value,
     source: lead.source,
-    campaign_name: lead.source === "Meta Ads" ? "Demo Clinic Campaign" : null,
+    campaign_name: lead.source === "Meta Ads" ? DEMO_CAMPAIGN_NAME : null,
     appointment_status: lead.cancelled
       ? "cancelled"
       : lead.reschedule
@@ -115,10 +124,11 @@ export default function Pipeline() {
     const key = lead.bookingIntent ? "appointment" : lead.temperature === "hot" || lead.temperature === "warm" ? "interested" : "new";
     const stage = stageByKey(key);
     const last = live.messages?.at(-1);
+    const demoName = isRenovationDemo ? "Demo Customer" : "Demo Patient";
     return {
       id: 1,
-      name: "Demo Patient",
-      whatsapp_profile_name: "Demo Patient",
+      name: demoName,
+      whatsapp_profile_name: demoName,
       whatsapp_number: "Live browser visitor",
       channel: live.channel || "whatsapp",
       temperature: lead.temperature || "cold",
@@ -126,8 +136,8 @@ export default function Pipeline() {
       stage_type: key,
       branch_name: lead.preferredBranch || null,
       owner_username: live.mode === "human" ? "Demo Admin" : null,
-      treatment_interest: lead.interests?.[0] || "Treatment not selected",
-      estimated_value: lead.bookingIntent ? 1800 : 0,
+      treatment_interest: lead.interests?.[0] || (isRenovationDemo ? "Project not selected" : "Treatment not selected"),
+      estimated_value: isRenovationDemo ? estimatedBudget(lead.budget) : lead.bookingIntent ? 1800 : 0,
       source: "Live demo",
       campaign_name: null,
       appointment_status: lead.bookingIntent ? "requested" : "none",
@@ -144,7 +154,7 @@ export default function Pipeline() {
   }, [live]);
 
   const leads = useMemo(() => [liveLead, ...SAMPLE_LEADS.map(mapLead)].filter(Boolean), [liveLead]);
-  const branches = useMemo(() => ["Kuala Lumpur", "Petaling Jaya"], []);
+  const branches = useMemo(() => [...new Set(leads.map((lead) => lead.branch_name).filter(Boolean))], [leads]);
   const selected = leads.find((lead) => lead.id === selectedId) || null;
   const open = leads.filter((lead) => !lead.is_closed);
 
