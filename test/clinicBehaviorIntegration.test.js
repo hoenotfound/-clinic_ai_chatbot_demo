@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const ai = require("../src/aiService");
+const industryProfile = require("../src/industryProfile");
 const { buildConcernFallback } = require("../src/concernFallback");
 
 test("AI prompt includes structured concern mappings and deterministic opening days", () => {
@@ -26,12 +27,16 @@ test("concern fallback defers pregnancy and medication messages to safety handli
   assert.equal(buildConcernFallback([{ role: "user", content: "I'm on medication and have pigmentation" }]), null);
 });
 
-test("patient demo exposes acquisition presets and dashboard displays the selected source", () => {
+test("patient demo sources acquisition presets from the active industry profile", () => {
   const publicScript = fs.readFileSync(path.join(__dirname, "..", "public", "channel-experience.js"), "utf8");
   const dashboardBar = fs.readFileSync(path.join(__dirname, "..", "portal-react", "src", "components", "LiveAcquisitionBar.jsx"), "utf8");
-  assert.match(publicScript, /HIFU Facebook Ad/);
-  assert.match(publicScript, /HIFU Jawline Demo Campaign/);
-  assert.match(publicScript, /Pico Instagram Ad/);
+
+  assert.equal(industryProfile.key, "clinic");
+  assert.equal(industryProfile.acquisitionPresets["hifu-facebook"].label, "HIFU Facebook Ad");
+  assert.equal(industryProfile.acquisitionPresets["hifu-facebook"].campaign, "HIFU Jawline Demo Campaign");
+  assert.equal(industryProfile.acquisitionPresets["pico-instagram"].label, "Pico Instagram Ad");
+
+  assert.match(publicScript, /demoConfig\.acquisitionPresets/);
   assert.match(publicScript, /clinicDemoAcquisition/);
   assert.match(dashboardBar, /Source/);
   assert.match(dashboardBar, /Campaign/);
