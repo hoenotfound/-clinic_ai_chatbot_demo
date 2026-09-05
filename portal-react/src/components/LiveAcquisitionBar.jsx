@@ -1,12 +1,7 @@
 import { useEffect, useState } from "react";
+import { industryProfile } from "../config/industryProfile";
 
-const FALLBACK = {
-  key: "organic-whatsapp",
-  label: "Organic WhatsApp",
-  source: "Organic",
-  campaign: null,
-  treatment: null,
-};
+const FALLBACK = industryProfile.acquisitionPresets["organic-whatsapp"];
 
 function readAcquisition() {
   try {
@@ -40,7 +35,7 @@ export default function LiveAcquisitionBar() {
         <span className="shrink-0 text-[var(--color-text-muted)]">Source</span>
         <strong className="shrink-0">{acquisition.source}</strong>
         {acquisition.campaign && <><span className="text-[var(--color-border)]">•</span><span className="shrink-0 text-[var(--color-text-muted)]">Campaign</span><strong className="shrink-0">{acquisition.campaign}</strong></>}
-        {acquisition.treatment && <><span className="text-[var(--color-border)]">•</span><span className="shrink-0 text-[var(--color-text-muted)]">Ad treatment</span><strong className="shrink-0">{acquisition.treatment}</strong></>}
+        {acquisition.treatment && <><span className="text-[var(--color-border)]">•</span><span className="shrink-0 text-[var(--color-text-muted)]">Ad {industryProfile.terms.service.toLowerCase()}</span><strong className="shrink-0">{acquisition.treatment}</strong></>}
       </div>
     </div>
   );
