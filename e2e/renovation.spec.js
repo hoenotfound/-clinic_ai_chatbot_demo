@@ -38,25 +38,23 @@ test("renovation profile stays industry-specific across customer view and the co
   await expect(journeyCaption).toContainText("AI-POWERED CUSTOMER JOURNEY");
   await expect(journeyCaption).toContainText("Reply. Qualify. Hand off.");
   await expect(page.locator('link[data-hero-showcase-layout="true"]')).toHaveCount(1);
+  await expect(journeyCaption).toHaveCSS("position", "relative");
 
   const heroLayout = await page.locator(".hero-product-card").evaluate((card) => {
     const lead = card.querySelector(".hero-lead-card").getBoundingClientRect();
-    const caption = card.querySelector(".hero-product-caption").getBoundingClientRect();
     const captionLabel = card.querySelector(".hero-product-caption span").getBoundingClientRect();
     const captionHeading = card.querySelector(".hero-product-caption strong").getBoundingClientRect();
     const product = card.getBoundingClientRect();
     return {
       leadBottom: lead.bottom,
-      captionTop: caption.top,
+      captionLabelTop: captionLabel.top,
       captionLabelBottom: captionLabel.bottom,
       captionHeadingTop: captionHeading.top,
       captionHeadingBottom: captionHeading.bottom,
       productBottom: product.bottom,
-      captionPosition: getComputedStyle(card.querySelector(".hero-product-caption")).position,
     };
   });
-  expect(heroLayout.captionPosition).toBe("relative");
-  expect(heroLayout.captionTop - heroLayout.leadBottom).toBeGreaterThanOrEqual(20);
+  expect(heroLayout.captionLabelTop - heroLayout.leadBottom).toBeGreaterThanOrEqual(20);
   expect(heroLayout.captionHeadingTop - heroLayout.captionLabelBottom).toBeGreaterThanOrEqual(5);
   expect(heroLayout.productBottom - heroLayout.captionHeadingBottom).toBeGreaterThanOrEqual(20);
 
