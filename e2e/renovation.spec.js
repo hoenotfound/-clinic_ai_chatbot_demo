@@ -62,7 +62,10 @@ test("renovation profile stays industry-specific across customer view and dashbo
   await liveLead.click();
   await expect(frame.getByText("RM 10,000", { exact: true }).first()).toBeVisible();
   const closeDrawer = frame.getByRole("button", { name: "Close lead drawer" });
-  await closeDrawer.click({ force: true });
+  // The dashboard runs inside an iframe that can be below the top-level viewport.
+  // Dispatching the DOM click here avoids treating top-level scroll geometry as
+  // a product failure while still exercising the real React close handler.
+  await closeDrawer.evaluate((button) => button.click());
   await expect(closeDrawer).toHaveCount(0);
 
   await frame.getByRole("link", { name: "Analytics" }).click();
