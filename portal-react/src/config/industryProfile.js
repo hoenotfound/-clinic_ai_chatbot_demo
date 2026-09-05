@@ -1,6 +1,17 @@
-const normalized = String(typeof __DEMO_INDUSTRY__ !== "undefined" ? __DEMO_INDUSTRY__ : "clinic")
-  .trim()
-  .toLowerCase();
+function runtimeIndustry() {
+  if (typeof window === "undefined") return null;
+  try {
+    const query = new URLSearchParams(window.location.search).get("industry");
+    if (query) return query;
+    return window.sessionStorage.getItem("demoIndustry") || window.localStorage.getItem("demoIndustryPreference");
+  } catch {
+    return null;
+  }
+}
+
+const normalized = String(
+  runtimeIndustry() || (typeof __DEMO_INDUSTRY__ !== "undefined" ? __DEMO_INDUSTRY__ : "clinic")
+).trim().toLowerCase();
 
 const renovationAliases = new Set(["renovation", "home-renovation", "carpentry"]);
 

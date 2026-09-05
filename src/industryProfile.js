@@ -1,8 +1,13 @@
+const { AsyncLocalStorage } = require("async_hooks");
 const { publicExperienceFor } = require("./publicExperienceProfiles");
 
-const selected = String(process.env.DEMO_INDUSTRY || "clinic").trim().toLowerCase();
 const renovationAliases = new Set(["renovation", "home-renovation", "carpentry"]);
-const key = renovationAliases.has(selected) ? "renovation" : "clinic";
+const industryContext = new AsyncLocalStorage();
+
+function normalizeIndustryKey(value) {
+  const selected = String(value || "clinic").trim().toLowerCase();
+  return renovationAliases.has(selected) ? "renovation" : "clinic";
+}
 
 function clinicProfile() {
   const config = require("./clinicConfig");
@@ -16,6 +21,13 @@ function clinicProfile() {
   return {
     key: "clinic",
     config,
+    selector: {
+      label: "Aesthetic Clinic",
+      eyebrow: "APPOINTMENTS & TREATMENTS",
+      description: "Treatment enquiries, pricing, appointment intent, multilingual replies and human takeover.",
+      highlights: ["Treatment enquiries", "Appointment intent", "Patient handoff"],
+      icon: "clinic",
+    },
     labels: {
       customer: "Patient",
       service: "Treatment",
@@ -52,6 +64,13 @@ function renovationProfile() {
   return {
     key: "renovation",
     config,
+    selector: {
+      label: "Home Renovation & Carpentry",
+      eyebrow: "QUOTATIONS & SITE MEASUREMENT",
+      description: "Kitchen cabinets, wardrobes, renovation qualification, quotation intent and site-measurement handoff.",
+      highlights: ["Cabinet enquiries", "Quotation intent", "Site measurement"],
+      icon: "home",
+    },
     labels: {
       customer: "Customer",
       service: "Project",
@@ -89,15 +108,83 @@ function renovationProfile() {
   };
 }
 
-const active = key === "renovation" ? renovationProfile() : clinicProfile();
+const profileFactories = { clinic: clinicProfile, renovation: renovationProfile };
+const profileCache = new Map();
+const defaultIndustryKey = normalizeIndustryKey(process.env.DEMO_INDUSTRY || "clinic");
 
-// .env.example intentionally carries the clinic CTA for the default profile.
-// When another profile is selected and that untouched clinic default is still
-// present, promote it to the active profile's default while preserving any
-// genuinely custom CTA label supplied by the deployer.
-const configuredSalesCtaLabel = String(process.env.SALES_CTA_LABEL || "").trim();
-if (active.key !== "clinic" && configuredSalesCtaLabel === "Set up my clinic") {
-  process.env.SALES_CTA_LABEL = active.salesCtaDefault;
+function getIndustryProfile(value) {
+  const key = normalizeIndustryKey(value || industryContext.getStore() || defaultIndustryKey);
+  if (!profileCache.has(key)) profileCache.set(key, profileFactories[key]());
+  return profileCache.get(key);
 }
 
-module.exports = active;
+function currentIndustryKey() {
+  return getIndustryProfile().key;
+}
+
+function runWithIndustry(value, callback) {
+  return industryContext.run(normalizeIndustryKey(value || defaultIndustryKey), callback);
+}
+
+function listIndustryProfiles() {
+  return ["clinic", "renovation"].map((key) => {
+    const profile = getIndustryProfile(key);
+    return { key: profile.key, ...profile.selector };
+  });
+}
+
+function delegate(name) {
+  return (...args) => getIndustryProfile()[name](...args);
+}
+
+const configProxy = new Proxy({}, {
+  get(_target, property) {
+    return getIndustryProfile().config[property];
+  },
+  has(_target, property) {
+    return property in getIndustryProfile().config;
+  },
+  ownKeys() {
+    return Reflect.ownKeys(getIndustryProfile().config);
+  },
+  getOwnPropertyDescriptor(_target, property) {
+    const descriptor = Object.getOwnPropertyDescriptor(getIndustryProfile().config, property);
+    return descriptor ? { ...descriptor, configurable: true } : undefined;
+  },
+});
+
+const exported = {
+  config: configProxy,
+  normalizeIndustryKey,
+  getIndustryProfile,
+  currentIndustryKey,
+  runWithIndustry,
+  listIndustryProfiles,
+  buildSystemPrompt: delegate("buildSystemPrompt"),
+  buildFallbackReply: delegate("buildFallbackReply"),
+  buildConcernFallback: delegate("buildConcernFallback"),
+  enforceBookingRules: delegate("enforceBookingRules"),
+  enforceSafetyRules: delegate("enforceSafetyRules"),
+  concernGuidanceForPrompt: delegate("concernGuidanceForPrompt"),
+  bookingRulesForPrompt: delegate("bookingRulesForPrompt"),
+};
+
+for (const property of ["key", "selector", "labels", "highIntentFields", "salesCtaDefault", "acquisitionPresets", "publicExperience"]) {
+  Object.defineProperty(exported, property, {
+    enumerable: true,
+    configurable: false,
+    get() {
+      return getIndustryProfile()[property];
+    },
+  });
+}
+
+// Preserve the deployment-level CTA behaviour for dedicated single-industry
+// deployments. Runtime-selected sessions still get a profile-aware default in
+// server publicConfig().
+const configuredSalesCtaLabel = String(process.env.SALES_CTA_LABEL || "").trim();
+if (defaultIndustryKey !== "clinic" && configuredSalesCtaLabel === "Set up my clinic") {
+  process.env.SALES_CTA_LABEL = getIndustryProfile(defaultIndustryKey).salesCtaDefault;
+}
+
+module.exports = exported;

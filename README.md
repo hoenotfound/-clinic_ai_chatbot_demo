@@ -1,31 +1,48 @@
-# Clinic AI Chatbot Demo
+# AI Chatbot Demo
 
 A standalone public sales demo for a multi-channel AI receptionist / sales assistant.
 
-The default profile recreates an aesthetic clinic experience. The same demo stack can also run the Home Renovation & Custom Carpentry profile by setting `DEMO_INDUSTRY=renovation` before build/start. This keeps one maintained demo codebase while allowing industry-specific AI behaviour, sample leads, pipeline language and branding.
+The same deployment now supports multiple first-class demo industries. Visitors can choose between the Aesthetic Clinic and Home Renovation & Custom Carpentry experiences from the public UI, and can switch industries later from the demo toolbar. Each selected industry gets its own AI behaviour, lead qualification, sample data, dashboard terminology and fresh private session.
 
 The demo recreates WhatsApp, Instagram and Messenger customer experiences in the browser while sending messages to a standalone demo backend. The staff-facing dashboard is a React + Tailwind portal that mirrors the production product design without connecting to production data or Meta credentials.
 
 ## Demo industry profiles
 
-Default aesthetic clinic:
+Available profiles:
+
+- **Aesthetic Clinic** — treatment enquiries, pricing, appointment intent and clinic handoff
+- **Home Renovation & Custom Carpentry** — cabinet enquiries, quotation intent, site measurement and renovation handoff
+
+`DEMO_INDUSTRY` now controls only the **default/fallback profile** for direct server use and backwards compatibility:
 
 ```env
 DEMO_INDUSTRY=clinic
 ```
 
-Home renovation / custom carpentry:
+or:
 
 ```env
 DEMO_INDUSTRY=renovation
 ```
 
-The renovation profile uses fictional `Oakline Demo Renovation & Carpentry` data and includes kitchen cabinets, built-in wardrobes, TV/living-room carpentry, shoe cabinets, storage and full-home custom carpentry. It qualifies enquiries using project scope, property type, area, measurements/floor-plan context, budget, timeline, quotation intent and site-measurement intent. Structural, electrical, plumbing, waterproofing, gas and permit questions are handed to staff rather than guessed.
+Visitors do not need a separate deployment for each profile. The public demo presents an industry chooser on first use and remembers the visitor's preference. Direct links are also supported:
 
-Keep each deployment on one profile. `DEMO_INDUSTRY` must be available during the React dashboard build as well as server startup so the dashboard sample data and branding match the backend profile.
+```text
+/?industry=clinic
+/?industry=renovation
+```
+
+Switching industry starts a fresh demo session and clears the current acquisition source so conversation, lead and attribution data cannot mix between profiles.
+
+The renovation profile uses fictional `Oakline Demo Renovation & Carpentry` data and includes kitchen cabinets, built-in wardrobes, TV/living-room carpentry, shoe cabinets, storage and full-home custom carpentry. It qualifies enquiries using project scope, property type, area, measurements/floor-plan context, budget, timeline, quotation intent and site-measurement intent. Structural, electrical, plumbing, waterproofing, gas and permit questions are handed to staff rather than guessed.
 
 ## What the demo includes
 
+- First-visit industry chooser
+- In-demo industry switcher
+- One deployment serving multiple first-class industry profiles
+- Industry-isolated sessions and AI behaviour
+- Direct industry demo URLs
 - WhatsApp-style customer chat
 - Instagram-style customer chat
 - Messenger-style customer chat
@@ -56,6 +73,10 @@ Keep each deployment on one profile. `DEMO_INDUSTRY` must be available during th
 ```text
 Prospect browser
      |
+     +--> Choose industry
+     |       +--> Aesthetic Clinic
+     |       +--> Home Renovation & Carpentry
+     |
      +--> Customer channel preview (HTML/CSS/JS)
      |
      +--> React Staff Dashboard
@@ -63,15 +84,17 @@ Prospect browser
      v
 Demo HTTP API (Node.js)
      |
-     +--> selected industry profile
+     +--> per-session industry context
      +--> in-memory session state
      |       or optional Redis shared state
-     +--> lead scoring / handoff logic
+     +--> industry-specific lead scoring / handoff logic
      +--> abuse / concurrency guards
      |
      v
 Gemini / Claude / Mock
 ```
+
+Industry context is resolved per session rather than by mutating a global environment variable. This allows concurrent visitors to use different demo industries safely on the same Node process.
 
 The public demo intentionally bypasses Meta because the channels are simulated in-browser. A real deployment still connects the production chatbot to the business's actual WhatsApp, Instagram and Facebook accounts through the appropriate Meta APIs and webhooks.
 
@@ -96,17 +119,13 @@ The Node server uses the `ioredis` runtime dependency when optional shared state
 cp .env.example .env
 ```
 
-2. Select the demo profile:
+2. Optionally choose the default profile. Clinic is the default if omitted:
 
 ```env
 DEMO_INDUSTRY=clinic
 ```
 
-or:
-
-```env
-DEMO_INDUSTRY=renovation
-```
+The runtime industry selector can still open either profile regardless of this default.
 
 3. Choose a provider.
 
@@ -138,7 +157,7 @@ AI_PROVIDER=mock
 npm install
 ```
 
-The root `postinstall` script installs the React dashboard dependencies and builds `portal-react/dist` automatically. Set `DEMO_INDUSTRY` before this build so the correct dashboard profile is compiled.
+The root `postinstall` script installs the React dashboard dependencies and builds `portal-react/dist` automatically. The dashboard bundle contains both current industry profiles; runtime URL/session state selects which profile is rendered.
 
 5. Start the app:
 
@@ -150,6 +169,13 @@ npm start
 
 ```text
 http://localhost:3000
+```
+
+On a fresh browser session the industry chooser appears automatically. You can also open a profile directly:
+
+```text
+http://localhost:3000/?industry=clinic
+http://localhost:3000/?industry=renovation
 ```
 
 ## Render deployment
@@ -166,13 +192,13 @@ Health check: /health
 
 `npm ci --omit=dev` still runs the root `postinstall`, which builds the React dashboard.
 
-Set the industry profile in Render before the build:
+You only need **one Render deployment** for the public multi-industry demo. `DEMO_INDUSTRY` may be left as `clinic` to define the fallback/default profile:
 
 ```env
-DEMO_INDUSTRY=renovation
+DEMO_INDUSTRY=clinic
 ```
 
-or leave it as `clinic` for the existing aesthetic-clinic demo.
+Visitors can still choose Home Renovation from the UI or open `?industry=renovation` directly. A second Render service is not required for the demo selector.
 
 Set the appropriate provider secret directly in Render:
 
@@ -199,7 +225,7 @@ SALES_CTA_LABEL=Set up my clinic
 SALES_CTA_URL=https://your-sales-link.example
 ```
 
-When the renovation profile is active and the CTA label is left at the clinic default, startup changes the label to `Set up my renovation chatbot`.
+When the runtime renovation profile is active and the CTA label is left at the untouched clinic default, the public config uses `Set up my renovation chatbot` for that profile. A genuinely custom CTA label is preserved across profiles.
 
 No Meta environment variables are needed for the public browser demo.
 
@@ -224,9 +250,12 @@ These reduce casual abuse and limit bursts of AI calls. Provider-side spend/quot
 ## Session behavior
 
 - Each visitor gets a UUID session.
+- Each session carries its own `industryKey`.
+- Switching industry creates a fresh session and resets the current acquisition source.
+- Clinic and renovation requests can run concurrently without sharing prompt/rule context.
 - Active use extends the session expiry window.
 - Without `REDIS_URL`, sessions and major counters are held in the Node process and reset on restart/redeploy.
-- With `REDIS_URL`, session state and major daily counters can survive web-service restarts for their configured TTL.
+- With `REDIS_URL`, session state and major daily counters can survive web-service restarts for their configured TTL, including the selected industry.
 - The demo never writes prospect conversations to the production chatbot database.
 - The current AI concurrency cap is per Node process.
 
@@ -290,7 +319,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-GitHub Actions builds the React dashboard, runs the Node regression suite, checks JavaScript syntax and runs Playwright against the visible React portal. The renovation profile also has dedicated regression coverage for quotation behaviour, site-measurement handoff, technical escalation, multilingual fallback and live project/budget/area qualification.
+GitHub Actions builds the React dashboard, runs the Node regression suite, checks JavaScript syntax and runs Playwright against the visible React portal. CI covers both the clinic and renovation profiles independently. Runtime-selector coverage also verifies first-visit selection, switching, mobile layout and concurrent backend profile isolation.
 
 ## Recommended public-demo safeguards
 

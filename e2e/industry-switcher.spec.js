@@ -1,0 +1,108 @@
+const { test, expect } = require("@playwright/test");
+
+test.use({ storageState: { cookies: [], origins: [] } });
+
+test("first-time industry chooser switches between isolated renovation and clinic demos", async ({ page }) => {
+  const browserErrors = [];
+  page.on("pageerror", (error) => browserErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") browserErrors.push(message.text());
+  });
+
+  await page.goto("/");
+
+  const picker = page.locator("[data-industry-picker]");
+  await expect(picker).toBeVisible();
+  await expect(picker.getByRole("heading", { name: "Choose an industry to explore" })).toBeVisible();
+  await expect(picker.locator('[data-industry="clinic"]')).toContainText("Aesthetic Clinic");
+  await expect(picker.locator('[data-industry="renovation"]')).toContainText("Home Renovation & Carpentry");
+  await page.screenshot({ path: "visual-artifacts/industry-selector-desktop.png" });
+
+  await picker.locator('[data-industry="renovation"]').click();
+  await expect(page).toHaveURL(/industry=renovation/);
+  await expect(page.getByRole("button", { name: "Switch demo industry" })).toContainText("Home Renovation & Carpentry");
+  await expect(page.locator(".experience-status strong")).toHaveText("Oakline Demo Renovation & Carpentry");
+  await expect(page.locator("#patientTab strong")).toHaveText("Customer View");
+  await expect(page.locator("#dashboardTab strong")).toHaveText("Sales Dashboard");
+
+  await expect.poll(async () => page.evaluate(() => sessionStorage.getItem("clinicDemoSessionId"))).not.toBeNull();
+  const renovationId = await page.evaluate(() => sessionStorage.getItem("clinicDemoSessionId"));
+  expect(renovationId).toBeTruthy();
+  await expect(page.locator("#reactDashboardFrame")).toHaveAttribute("src", /industry=renovation/);
+  const renovationFrame = page.frameLocator("#reactDashboardFrame");
+  await expect(renovationFrame.getByRole("heading", { name: "Inbox", exact: true })).toBeVisible();
+  await expect(renovationFrame.locator("body")).toContainText("Oakline Demo Renovation");
+  await page.screenshot({ path: "visual-artifacts/runtime-renovation-demo.png", fullPage: true });
+
+  await page.getByRole("button", { name: "Switch demo industry" }).click();
+  await expect(page.locator("[data-industry-picker]")).toBeVisible();
+  await expect(page.locator('[data-industry="renovation"] .industry-picker-current')).toHaveText("Current");
+  await page.locator('[data-industry="clinic"]').click();
+
+  await expect(page).toHaveURL(/industry=clinic/);
+  await expect(page.getByRole("button", { name: "Switch demo industry" })).toContainText("Aesthetic Clinic");
+  await expect(page.locator(".experience-status strong")).toHaveText("Nova Demo Aesthetic Clinic");
+  await expect(page.locator("#patientTab strong")).toHaveText("Patient View");
+  await expect(page.locator("#dashboardTab strong")).toHaveText("Clinic Dashboard");
+  await expect(page.locator("#reactDashboardFrame")).toHaveAttribute("src", /industry=clinic/);
+
+  await expect.poll(async () => page.evaluate(() => sessionStorage.getItem("clinicDemoSessionId"))).not.toBeNull();
+  const clinicSessionId = await page.evaluate(() => sessionStorage.getItem("clinicDemoSessionId"));
+  expect(clinicSessionId).toBeTruthy();
+  expect(clinicSessionId).not.toBe(renovationId);
+
+  const configs = await page.evaluate(async () => {
+    const [clinicResponse, renovationResponse] = await Promise.all([
+      fetch("/api/demo/config?industry=clinic"),
+      fetch("/api/demo/config?industry=renovation"),
+    ]);
+    return [await clinicResponse.json(), await renovationResponse.json()];
+  });
+  expect(configs[0].industryKey).toBe("clinic");
+  expect(configs[0].businessName).toMatch(/Nova Demo Aesthetic Clinic/i);
+  expect(configs[1].industryKey).toBe("renovation");
+  expect(configs[1].businessName).toMatch(/Oakline Demo Renovation/i);
+
+  expect(browserErrors).toEqual([]);
+});
+
+test("industry selector is usable on a narrow mobile viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+
+  const picker = page.locator("[data-industry-picker]");
+  await expect(picker).toBeVisible();
+  const dialog = picker.locator(".industry-picker-dialog");
+  await expect(dialog).toBeVisible();
+  await expect(picker.locator('[data-industry="clinic"]')).toBeVisible();
+  await expect(picker.locator('[data-industry="renovation"]')).toBeVisible();
+
+  const layout = await page.evaluate(() => ({
+    bodyWidth: document.body.scrollWidth,
+    viewportWidth: window.innerWidth,
+    dialogBottom: document.querySelector(".industry-picker-dialog")?.getBoundingClientRect().bottom || 0,
+    viewportHeight: window.innerHeight,
+  }));
+  expect(layout.bodyWidth).toBeLessThanOrEqual(layout.viewportWidth + 1);
+  expect(layout.dialogBottom).toBeLessThanOrEqual(layout.viewportHeight + 1);
+  await page.screenshot({ path: "visual-artifacts/industry-selector-mobile.png" });
+
+  await picker.locator('[data-industry="renovation"]').click();
+  const switcher = page.getByRole("button", { name: "Switch demo industry" });
+  await expect(switcher).toBeVisible();
+  await expect(switcher).toContainText("Home Renovation");
+
+  const toolbarLayout = await page.evaluate(() => {
+    const toolbar = document.querySelector(".experience-toolbar")?.getBoundingClientRect();
+    const switcher = document.querySelector("[data-industry-switcher-button]")?.getBoundingClientRect();
+    return {
+      bodyWidth: document.body.scrollWidth,
+      viewportWidth: window.innerWidth,
+      toolbarHeight: toolbar?.height || 0,
+      switcherRight: switcher?.right || 0,
+    };
+  });
+  expect(toolbarLayout.bodyWidth).toBeLessThanOrEqual(toolbarLayout.viewportWidth + 1);
+  expect(toolbarLayout.switcherRight).toBeLessThanOrEqual(toolbarLayout.viewportWidth + 1);
+  expect(toolbarLayout.toolbarHeight).toBeLessThanOrEqual(78);
+});

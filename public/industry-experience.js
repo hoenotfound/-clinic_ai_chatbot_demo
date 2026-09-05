@@ -10,6 +10,15 @@
     if (element && value) element.setAttribute("content", value);
   }
 
+  function selectedIndustry() {
+    try {
+      const query = new URL(window.location.href).searchParams.get("industry");
+      return query || sessionStorage.getItem("demoIndustry") || localStorage.getItem("demoIndustryPreference") || "";
+    } catch {
+      return "";
+    }
+  }
+
   function renderHero(experience) {
     const badge = document.querySelector(".scaling-pill");
     if (badge) badge.innerHTML = `<span class="status-dot"></span>${experience.badge}`;
@@ -156,9 +165,13 @@
   }
 
   async function loadConfig() {
-    if (window.demoIndustryConfig?.industryKey) return applyConfig(window.demoIndustryConfig);
+    const selected = selectedIndustry();
+    if (window.demoIndustryConfig?.industryKey && (!selected || window.demoIndustryConfig.industryKey === selected)) {
+      return applyConfig(window.demoIndustryConfig);
+    }
     try {
-      const response = await fetch("/api/demo/config", { headers: { Accept: "application/json" } });
+      const suffix = selected ? `?industry=${encodeURIComponent(selected)}` : "";
+      const response = await fetch(`/api/demo/config${suffix}`, { headers: { Accept: "application/json" } });
       if (!response.ok) return;
       applyConfig(await response.json());
     } catch {}

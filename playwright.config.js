@@ -1,5 +1,9 @@
 const { defineConfig } = require("@playwright/test");
 
+const defaultDemoIndustry = String(process.env.DEMO_INDUSTRY || "clinic").toLowerCase().includes("renovation")
+  ? "renovation"
+  : "clinic";
+
 module.exports = defineConfig({
   testDir: "./e2e",
   timeout: 45_000,
@@ -10,6 +14,13 @@ module.exports = defineConfig({
   use: {
     baseURL: "http://127.0.0.1:3100",
     trace: "retain-on-failure",
+    storageState: {
+      cookies: [],
+      origins: [{
+        origin: "http://127.0.0.1:3100",
+        localStorage: [{ name: "demoIndustryPreference", value: defaultDemoIndustry }],
+      }],
+    },
   },
   webServer: {
     command: "npm start",

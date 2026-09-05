@@ -1,5 +1,7 @@
 const state = {
   config: null,
+  industryKey: null,
+  industryOptions: [],
   session: null,
   loading: false,
   messagePending: false,
@@ -9,6 +11,7 @@ const state = {
   hasTakenOver: false,
   syncTimer: null,
   telemetryTimer: null,
+  industrySwitcherButton: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -45,6 +48,65 @@ const channelMeta = {
   instagram: { label: "Instagram", theme: "instagram-theme", status: "Active now", caption: "Instagram customer experience" },
   facebook: { label: "Messenger", theme: "facebook-theme", status: "Active now", caption: "Messenger customer experience" },
 };
+
+const VALID_INDUSTRIES = new Set(["clinic", "renovation"]);
+const FALLBACK_INDUSTRIES = [
+  {
+    key: "clinic",
+    label: "Aesthetic Clinic",
+    eyebrow: "APPOINTMENTS & TREATMENTS",
+    description: "Treatment enquiries, pricing, appointment intent, multilingual replies and human takeover.",
+    highlights: ["Treatment enquiries", "Appointment intent", "Patient handoff"],
+    icon: "clinic",
+  },
+  {
+    key: "renovation",
+    label: "Home Renovation & Carpentry",
+    eyebrow: "QUOTATIONS & SITE MEASUREMENT",
+    description: "Kitchen cabinets, wardrobes, renovation qualification, quotation intent and site-measurement handoff.",
+    highlights: ["Cabinet enquiries", "Quotation intent", "Site measurement"],
+    icon: "home",
+  },
+];
+
+function normalizeIndustry(value) {
+  const key = String(value || "").trim().toLowerCase();
+  if (["renovation", "home-renovation", "carpentry"].includes(key)) return "renovation";
+  return key === "clinic" ? "clinic" : null;
+}
+
+function queryIndustry() {
+  try {
+    return normalizeIndustry(new URL(window.location.href).searchParams.get("industry"));
+  } catch {
+    return null;
+  }
+}
+
+function storedIndustry() {
+  try {
+    return normalizeIndustry(sessionStorage.getItem("demoIndustry") || localStorage.getItem("demoIndustryPreference"));
+  } catch {
+    return null;
+  }
+}
+
+function saveIndustryPreference(key) {
+  try {
+    sessionStorage.setItem("demoIndustry", key);
+    localStorage.setItem("demoIndustryPreference", key);
+  } catch {}
+}
+
+function setIndustryUrl(key, { replace = true } = {}) {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set("industry", key);
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    if (replace) window.history.replaceState({}, "", next);
+    else window.location.assign(next);
+  } catch {}
+}
 
 function profileLabels() {
   return state.config?.labels || {
@@ -92,7 +154,7 @@ function recordTelemetry(event = "heartbeat", surface = state.activeView) {
   fetch("/api/telemetry", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ visitorId, event, surface }),
+    body: JSON.stringify({ visitorId, event, surface, industry: state.industryKey }),
     keepalive: true,
   }).catch(() => {});
 }
@@ -114,6 +176,238 @@ async function api(path, options = {}) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || "Request failed.");
   return data;
+}
+
+function ensureIndustryStyles() {
+  if (document.querySelector('link[data-industry-switcher="true"]')) return;
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = "/industry-switcher.css";
+  link.dataset.industrySwitcher = "true";
+  document.head.appendChild(link);
+}
+
+async function loadIndustryOptions() {
+  try {
+    const data = await api("/api/demo/industries");
+    const options = Array.isArray(data.industries) ? data.industries.filter((item) => VALID_INDUSTRIES.has(item.key)) : [];
+    if (options.length) return options;
+  } catch {}
+  return FALLBACK_INDUSTRIES;
+}
+
+function industryIcon(key) {
+  return key === "renovation" ? "⌂" : "+";
+}
+
+function createIndustryCard(option, currentKey, choose) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "industry-picker-card";
+  button.dataset.industry = option.key;
+  if (option.key === currentKey) button.classList.add("is-current");
+
+  const icon = document.createElement("span");
+  icon.className = "industry-picker-icon";
+  icon.textContent = industryIcon(option.key);
+
+  if (option.key === currentKey) {
+    const current = document.createElement("span");
+    current.className = "industry-picker-current";
+    current.textContent = "Current";
+    button.appendChild(current);
+  }
+
+  const eyebrow = document.createElement("small");
+  eyebrow.textContent = option.eyebrow || "DEMO INDUSTRY";
+  const title = document.createElement("strong");
+  title.textContent = option.label;
+  const description = document.createElement("p");
+  description.textContent = option.description || "Explore this AI chatbot demo profile.";
+  const tags = document.createElement("div");
+  tags.className = "industry-picker-tags";
+  (option.highlights || []).slice(0, 3).forEach((item) => {
+    const tag = document.createElement("span");
+    tag.textContent = item;
+    tags.appendChild(tag);
+  });
+  const arrow = document.createElement("span");
+  arrow.className = "industry-picker-arrow";
+  arrow.textContent = option.key === currentKey ? "Continue this demo  →" : "Open this demo  →";
+
+  button.append(icon, eyebrow, title, description, tags, arrow);
+  button.addEventListener("click", () => choose(option.key));
+  return button;
+}
+
+function showIndustryPicker(options, currentKey, { required = false } = {}) {
+  ensureIndustryStyles();
+  return new Promise((resolve) => {
+    const existing = document.querySelector("[data-industry-picker]");
+    existing?.remove();
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "industry-picker-backdrop";
+    backdrop.dataset.industryPicker = "true";
+    backdrop.setAttribute("role", "presentation");
+
+    const dialog = document.createElement("section");
+    dialog.className = "industry-picker-dialog";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "industryPickerTitle");
+
+    const head = document.createElement("div");
+    head.className = "industry-picker-head";
+    const headingCopy = document.createElement("div");
+    const kicker = document.createElement("p");
+    kicker.className = "industry-picker-kicker";
+    kicker.textContent = "INTERACTIVE AI CHATBOT DEMOS";
+    const title = document.createElement("h2");
+    title.id = "industryPickerTitle";
+    title.textContent = required ? "Choose an industry to explore" : "Switch demo industry";
+    const copy = document.createElement("p");
+    copy.textContent = required
+      ? "Pick the business closest to what you want to see. Each demo has its own AI behaviour, lead qualification, sample data and dashboard workflow."
+      : "Switching industry starts a fresh private demo session so conversations and lead data never mix between profiles.";
+    headingCopy.append(kicker, title, copy);
+
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "industry-picker-close";
+    close.setAttribute("aria-label", "Close industry selector");
+    close.textContent = "×";
+    if (required) close.hidden = true;
+    head.append(headingCopy, close);
+
+    const grid = document.createElement("div");
+    grid.className = "industry-picker-grid";
+
+    let settled = false;
+    const cleanup = (value) => {
+      if (settled) return;
+      settled = true;
+      document.documentElement.classList.remove("industry-picker-open");
+      document.removeEventListener("keydown", onKeyDown);
+      backdrop.remove();
+      resolve(value);
+    };
+    const choose = (key) => cleanup(key);
+    options.forEach((option) => grid.appendChild(createIndustryCard(option, currentKey, choose)));
+
+    const foot = document.createElement("p");
+    foot.className = "industry-picker-foot";
+    foot.textContent = "You can switch industry anytime from the demo toolbar.";
+
+    dialog.append(head, grid, foot);
+    backdrop.appendChild(dialog);
+    document.body.appendChild(backdrop);
+    document.documentElement.classList.add("industry-picker-open");
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape" && !required) cleanup(null);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    close.addEventListener("click", () => cleanup(null));
+    backdrop.addEventListener("click", (event) => {
+      if (event.target === backdrop && !required) cleanup(null);
+    });
+    requestAnimationFrame(() => grid.querySelector("button")?.focus());
+  });
+}
+
+function clearSessionForIndustrySwitch() {
+  try {
+    sessionStorage.removeItem("clinicDemoSessionId");
+    sessionStorage.removeItem("demoSessionId:clinic");
+    sessionStorage.removeItem("demoSessionId:renovation");
+    sessionStorage.removeItem("clinicDemoAcquisition");
+  } catch {}
+}
+
+async function resolveInitialIndustry() {
+  state.industryOptions = await loadIndustryOptions();
+  const fromQuery = queryIndustry();
+  const fromStorage = storedIndustry();
+  const selected = fromQuery || fromStorage;
+
+  if (selected) {
+    if (fromQuery && fromStorage && fromQuery !== fromStorage) clearSessionForIndustrySwitch();
+    saveIndustryPreference(selected);
+    setIndustryUrl(selected, { replace: true });
+    return selected;
+  }
+
+  const chosen = await showIndustryPicker(state.industryOptions, null, { required: true });
+  const key = normalizeIndustry(chosen) || "clinic";
+  clearSessionForIndustrySwitch();
+  saveIndustryPreference(key);
+  setIndustryUrl(key, { replace: true });
+  return key;
+}
+
+function currentIndustryOption() {
+  return state.industryOptions.find((item) => item.key === state.industryKey) || FALLBACK_INDUSTRIES.find((item) => item.key === state.industryKey);
+}
+
+function installIndustrySwitcher() {
+  const toolbar = document.querySelector(".experience-toolbar");
+  if (!toolbar || toolbar.querySelector("[data-industry-switcher-button]")) return;
+  ensureIndustryStyles();
+
+  let actions = toolbar.querySelector(".industry-switcher-actions");
+  if (!actions) {
+    actions = document.createElement("div");
+    actions.className = "industry-switcher-actions";
+    if (els.newDemoButton) {
+      toolbar.insertBefore(actions, els.newDemoButton);
+      actions.appendChild(els.newDemoButton);
+    } else {
+      toolbar.appendChild(actions);
+    }
+  }
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "industry-switcher-button";
+  button.dataset.industrySwitcherButton = "true";
+  button.setAttribute("aria-label", "Switch demo industry");
+
+  const icon = document.createElement("span");
+  icon.className = "industry-switcher-icon";
+  icon.textContent = industryIcon(state.industryKey);
+  const copy = document.createElement("span");
+  copy.className = "industry-switcher-copy";
+  const small = document.createElement("small");
+  small.textContent = "Demo industry · Switch";
+  const strong = document.createElement("strong");
+  strong.textContent = currentIndustryOption()?.label || "Choose industry";
+  copy.append(small, strong);
+  const chevron = document.createElement("span");
+  chevron.className = "industry-switcher-chevron";
+  chevron.textContent = "⌄";
+  button.append(icon, copy, chevron);
+
+  button.addEventListener("click", async () => {
+    if (state.messagePending || state.transitioning) return;
+    const selected = await showIndustryPicker(state.industryOptions, state.industryKey, { required: false });
+    const next = normalizeIndustry(selected);
+    if (!next || next === state.industryKey) return;
+    clearSessionForIndustrySwitch();
+    saveIndustryPreference(next);
+    setIndustryUrl(next, { replace: false });
+  });
+
+  actions.insertBefore(button, els.newDemoButton || null);
+  state.industrySwitcherButton = button;
+}
+
+function configureDashboardFrame() {
+  const frame = document.getElementById("reactDashboardFrame");
+  if (!frame || !state.industryKey) return;
+  const raw = frame.getAttribute("src") || "./dashboard/inbox";
+  const base = raw.split("?")[0];
+  frame.setAttribute("src", `${base}?industry=${encodeURIComponent(state.industryKey)}`);
 }
 
 function formatTime(timestamp) {
@@ -138,6 +432,7 @@ function refreshInteractionState() {
   if (els.customerInput) els.customerInput.disabled = blocked;
   if (els.customerSendButton) els.customerSendButton.disabled = blocked;
   if (els.newDemoButton) els.newDemoButton.disabled = blocked;
+  if (state.industrySwitcherButton) state.industrySwitcherButton.disabled = blocked;
   document.querySelectorAll(".channel-button, .suggestion-chip").forEach((button) => {
     button.disabled = blocked;
   });
@@ -307,28 +602,35 @@ function setLoading(loading) {
   if (loading && els.messages) setTimeout(() => { els.messages.scrollTop = els.messages.scrollHeight; }, 0);
 }
 
+function activeSessionStorageKey() {
+  return `demoSessionId:${state.industryKey || "clinic"}`;
+}
+
 async function createSession(channel = "whatsapp") {
   const data = await api("/api/demo/sessions", {
     method: "POST",
-    body: JSON.stringify({ channel }),
+    body: JSON.stringify({ channel, industry: state.industryKey }),
   });
   state.session = data.session;
   state.hasViewedDashboard = false;
   state.hasTakenOver = false;
+  sessionStorage.setItem(activeSessionStorageKey(), state.session.id);
   sessionStorage.setItem("clinicDemoSessionId", state.session.id);
   renderAll();
 }
 
 async function restoreOrCreateSession() {
-  const saved = sessionStorage.getItem("clinicDemoSessionId");
+  const saved = sessionStorage.getItem(activeSessionStorageKey());
   if (saved) {
     try {
       const data = await api(`/api/demo/sessions/${encodeURIComponent(saved)}`);
       state.session = data.session;
+      sessionStorage.setItem("clinicDemoSessionId", state.session.id);
       state.hasTakenOver = state.session.mode === "human" || state.session.messages.some((message) => message.source === "staff");
       renderAll();
       return;
     } catch {
+      sessionStorage.removeItem(activeSessionStorageKey());
       sessionStorage.removeItem("clinicDemoSessionId");
     }
   }
@@ -346,7 +648,10 @@ async function syncSession() {
     renderAll();
   } catch (error) {
     if (state.session?.id !== sessionId) return;
-    if (/expired/i.test(error.message)) sessionStorage.removeItem("clinicDemoSessionId");
+    if (/expired/i.test(error.message)) {
+      sessionStorage.removeItem(activeSessionStorageKey());
+      sessionStorage.removeItem("clinicDemoSessionId");
+    }
   }
 }
 
@@ -425,9 +730,12 @@ async function startNewDemo() {
   setTransitioning(true);
   try {
     const currentChannel = state.session?.channel || channelFromUi();
+    sessionStorage.removeItem(activeSessionStorageKey());
+    sessionStorage.removeItem("clinicDemoSessionId");
+    sessionStorage.removeItem("clinicDemoAcquisition");
     await createSession(currentChannel);
     setActiveView("patient");
-    showToast("New private demo session started.");
+    showToast(`New ${currentIndustryOption()?.label || "private"} demo session started.`);
   } catch (error) {
     showToast(error.message);
   } finally {
@@ -498,15 +806,23 @@ function loadChannelExperienceLayer() {
 
 async function init() {
   bindEvents();
-  recordTelemetry("patient_view", "patient");
   try {
-    state.config = window.demoIndustryConfig?.industryKey ? window.demoIndustryConfig : await api("/api/demo/config");
+    state.industryKey = await resolveInitialIndustry();
+    saveIndustryPreference(state.industryKey);
+    sessionStorage.setItem("demoIndustry", state.industryKey);
+
+    const preloaded = window.demoIndustryConfig?.industryKey === state.industryKey ? window.demoIndustryConfig : null;
+    state.config = preloaded || await api(`/api/demo/config?industry=${encodeURIComponent(state.industryKey)}`);
+    state.industryOptions = state.config.availableIndustries?.length ? state.config.availableIndustries : state.industryOptions;
     window.demoIndustryConfig = state.config;
     window.applyDemoIndustryExperience?.(state.config);
     configureSalesCta();
+    configureDashboardFrame();
+    installIndustrySwitcher();
     loadChannelExperienceLayer();
     await restoreOrCreateSession();
     refreshInteractionState();
+    recordTelemetry("patient_view", "patient");
     state.syncTimer = setInterval(syncSession, 1800);
     state.telemetryTimer = setInterval(() => recordTelemetry("heartbeat", state.activeView), 30_000);
   } catch (error) {

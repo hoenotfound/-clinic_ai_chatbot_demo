@@ -16,7 +16,7 @@ test("demo and React dashboard work under the /ai-chatbot mount path", async ({ 
   });
 
   await page.goto("/ai-chatbot");
-  await expect(page).toHaveURL(/\/ai-chatbot\/$/);
+  await expect(page).toHaveURL(/\/ai-chatbot\/\?industry=clinic$/);
   await expect(page.getByRole("heading", { name: /Turn every clinic enquiry/i })).toBeVisible();
 
   const configResponse = await page.request.get("/ai-chatbot/api/demo/config");
@@ -33,6 +33,7 @@ test("demo and React dashboard work under the /ai-chatbot mount path", async ({ 
   const iframeHandle = await iframe.elementHandle();
   const frame = await iframeHandle.contentFrame();
   expect(new URL(frame.url()).pathname).toBe("/ai-chatbot/dashboard/inbox");
+  expect(new URL(frame.url()).searchParams.get("industry")).toBe("clinic");
 
   const inbox = dashboardFrame.locator('aside[aria-label="Conversation inbox"]');
   const liveConversation = inbox.getByRole("button", { name: /Demo Patient/ });
@@ -46,9 +47,10 @@ test("demo and React dashboard work under the /ai-chatbot mount path", async ({ 
   await expect(dashboardFrame.getByRole("heading", { name: "Lead Pipeline" })).toBeVisible();
   expect(new URL(frame.url()).pathname).toBe("/ai-chatbot/dashboard/pipeline");
 
-  await frame.goto("http://127.0.0.1:3100/ai-chatbot/dashboard/settings/team");
+  await frame.goto("http://127.0.0.1:3100/ai-chatbot/dashboard/settings/team?industry=clinic");
   await expect(dashboardFrame.getByRole("heading", { name: "Team & Access" })).toBeVisible();
   expect(new URL(frame.url()).pathname).toBe("/ai-chatbot/dashboard/settings/team");
+  expect(new URL(frame.url()).searchParams.get("industry")).toBe("clinic");
 
   expect(failedLocalResponses, `Failed local responses: ${failedLocalResponses.join("\n")}`).toEqual([]);
   expect(browserErrors, `Browser errors: ${browserErrors.join("\n")}`).toEqual([]);
