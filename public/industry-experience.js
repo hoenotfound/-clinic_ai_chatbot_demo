@@ -39,7 +39,6 @@
     ["Timing", "Timeline"],
     ["Booking", "Site visit"],
     ["HIFU", "Kitchen Cabinets"],
-    ["KL", "Puchong"],
     ["Switch to Clinic Dashboard to see these signals update with the conversation.", "Switch to Sales Dashboard to see these project signals update with the conversation."],
     ["Patient enquiry", "Customer enquiry"],
     ["Answers with your clinic knowledge and rules", "Answers with your renovation services, pricing rules and sales process"],
@@ -62,15 +61,22 @@
     if (element && element.textContent !== value) element.textContent = value;
   }
 
+  function shouldPreserveTextNode(node) {
+    const parent = node?.parentElement;
+    return Boolean(parent?.closest("#messages, #typingIndicator"));
+  }
+
   function adaptText(root) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
     for (const node of nodes) {
+      if (shouldPreserveTextNode(node)) continue;
       const next = replaceText(node.nodeValue);
       if (next !== node.nodeValue) node.nodeValue = next;
     }
     root.querySelectorAll?.("[aria-label], [title], input[placeholder], textarea[placeholder]").forEach((element) => {
+      if (element.closest("#messages, #typingIndicator")) return;
       for (const attr of ["aria-label", "title", "placeholder"]) {
         const value = element.getAttribute(attr);
         if (!value) continue;
