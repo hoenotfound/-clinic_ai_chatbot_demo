@@ -51,6 +51,41 @@
     ["Booking intent detected", "Site-measurement intent detected"],
   ];
 
+  const renovationAcquisitionPresets = {
+    "hifu-facebook": {
+      key: "hifu-facebook",
+      label: "Kitchen Cabinets Facebook Ad",
+      source: "Meta Ads",
+      campaign: "Kitchen Cabinets Demo Campaign",
+      treatment: "Kitchen Cabinets",
+      channel: "facebook",
+    },
+    "pico-instagram": {
+      key: "pico-instagram",
+      label: "Wardrobe Instagram Ad",
+      source: "Meta Ads",
+      campaign: "Built-in Wardrobe Demo Campaign",
+      treatment: "Built-in Wardrobes",
+      channel: "instagram",
+    },
+    "organic-whatsapp": {
+      key: "organic-whatsapp",
+      label: "Organic WhatsApp",
+      source: "Organic",
+      campaign: null,
+      treatment: null,
+      channel: "whatsapp",
+    },
+    referral: {
+      key: "referral",
+      label: "Referral",
+      source: "Referral",
+      campaign: null,
+      treatment: null,
+      channel: "whatsapp",
+    },
+  };
+
   function replaceText(value) {
     let next = String(value || "");
     for (const [from, to] of textReplacements) next = next.split(from).join(to);
@@ -87,7 +122,7 @@
   }
 
   function configureSuggestions() {
-    const chips = [...document.querySelectorAll(".suggestion-chip")];
+    const chips = [...document.querySelectorAll(".prompt-panel .suggestion-chip")];
     const suggestions = [
       { message: "Hi, kitchen cabinet how much?", label: "Kitchen cabinet price?", kind: "Price" },
       { message: "New condo in Cheras. I need kitchen cabinet and wardrobe, budget around RM20k.", label: "I need kitchen + wardrobe", kind: "Project" },
@@ -100,6 +135,16 @@
       if (chip.dataset.message !== item.message) chip.dataset.message = item.message;
       setText(chip.querySelector("span"), item.kind);
       setText(chip.querySelector("strong"), item.label);
+    });
+  }
+
+  function configureAcquisitionPresets() {
+    document.querySelectorAll("[data-acquisition-key]").forEach((button) => {
+      const preset = renovationAcquisitionPresets[button.dataset.acquisitionKey];
+      if (!preset) return;
+      const kicker = preset.source === "Meta Ads" ? "Meta Ads" : preset.source;
+      setText(button.querySelector("span"), kicker);
+      setText(button.querySelector("strong"), preset.label);
     });
   }
 
@@ -125,9 +170,30 @@
     const metaText = "Try DA Smarketing's live AI renovation and carpentry chatbot demo across WhatsApp, Instagram and Messenger, from first enquiry to quotation qualification and human takeover.";
     if (description && description.content !== metaText) description.content = metaText;
     document.querySelectorAll(".clinic-avatar, .empty-logo, .hero-product-avatar").forEach((element) => setText(element, "O"));
-    configureSuggestions();
-    configureCapturePreview();
     adaptText(document.body);
+    configureSuggestions();
+    configureAcquisitionPresets();
+    configureCapturePreview();
+  }
+
+  function bindRenovationAcquisitionPersistence() {
+    if (document.documentElement.dataset.renovationAcquisitionBound === "true") return;
+    document.documentElement.dataset.renovationAcquisitionBound = "true";
+    document.addEventListener("click", (event) => {
+      const button = event.target?.closest?.("[data-acquisition-key]");
+      if (!button) return;
+      const preset = renovationAcquisitionPresets[button.dataset.acquisitionKey];
+      if (!preset) return;
+      // channel-experience.js owns the original click handler. Persist the
+      // industry-specific equivalent immediately afterwards so the dashboard
+      // receives renovation campaign/project context instead of clinic values.
+      setTimeout(() => {
+        try {
+          sessionStorage.setItem("clinicDemoAcquisition", JSON.stringify(preset));
+          window.postMessage({ type: "clinic-demo-acquisition-updated" }, window.location.origin);
+        } catch {}
+      }, 0);
+    });
   }
 
   async function init() {
@@ -137,6 +203,7 @@
       const config = await response.json();
       if (!/Oakline Demo Renovation/i.test(String(config.clinicName || ""))) return;
       document.documentElement.dataset.demoIndustry = "renovation";
+      bindRenovationAcquisitionPersistence();
       configureBranding();
       let queued = false;
       const observer = new MutationObserver(() => {
@@ -146,6 +213,7 @@
           queued = false;
           adaptText(document.body);
           configureSuggestions();
+          configureAcquisitionPresets();
           configureCapturePreview();
         });
       });
