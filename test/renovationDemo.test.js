@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 process.env.DEMO_INDUSTRY = "renovation";
 process.env.AI_PROVIDER = "mock";
+process.env.SALES_CTA_LABEL = "Set up my clinic";
 
 const industry = require("../src/industryProfile");
 const clinicConfig = require("../src/clinicConfig");
@@ -24,6 +25,7 @@ test("renovation is selected as a first-class profile without mutating clinic co
   assert.equal(industry.config.businessName, "Oakline Demo Renovation & Carpentry");
   assert.ok(industry.config.services.some((service) => service.name === "Kitchen Cabinets"));
   assert.equal(industry.salesCtaDefault, "Set up my renovation chatbot");
+  assert.equal(process.env.SALES_CTA_LABEL, "Set up my renovation chatbot");
   assert.match(clinicConfig.clinicName, /Nova Demo Aesthetic Clinic/i);
   assert.notEqual(clinicConfig.industryKey, "renovation");
 });
