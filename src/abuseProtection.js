@@ -1,6 +1,8 @@
 const crypto = require("crypto");
 const http = require("http");
 const Redis = require("ioredis");
+const { runWithConversationContext } = require("./aiMemoryContext");
+const { establishedConversationLanguage, languageLabel } = require("./conversationLanguage");
 
 function intEnv(name, fallback) {
   const value = Number.parseInt(process.env[name] || "", 10);
@@ -15,9 +17,10 @@ const limits = {
   aiHistoryMaxChars: intEnv("DEMO_AI_HISTORY_MAX_CHARS", 12000),
 };
 
-const MESSAGE_PATH = /^\/(?:ai-chatbot\/)?api\/demo\/sessions\/[^/]+\/message$/;
+const MESSAGE_PATH = /^\/(?:ai-chatbot\/)?api\/demo\/sessions\/([^/]+)\/message$/;
 const TELEMETRY_PATH = /^\/(?:ai-chatbot\/)?api\/telemetry$/;
 const localCounters = new Map();
+const sessionQueues = new Map();
 let redis = null;
 let redisWarned = false;
 let httpInstalled = false;
@@ -158,6 +161,27 @@ function isTelemetryRequest(req) {
   return req?.method === "POST" && TELEMETRY_PATH.test(requestPath(req));
 }
 
+function sessionIdForRequest(req) {
+  if (req?.method !== "POST") return null;
+  const match = requestPath(req).match(MESSAGE_PATH);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
+function serializeSessionRequest(sessionId, operation) {
+  if (!sessionId) return Promise.resolve().then(operation);
+  const previous = sessionQueues.get(sessionId) || Promise.resolve();
+  const next = previous.catch(() => {}).then(operation);
+  sessionQueues.set(sessionId, next);
+  return next.finally(() => {
+    if (sessionQueues.get(sessionId) === next) sessionQueues.delete(sessionId);
+  });
+}
+
 function sendRateLimit(res, error) {
   if (res.headersSent || res.writableEnded) return;
   const payload = JSON.stringify({ error: error.message });
@@ -193,12 +217,57 @@ function trimAiHistory(messages, {
   return selected;
 }
 
+function buildConversationMemory(messages) {
+  const fullMessages = Array.isArray(messages) ? messages : [];
+  const language = establishedConversationLanguage(fullMessages);
+  const facts = [`- Established customer language: ${languageLabel(language)}`];
+
+  try {
+    const industry = require("./industryProfile");
+    const demoState = require("./demoState");
+    const memorySession = { messages: fullMessages, lead: {} };
+    const lead = demoState.updateLead(memorySession) || {};
+
+    if (Array.isArray(lead.interests) && lead.interests.length) {
+      facts.push(`- ${industry.key === "renovation" ? "Project interests" : "Treatments discussed"}: ${lead.interests.join(", ")}`);
+    }
+    if (industry.key === "renovation") {
+      if (lead.propertyType) facts.push(`- Property type: ${lead.propertyType}`);
+      if (lead.propertyStatus) facts.push(`- Property status: ${lead.propertyStatus}`);
+      if (lead.preferredBranch) facts.push(`- Project area: ${lead.preferredBranch}`);
+      if (lead.budget) facts.push(`- Latest budget: ${lead.budget}`);
+      if (lead.measurementsKnown) facts.push("- Measurements or floor-plan context has been provided");
+      if (lead.timelineMentioned) facts.push("- Customer has mentioned a project timeline or move-in timing");
+      if (lead.preferredTiming) facts.push(`- Timing preference: ${lead.preferredTiming}`);
+      if (lead.siteMeasurementIntent) facts.push("- Customer has shown site-measurement intent");
+      if (lead.quotationIntent) facts.push("- Customer has requested quotation-related follow-up");
+      if (lead.technicalHandoff) facts.push("- A site-specific technical question requires staff follow-up");
+    } else {
+      if (lead.preferredBranch) facts.push(`- Preferred branch: ${lead.preferredBranch}`);
+      if (lead.preferredTiming) facts.push(`- Preferred timing: ${lead.preferredTiming}`);
+      if (lead.bookingIntent) facts.push("- Customer has shown booking intent");
+    }
+  } catch (error) {
+    console.warn("Could not build structured demo conversation memory:", error.message);
+  }
+
+  return facts.join("\n");
+}
+
 function installAiHistoryCap() {
   if (aiHistoryInstalled) return;
   const ai = require("./aiService");
   if (typeof ai.getReply !== "function") return;
   const originalGetReply = ai.getReply.bind(ai);
-  ai.getReply = (messages, isFirstMessage) => originalGetReply(trimAiHistory(messages), isFirstMessage);
+  ai.getReply = (messages, isFirstMessage) => {
+    const fullMessages = Array.isArray(messages) ? messages : [];
+    const context = {
+      fullMessages,
+      memory: buildConversationMemory(fullMessages),
+      language: establishedConversationLanguage(fullMessages),
+    };
+    return runWithConversationContext(context, () => originalGetReply(trimAiHistory(fullMessages), isFirstMessage));
+  };
   aiHistoryInstalled = true;
 }
 
@@ -211,19 +280,30 @@ function installHttpRateLimit() {
     if (listenerIndex >= 0) {
       const listener = args[listenerIndex];
       args[listenerIndex] = function protectedRequestListener(req, res) {
-        let guard = null;
         const ip = clientIp(req);
-        if (isCustomerMessageRequest(req)) guard = enforceIpMessageLimits(ip);
-        else if (isTelemetryRequest(req)) guard = enforceIpTelemetryLimit(ip);
+        const guard = isCustomerMessageRequest(req)
+          ? enforceIpMessageLimits(ip)
+          : isTelemetryRequest(req)
+            ? enforceIpTelemetryLimit(ip)
+            : null;
         if (!guard) return listener.call(this, req, res);
 
-        guard
-          .then(() => listener.call(this, req, res))
-          .catch((error) => {
+        const invoke = async () => {
+          try {
+            await guard;
+          } catch (error) {
             if (error?.statusCode === 429) return sendRateLimit(res, error);
             console.error("Demo abuse protection failed open:", error);
-            return listener.call(this, req, res);
-          });
+          }
+          return listener.call(this, req, res);
+        };
+
+        const sessionId = sessionIdForRequest(req);
+        const operation = sessionId ? serializeSessionRequest(sessionId, invoke) : invoke();
+        operation.catch((error) => {
+          console.error("Demo request listener failed:", error);
+        });
+        return operation;
       };
     }
     return originalCreateServer.apply(this, args);
@@ -239,6 +319,7 @@ function installAbuseProtection() {
 
 function resetForTests() {
   localCounters.clear();
+  sessionQueues.clear();
 }
 
 module.exports = {
@@ -246,9 +327,12 @@ module.exports = {
   clientIp,
   isCustomerMessageRequest,
   isTelemetryRequest,
+  sessionIdForRequest,
+  serializeSessionRequest,
   enforceIpMessageLimits,
   enforceIpTelemetryLimit,
   trimAiHistory,
+  buildConversationMemory,
   installAbuseProtection,
   resetForTests,
 };
