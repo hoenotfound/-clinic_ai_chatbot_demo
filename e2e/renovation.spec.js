@@ -70,7 +70,7 @@ test("renovation profile stays industry-specific across customer view and dashbo
 
   await frame.getByRole("link", { name: "Analytics" }).click();
   await expect(frame.getByRole("heading", { name: "Analytics" })).toBeVisible();
-  await frame.getByRole("button", { name: "Filters" }).click();
+  await frame.getByRole("button", { name: "Filters", exact: true }).click();
 
   const projectSelect = frame.locator("label").filter({ hasText: /^Project/ }).locator("select");
   await expect(projectSelect.locator('option[value="Shoe Cabinet & Entrance Storage"]')).toHaveText("Shoe / Entrance Storage");
