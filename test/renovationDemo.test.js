@@ -28,6 +28,24 @@ test("renovation prompt focuses on carpentry qualification instead of medical be
   assert.doesNotMatch(prompt, /clinician decides diagnosis/i);
 });
 
+test("Gemini and Claude provider prompt stays renovation-specific", () => {
+  const prompt = ai._test.enhancedSystemPrompt(true);
+  assert.match(prompt, /STRUCTURED RENOVATION SALES KNOWLEDGE/i);
+  assert.match(prompt, /DETERMINISTIC RENOVATION HANDOFF RULES/i);
+  assert.doesNotMatch(prompt, /CONCERN-TO-TREATMENT/i);
+  assert.doesNotMatch(prompt, /diagnosis/i);
+  assert.doesNotMatch(prompt, /clinician/i);
+
+  const geminiBody = ai._test.buildGeminiRequest(
+    [{ role: "user", content: "Kitchen cabinet how much?" }],
+    true,
+    "gemini-2.5-flash"
+  );
+  const geminiPrompt = geminiBody.systemInstruction.parts.map((part) => part.text).join("\n");
+  assert.match(geminiPrompt, /RENOVATION SALES KNOWLEDGE/i);
+  assert.doesNotMatch(geminiPrompt, /clinician|diagnosis|CONCERN-TO-TREATMENT/i);
+});
+
 test("deterministic fallback gives renovation pricing and asks a useful next question", () => {
   const reply = ai.getFallbackReply([
     { role: "user", content: "Kitchen cabinet how much?" },
@@ -81,5 +99,6 @@ test("site measurement request becomes high-intent live lead", () => {
   assert.equal(session.lead.bookingIntent, true);
   assert.equal(session.lead.temperature, "hot");
   assert.equal(session.lead.preferredBranch, "Petaling Jaya / Subang / Shah Alam");
+  assert.equal(session.lead.budget, "RM8,000");
   assert.match(session.lead.summary, /site measurement|staff follow-up/i);
 });
