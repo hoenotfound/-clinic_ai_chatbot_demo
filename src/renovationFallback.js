@@ -2,6 +2,7 @@ const renovation = require("./renovationConfig");
 
 const HUMAN_REQUEST_PATTERN = /(?:speak|talk|chat|connect)\s+(?:me\s+)?(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:can|could)\s+i\s+(?:speak|talk)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:need|want)\s+(?:a\s+)?(?:human|designer|salesperson|project manager)|human\s+(?:please|pls)|真人|人工|转人工|轉人工|找设计师|找設計師|联系顾问|聯繫顧問|nak\s+cakap\s+dengan\s+(?:staff|designer|sales)|mahu\s+cakap\s+dengan\s+(?:staff|designer|sales)/i;
 const SITE_VISIT_PATTERN = /site\s*(?:visit|measurement|measure)|come\s+(?:and\s+)?measure|come\s+measure|measure\s+(?:my|the)\s+(?:house|home|unit|place)|arrange\s+(?:a\s+)?measurement|quotation\s+appointment|home\s+visit|上门量尺|上門量尺|量尺|现场测量|現場測量|datang\s+ukur|site\s+measurement|ukur\s+rumah/i;
+const QUOTE_INTENT_PATTERN = /exact\s+(?:price|quote|quotation)|proper\s+(?:quote|quotation)|send\s+(?:me\s+)?(?:a\s+)?quote|prepare\s+(?:a\s+)?quotation|can\s+(?:you\s+)?quote|nak\s+quotation|mahu\s+quotation|buat\s+quotation|正式报价|正式報價|给我报价|給我報價|出报价|出報價/i;
 const TECHNICAL_PATTERN = /load[- ]?bearing|structural|hack(?:ing)?\s+(?:wall|beam|column)|electrical|rewir(?:e|ing)|plumb(?:ing)?|waterproof(?:ing)?|gas\s+(?:pipe|line)|permit|authority|approval|承重墙|承重牆|敲墙|敲牆|电线|電線|水管|防水|kelulusan|struktur|pendawaian|paip/i;
 const COMPLAINT_PATTERN = /complaint|refund|defect|damage|poor workmanship|wrong colour|wrong color|not happy|very disappointed|投诉|投訴|退款|瑕疵|做坏|做壞|rosak|aduan/i;
 const PRICE_PATTERN = /price|how much|cost|quotation|quote|budget|harga|berapa|kos|sebut harga|多少钱|多少錢|价格|價格|价钱|價錢|报价|報價|预算|預算/i;
@@ -110,6 +111,7 @@ function buildFallbackReply(messages) {
   if (COMPLAINT_PATTERN.test(text)) return handoffReply(language, "complaint");
   if (TECHNICAL_PATTERN.test(text)) return handoffReply(language, "technical");
   if (SITE_VISIT_PATTERN.test(text)) return handoffReply(language, "quote");
+  if (QUOTE_INTENT_PATTERN.test(text)) return handoffReply(language, "quote");
   if (HUMAN_REQUEST_PATTERN.test(text)) return handoffReply(language, "human");
 
   const service = detectService(text) || detectKnownService(messages);
