@@ -1,18 +1,12 @@
 import { withAppBase } from "../basePath";
-import { isRenovationDemo } from "./demoIndustry";
+import { industryProfile } from "./industryProfile";
 
-export const branding = isRenovationDemo
-  ? {
-      clientName: "Oakline Demo Renovation",
-      clientLogo: withAppBase("/dashboard/oakline-demo-logo.svg"),
-      loginTagline: "Interactive renovation AI sales demo",
-      agencyName: "AI Renovation Demo",
-      agencyLogo: withAppBase("/dashboard/oakline-demo-logo.svg"),
-    }
-  : {
-      clientName: "Nova Demo Clinic",
-      clientLogo: withAppBase("/dashboard/nova-demo-logo.svg"),
-      loginTagline: "Interactive clinic AI sales demo",
-      agencyName: "AI Clinic Demo",
-      agencyLogo: withAppBase("/dashboard/nova-demo-logo.svg"),
-    };
+const isRenovation = industryProfile.key === "renovation";
+
+export const branding = {
+  clientName: industryProfile.shortBusinessName,
+  clientLogo: withAppBase(isRenovation ? "/dashboard/oakline-demo-logo.svg" : "/dashboard/nova-demo-logo.svg"),
+  loginTagline: isRenovation ? "Interactive renovation AI sales demo" : "Interactive clinic AI sales demo",
+  agencyName: isRenovation ? "AI Renovation Demo" : "AI Clinic Demo",
+  agencyLogo: withAppBase(isRenovation ? "/dashboard/oakline-demo-logo.svg" : "/dashboard/nova-demo-logo.svg"),
+};
