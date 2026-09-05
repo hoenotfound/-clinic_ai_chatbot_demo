@@ -99,8 +99,8 @@ test("renovation profile stays industry-specific across customer view and the co
 
   await openDashboardPage(frame, "Settings");
   await expect(frame.getByText("Renovation business profile", { exact: true })).toBeVisible();
-  await expect(frame.getByDisplayValue("Oakline Demo Renovation & Carpentry")).toBeVisible();
-  await expect(frame.getByDisplayValue("Aiden")).toBeVisible();
+  await expect(frame.getByRole("textbox", { name: "Business name" })).toHaveValue("Oakline Demo Renovation & Carpentry");
+  await expect(frame.getByRole("textbox", { name: "AI assistant name" })).toHaveValue("Aiden");
   await expect(frame.getByText("Quotation & measurement intent", { exact: true })).toBeVisible();
   await frame.getByRole("button", { name: "Promotions", exact: true }).click();
   await expect(frame.getByText("No active demo promotion", { exact: true })).toBeVisible();
