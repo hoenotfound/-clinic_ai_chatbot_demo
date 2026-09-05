@@ -28,9 +28,41 @@
     document.head.appendChild(script);
   }
 
+  function installMobileDashboardViewportGuard() {
+    const mobileDashboard = window.matchMedia("(max-width: 767px)");
+
+    const alignDashboard = () => {
+      if (!mobileDashboard.matches) return;
+      const dashboard = document.getElementById("dashboardView");
+      const frame = document.getElementById("reactDashboardFrame");
+      if (!dashboard?.classList.contains("active") || !frame) return;
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const headerHeight = document.querySelector(".topbar")?.getBoundingClientRect().height || 0;
+          const rect = frame.getBoundingClientRect();
+          const desiredTop = headerHeight + 4;
+          const needsAlignment = rect.top < desiredTop - 2 || rect.bottom > window.innerHeight;
+          if (!needsAlignment) return;
+          window.scrollTo({
+            top: Math.max(0, window.scrollY + rect.top - desiredTop),
+            behavior: "auto",
+          });
+        });
+      });
+    };
+
+    document.addEventListener("click", (event) => {
+      if (!(event.target instanceof Element) || !event.target.closest("#dashboardTab")) return;
+      alignDashboard();
+    });
+    window.addEventListener("resize", alignDashboard, { passive: true });
+  }
+
   window.clinicDemoBasePath = basePath;
   window.clinicDemoUrl = withBase;
   loadIndustrySwitcherStyles();
+  installMobileDashboardViewportGuard();
 
   if (!basePath) {
     loadIndustryExperience();
