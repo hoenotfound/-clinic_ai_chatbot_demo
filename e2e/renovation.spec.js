@@ -24,9 +24,21 @@ test("renovation profile stays industry-specific across customer view and dashbo
   await page.goto("/");
 
   await expect(page.getByText("Oakline Demo Renovation & Carpentry").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Kitchen cabinet price?" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Kitchen cabinet price?" }).click();
+  const facebookAcquisition = page.locator('[data-acquisition-key="hifu-facebook"]');
+  await expect(facebookAcquisition).toContainText("Kitchen Cabinets Facebook Ad");
+  await facebookAcquisition.click();
+  await expect.poll(async () => page.evaluate(() => JSON.parse(sessionStorage.getItem("clinicDemoAcquisition") || "null"))).toMatchObject({
+    key: "hifu-facebook",
+    campaign: "Kitchen Cabinets Demo Campaign",
+    treatment: "Kitchen Cabinets",
+    channel: "facebook",
+  });
+
+  const priceChip = page.locator(".prompt-panel .suggestion-chip").filter({ hasText: "Kitchen cabinet price?" });
+  await expect(priceChip).toHaveCount(1);
+  await expect(priceChip).toHaveAttribute("data-message", "Hi, kitchen cabinet how much?");
+  await priceChip.click();
   await expect(page.locator("#messages")).toContainText("RM 6,800");
 
   await sendCustomerMessage(page, "New condo in Puchong, kitchen around 12ft. Budget RM10k.");
@@ -39,6 +51,7 @@ test("renovation profile stays industry-specific across customer view and dashbo
 
   // Industry presentation copy must never rewrite customer-authored text.
   await expect(frame.getByText(literalCustomerMessage, { exact: true }).first()).toBeVisible();
+  await expect(frame.getByText("Kitchen Cabinets Demo Campaign", { exact: true }).first()).toBeVisible();
 
   await frame.getByRole("link", { name: "Pipeline" }).click();
   await expect(frame.getByRole("heading", { name: "Lead Pipeline" })).toBeVisible();
