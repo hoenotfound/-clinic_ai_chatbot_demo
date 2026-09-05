@@ -35,7 +35,7 @@ function clinicProfile() {
     bookingRulesForPrompt,
     salesCtaDefault: "Set up my clinic",
     acquisitionPresets: {
-      "hifu-facebook": { key: "hifu-facebook", label: "HIFU Facebook Ad", source: "Meta Ads", campaign: "HIFU Demo Campaign", treatment: "HIFU Skin Lifting", channel: "facebook" },
+      "hifu-facebook": { key: "hifu-facebook", label: "HIFU Facebook Ad", source: "Meta Ads", campaign: "HIFU Jawline Demo Campaign", treatment: "HIFU Skin Lifting", channel: "facebook" },
       "pico-instagram": { key: "pico-instagram", label: "Pico Instagram Ad", source: "Meta Ads", campaign: "Pico Demo Campaign", treatment: "Pico Laser", channel: "instagram" },
       "organic-whatsapp": { key: "organic-whatsapp", label: "Organic WhatsApp", source: "Organic", campaign: null, treatment: null, channel: "whatsapp" },
       referral: { key: "referral", label: "Referral", source: "Referral", campaign: null, treatment: null, channel: "whatsapp" },
