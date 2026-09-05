@@ -10,10 +10,22 @@
     return `${basePath}${value}`;
   }
 
+  function loadIndustryExperience() {
+    if (document.querySelector('script[data-industry-experience="true"]')) return;
+    const script = document.createElement("script");
+    script.src = withBase("/industry-experience.js");
+    script.dataset.industryExperience = "true";
+    script.async = false;
+    document.head.appendChild(script);
+  }
+
   window.clinicDemoBasePath = basePath;
   window.clinicDemoUrl = withBase;
 
-  if (!basePath) return;
+  if (!basePath) {
+    loadIndustryExperience();
+    return;
+  }
 
   const nativeFetch = window.fetch.bind(window);
   window.fetch = (input, init) => {
@@ -38,4 +50,5 @@
   patchUrlProperty(HTMLScriptElement.prototype, "src");
   patchUrlProperty(HTMLLinkElement.prototype, "href");
   patchUrlProperty(HTMLIFrameElement.prototype, "src");
+  loadIndustryExperience();
 })();
