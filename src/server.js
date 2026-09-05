@@ -2,7 +2,6 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const clinic = require("./clinicConfig");
 
 function loadDotEnv() {
   const envPath = path.join(__dirname, "..", ".env");
@@ -23,6 +22,8 @@ function loadDotEnv() {
 }
 
 loadDotEnv();
+const industryProfile = require("./industryProfile");
+const business = industryProfile.config;
 const state = require("./demoState");
 const shared = require("./sharedState");
 const opsStats = require("./opsStats");
@@ -288,14 +289,23 @@ async function persistSession(session) {
 }
 
 function publicConfig() {
+  const businessName = business.businessName || business.clinicName || "Demo Business";
+  const locations = Array.isArray(business.branches) ? business.branches : [];
   return {
-    clinicName: clinic.clinicName,
-    assistantName: clinic.assistantName,
-    branches: clinic.branches,
-    services: clinic.services.map(({ aliases, ...service }) => service),
-    promotion: clinic.promotion,
+    industryKey: industryProfile.key,
+    businessName,
+    clinicName: businessName,
+    assistantName: business.assistantName,
+    labels: industryProfile.labels,
+    highIntentFields: industryProfile.highIntentFields,
+    locations,
+    branches: locations,
+    services: (business.services || []).map(({ aliases, ...service }) => service),
+    promotion: business.promotion || null,
+    acquisitionPresets: industryProfile.acquisitionPresets,
+    publicExperience: industryProfile.publicExperience,
     salesCta: {
-      label: process.env.SALES_CTA_LABEL || "Set up my clinic",
+      label: process.env.SALES_CTA_LABEL || industryProfile.salesCtaDefault,
       url: process.env.SALES_CTA_URL || "",
     },
     limits: {
@@ -413,7 +423,7 @@ async function handleApi(req, res, url) {
         });
       }
 
-      if (isFirstMessage) reply = `${clinic.introMessage}\n\n${reply}`;
+      if (isFirstMessage) reply = `${business.introMessage}\n\n${reply}`;
       const assistantMessage = state.addAssistantMessage(session, reply);
       const showPromotion = !degraded && !session.needsAttention && state.shouldShowPromotion(session);
       if (showPromotion) state.markPromotionShown(session, assistantMessage.id);
@@ -422,7 +432,7 @@ async function handleApi(req, res, url) {
         session: state.publicSession(session),
         aiReplied: !degraded,
         degraded,
-        promotion: showPromotion ? clinic.promotion : null,
+        promotion: showPromotion ? (business.promotion || null) : null,
       });
     } finally {
       releaseAiSlot?.();
@@ -432,6 +442,7 @@ async function handleApi(req, res, url) {
 }
 
 function buildOpsPage() {
+  const customerLabel = industryProfile.labels.customer;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -444,17 +455,17 @@ function buildOpsPage() {
 <body>
   <main class="ops-shell">
     <header class="ops-header">
-      <div><p class="eyebrow">Private admin view</p><h1>Demo Operations</h1><p class="subtitle">Live usage, interactions and Gemini health for the public clinic chatbot demo.</p></div>
+      <div><p class="eyebrow">Private admin view</p><h1>Demo Operations</h1><p class="subtitle">Live usage, interactions and Gemini health for the public ${industryProfile.key} chatbot demo.</p></div>
       <div class="header-meta"><span id="todayLabel">Today</span><span id="storageLabel">Loading storage status…</span><span id="updatedAt">Loading…</span></div>
     </header>
 
     <section class="grid metric-grid" aria-label="Visitor metrics">
       <article class="metric"><span>Active now</span><strong id="activeVisitors">0</strong></article>
       <article class="metric"><span>Unique today</span><strong id="uniqueVisitors">0</strong></article>
-      <article class="metric"><span>Patient view opens</span><strong id="patientViews">0</strong></article>
+      <article class="metric"><span>${customerLabel} view opens</span><strong id="patientViews">0</strong></article>
       <article class="metric"><span>Dashboard opens</span><strong id="dashboardViews">0</strong></article>
       <article class="metric"><span>Demo sessions</span><strong id="sessionsStarted">0</strong></article>
-      <article class="metric"><span>Patient messages</span><strong id="customerMessages">0</strong></article>
+      <article class="metric"><span>${customerLabel} messages</span><strong id="customerMessages">0</strong></article>
     </section>
 
     <section class="section">
@@ -588,7 +599,8 @@ function buildEnhancedIndex(filePath) {
 
   if (dashboardStart >= 0 && proofStart > dashboardStart && PORTAL_DASHBOARD_PARTS.every((part) => fs.existsSync(part))) {
     const portalDashboard = PORTAL_DASHBOARD_PARTS.map((part) => fs.readFileSync(part, "utf8")).join("");
-    const replacement = `${dashboardStartToken}\n          <iframe id="reactDashboardFrame" class="react-dashboard-frame" src="/dashboard/inbox" title="Nova Demo Clinic staff portal"></iframe>\n          <div class="legacy-dashboard-hooks" aria-hidden="true">\n${portalDashboard}\n          </div>\n        </div>\n      </section>\n\n`;
+    const businessName = business.businessName || business.clinicName || "Demo Business";
+    const replacement = `${dashboardStartToken}\n          <iframe id="reactDashboardFrame" class="react-dashboard-frame" src="/dashboard/inbox" title="${businessName} staff portal"></iframe>\n          <div class="legacy-dashboard-hooks" aria-hidden="true">\n${portalDashboard}\n          </div>\n        </div>\n      </section>\n\n`;
     html = html.slice(0, dashboardStart) + replacement + html.slice(proofStart);
   }
 
@@ -715,7 +727,7 @@ const server = http.createServer(async (req, res) => {
 setInterval(state.cleanupExpiredSessions, 10 * 60_000).unref();
 
 server.listen(PORT, () => {
-  console.log(`Clinic AI demo running on port ${PORT}`);
+  console.log(`AI chatbot demo (${industryProfile.key}) running on port ${PORT}`);
   console.log("AI provider configured:", ai.configured);
   console.log("Demo operations dashboard configured:", opsAuthConfigured());
 });
