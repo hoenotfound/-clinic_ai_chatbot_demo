@@ -29,10 +29,29 @@ const TEXT_REPLACEMENTS = [
   ["Reply to patient…", "Reply to customer…"],
 ];
 
+const OPTION_REPLACEMENTS = new Map([
+  ["HIFU Skin Lifting", ["Kitchen Cabinets", "Kitchen Cabinets"]],
+  ["Pico Laser", ["Built-in Wardrobes", "Built-in Wardrobes"]],
+  ["Skin Booster", ["Full-Home Custom Carpentry", "Full-Home Carpentry"]],
+  ["Botulinum Toxin", ["TV Console & Living Room Carpentry", "Living Room Carpentry"]],
+  ["Mira", ["Amir", "Amir"]],
+  ["Sarah", ["Mei", "Mei"]],
+]);
+
 function replaceText(value) {
   let next = value;
   for (const [from, to] of TEXT_REPLACEMENTS) next = next.split(from).join(to);
   return next;
+}
+
+function adaptControls(root) {
+  root.querySelectorAll?.("select option").forEach((option) => {
+    const replacement = OPTION_REPLACEMENTS.get(option.value);
+    if (!replacement) return;
+    const [value, label] = replacement;
+    if (option.value !== value) option.value = value;
+    if (option.textContent !== label) option.textContent = label;
+  });
 }
 
 function adaptNode(root) {
@@ -53,6 +72,7 @@ function adaptNode(root) {
       if (next !== value) element.setAttribute(attribute, next);
     }
   });
+  adaptControls(root);
 }
 
 export default function IndustryLanguageAdapter() {
@@ -61,8 +81,16 @@ export default function IndustryLanguageAdapter() {
     const root = document.getElementById("root");
     if (!root) return undefined;
     adaptNode(root);
-    const observer = new MutationObserver(() => adaptNode(root));
-    observer.observe(root, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["placeholder", "aria-label", "title"] });
+    let queued = false;
+    const observer = new MutationObserver(() => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        adaptNode(root);
+      });
+    });
+    observer.observe(root, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["placeholder", "aria-label", "title", "value"] });
     return () => observer.disconnect();
   }, []);
 
