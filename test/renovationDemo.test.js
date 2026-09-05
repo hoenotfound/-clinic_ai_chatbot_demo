@@ -51,8 +51,30 @@ test("technical renovation questions are escalated", () => {
 });
 
 test("existing session lead detection recognizes renovation services", () => {
-  const session = state.createSession({ channel: "whatsapp", ip: `renovation-test-${Date.now()}` });
+  const session = state.createSession({ channel: "whatsapp", ip: `renovation-test-${Date.now()}-service` });
   state.addCustomerMessage(session, "I want kitchen cabinet, how much?");
   assert.ok(session.lead.interests.includes("Kitchen Cabinets"));
   assert.equal(session.lead.temperature, "warm");
+});
+
+test("live renovation lead remembers project, property, area and budget", () => {
+  const session = state.createSession({ channel: "whatsapp", ip: `renovation-test-${Date.now()}-qualify` });
+  state.addCustomerMessage(session, "New condo in Puchong, kitchen cabinet around 12ft. Budget RM10k.");
+  assert.ok(session.lead.interests.includes("Kitchen Cabinets"));
+  assert.equal(session.lead.propertyType, "New project");
+  assert.equal(session.lead.preferredBranch, "Cheras / Kajang / Puchong");
+  assert.equal(session.lead.budget, "RM10,000");
+  assert.equal(session.lead.measurementsKnown, true);
+  assert.equal(session.lead.temperature, "hot");
+});
+
+test("site measurement request becomes high-intent live lead", () => {
+  const session = state.createSession({ channel: "instagram", ip: `renovation-test-${Date.now()}-site` });
+  state.addCustomerMessage(session, "I want wardrobe for my condo in PJ");
+  state.lastCustomerMessageAt = 0;
+  state.addCustomerMessage(session, "Budget around 8k. Can your team come for site measurement Saturday morning?");
+  assert.equal(session.lead.bookingIntent, true);
+  assert.equal(session.lead.temperature, "hot");
+  assert.equal(session.lead.preferredBranch, "Petaling Jaya / Subang / Shah Alam");
+  assert.match(session.lead.summary, /site measurement|staff follow-up/i);
 });
