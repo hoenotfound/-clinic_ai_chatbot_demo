@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ToastContainer, useToasts } from "../components/Toast";
+import { industryProfile } from "../config/industryProfile";
 
 const LANGS = [
   { key: "en", label: "English" },
@@ -7,11 +8,8 @@ const LANGS = [
   { key: "zh", label: "中文" },
 ];
 
-const DEFAULTS = {
-  en: "Hi! Just checking in to see if you still need any help. Feel free to reply whenever you're ready 😊",
-  ms: "Hai! Saya cuma ingin bertanya sama ada anda masih memerlukan bantuan. Balas sahaja apabila anda sudah bersedia 😊",
-  zh: "嗨！想跟进一下，看看您是否还需要任何帮助。方便时回复我们就可以了 😊",
-};
+const TOOL_PROFILE = industryProfile.tools;
+const DEFAULTS = TOOL_PROFILE.followUpDefaults;
 
 export default function Tools() {
   const [active, setActive] = useState("followUp");
@@ -34,7 +32,7 @@ export default function Tools() {
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
   function fakeSave(text) {
-    showToast(`${text} Demo settings are not connected to a real clinic.`, "info");
+    showToast(`${text} ${TOOL_PROFILE.disconnectedCopy}`, "info");
   }
 
   function runFollowUpDemo() {
@@ -78,15 +76,7 @@ export default function Tools() {
             <PageHead eyebrow="Automated follow-up" title="Reconnect with enquiries automatically" copy="Show prospects exactly what happens when a warm lead goes quiet — from inactivity detection to an automatic follow-up message." active={enabled} />
 
             <div className="mt-6 space-y-5">
-              <FollowUpScenario
-                scenario={scenario}
-                run={runFollowUpDemo}
-                reset={resetFollowUpDemo}
-                delayLabel={delayLabel}
-                message={translations[lang]}
-                language={LANGS.find((item) => item.key === lang)?.label || "English"}
-                enabled={enabled}
-              />
+              <FollowUpScenario scenario={scenario} run={runFollowUpDemo} reset={resetFollowUpDemo} delayLabel={delayLabel} message={translations[lang]} language={LANGS.find((item) => item.key === lang)?.label || "English"} enabled={enabled} />
 
               <div className="grid gap-5 xl:grid-cols-[1fr_21rem]">
                 <div className="space-y-5">
@@ -139,16 +129,16 @@ export default function Tools() {
                 <aside className="self-start rounded-2xl border border-[var(--color-border)] bg-white p-4 shadow-sm xl:sticky xl:top-5">
                   <div className="flex items-start justify-between"><div><span className="text-[9px] font-bold uppercase tracking-[.12em] text-[var(--color-text-muted)]">Customer preview</span><strong className="mt-1 block text-sm">{LANGS.find((item) => item.key === lang)?.label}</strong></div><em className="rounded-full bg-[var(--color-primary-light)] px-2.5 py-1 text-[9px] not-italic font-semibold text-[var(--color-primary)]">WhatsApp</em></div>
                   <div className="mt-4 min-h-56 rounded-2xl border border-[var(--color-border)] bg-[#f5f7f5] bg-[radial-gradient(circle_at_1px_1px,rgba(47,111,98,.055)_1px,transparent_0)] bg-[length:22px_22px] p-4">
-                    <div className="ml-auto max-w-[94%] rounded-2xl rounded-br-md bg-[var(--color-primary)] px-3.5 py-3 text-xs leading-5 text-white shadow-sm"><small className="mb-1 block text-[9px] text-white/65">Nova Demo Clinic</small>{translations[lang]}</div>
+                    <div className="ml-auto max-w-[94%] rounded-2xl rounded-br-md bg-[var(--color-primary)] px-3.5 py-3 text-xs leading-5 text-white shadow-sm"><small className="mb-1 block text-[9px] text-white/65">{industryProfile.shortBusinessName}</small>{translations[lang]}</div>
                   </div>
-                  <p className="mt-3 text-[10px] leading-5 text-[var(--color-text-muted)]">Before it sends, the production system checks that the patient has not already replied and that the conversation is still eligible.</p>
+                  <p className="mt-3 text-[10px] leading-5 text-[var(--color-text-muted)]">{TOOL_PROFILE.previewEligibility}</p>
                 </aside>
               </div>
             </div>
           </div>
         ) : (
           <div className="mx-auto max-w-5xl p-4 sm:p-6 lg:p-7">
-            <PageHead eyebrow="Automatic Lead Temperature" title="Prioritise the enquiries most likely to book" copy="The AI reviews the conversation after it goes quiet and automatically labels leads Hot, Warm or Cold." active={scoring.enabled} />
+            <PageHead eyebrow="Automatic Lead Temperature" title={TOOL_PROFILE.scoringTitle} copy="The AI reviews the conversation after it goes quiet and automatically labels leads Hot, Warm or Cold." active={scoring.enabled} />
             <div className="mt-6 space-y-5">
               <Card n="1" title="Choose when scoring runs" copy="Scoring waits until the conversation has been quiet long enough to understand the customer's latest intent.">
                 <div className="grid gap-3 md:grid-cols-3">
@@ -158,7 +148,7 @@ export default function Tools() {
                 </div>
               </Card>
               <Card n="2" title="How the labels work" copy="The demo uses the same sales-intent language your team sees in the production workspace.">
-                <div className="grid gap-3 md:grid-cols-3"><Temp color="danger" title="Hot" copy="Strong booking intent, appointment timing, or a clear request to proceed." /><Temp color="accent" title="Warm" copy="Active treatment or pricing interest but no firm booking intent yet." /><Temp color="cold" title="Cold" copy="Early-stage enquiry, low intent, or the latest message shows reduced interest." /></div>
+                <div className="grid gap-3 md:grid-cols-3"><Temp color="danger" title="Hot" copy={TOOL_PROFILE.hotCopy} /><Temp color="accent" title="Warm" copy={TOOL_PROFILE.warmCopy} /><Temp color="cold" title="Cold" copy="Early-stage enquiry, low intent, or the latest message shows reduced interest." /></div>
               </Card>
               <Card n="3" title="What happens next" copy="Temperature updates flow into Inbox filters, Pipeline priority and Analytics.">
                 <div className="grid gap-3 sm:grid-cols-2"><Info title="Automatic organisation" copy="Every conversation is classified without staff manually tagging leads." /><Info title="Human override" copy="Staff can still update lead stages and take over the conversation whenever needed." /></div>
@@ -188,7 +178,7 @@ function FollowUpScenario({ scenario, run, reset, delayLabel, message, language,
       <div className="grid gap-5 p-5 lg:grid-cols-[1.05fr_.95fr] sm:p-6">
         <div>
           <div className="flex items-center justify-between rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
-            <div><span className="text-[9px] font-bold uppercase tracking-wide text-[var(--color-text-muted)]">Sample quiet lead</span><strong className="mt-1 block text-sm">Amanda Lee · Pico Laser</strong><p className="mt-1 text-[10px] text-[var(--color-text-muted)]">Warm · Kuala Lumpur · no reply after the clinic's last message</p></div>
+            <div><span className="text-[9px] font-bold uppercase tracking-wide text-[var(--color-text-muted)]">Sample quiet lead</span><strong className="mt-1 block text-sm">{TOOL_PROFILE.sampleLeadName} · {TOOL_PROFILE.sampleLeadService}</strong><p className="mt-1 text-[10px] text-[var(--color-text-muted)]">Warm · {TOOL_PROFILE.sampleLeadArea} · {TOOL_PROFILE.quietCopy}</p></div>
             <span className="rounded-full bg-[var(--color-accent-light)] px-2.5 py-1 text-[9px] font-bold text-[#8a641f]">WARM</span>
           </div>
 
@@ -201,17 +191,17 @@ function FollowUpScenario({ scenario, run, reset, delayLabel, message, language,
 
           <div className="mt-4 rounded-2xl border border-[var(--color-border)] bg-white p-4">
             <div className="flex items-center justify-between"><strong className="text-xs">What the automation checks</strong><span className="text-[9px] font-semibold text-[var(--color-text-muted)]">Demo logic</span></div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-3"><Check label="Patient has not replied" active={step >= 2} /><Check label="Conversation still open" active={step >= 2} /><Check label="Follow-up not already sent" active={step >= 2} /></div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-3"><Check label={TOOL_PROFILE.customerCheck} active={step >= 2} /><Check label="Conversation still open" active={step >= 2} /><Check label="Follow-up not already sent" active={step >= 2} /></div>
           </div>
         </div>
 
         <div className="rounded-2xl border border-[var(--color-border)] bg-[#f5f7f5] p-4">
-          <div className="flex items-center justify-between"><div><span className="text-[9px] font-bold uppercase tracking-[.12em] text-[var(--color-text-muted)]">Patient chat preview</span><strong className="mt-1 block text-xs">{language}</strong></div><span className="rounded-full bg-white px-2 py-1 text-[9px] font-semibold text-[var(--color-primary)] shadow-sm">WhatsApp</span></div>
+          <div className="flex items-center justify-between"><div><span className="text-[9px] font-bold uppercase tracking-[.12em] text-[var(--color-text-muted)]">{TOOL_PROFILE.chatPreviewTitle}</span><strong className="mt-1 block text-xs">{language}</strong></div><span className="rounded-full bg-white px-2 py-1 text-[9px] font-semibold text-[var(--color-primary)] shadow-sm">WhatsApp</span></div>
           <div className="mt-4 space-y-2 text-xs leading-5">
-            <div className="max-w-[88%] rounded-2xl rounded-bl-md bg-white px-3 py-2.5 shadow-sm">KL is easier. I need to check my work schedule first.</div>
-            <div className="ml-auto max-w-[88%] rounded-2xl rounded-br-md bg-[var(--color-primary)] px-3 py-2.5 text-white shadow-sm">No problem 😊 Take your time. Let me know if you'd like help choosing a slot.</div>
+            <div className="max-w-[88%] rounded-2xl rounded-bl-md bg-white px-3 py-2.5 shadow-sm">{TOOL_PROFILE.sampleCustomerMessage}</div>
+            <div className="ml-auto max-w-[88%] rounded-2xl rounded-br-md bg-[var(--color-primary)] px-3 py-2.5 text-white shadow-sm">{TOOL_PROFILE.sampleAssistantMessage}</div>
             {scenario === "waiting" && <StatusBubble>Waiting for {delayLabel} of inactivity…</StatusBubble>}
-            {scenario === "checking" && <StatusBubble>Checking for a new patient reply…</StatusBubble>}
+            {scenario === "checking" && <StatusBubble>{TOOL_PROFILE.checkingCopy}</StatusBubble>}
             {scenario === "sent" && <div className="ml-auto max-w-[88%] animate-[pulse_650ms_ease-out_1] rounded-2xl rounded-br-md bg-[var(--color-primary)] px-3 py-2.5 text-white shadow-sm"><small className="mb-1 block text-[9px] text-white/65">Automatic follow-up</small>{message}</div>}
           </div>
         </div>
@@ -220,15 +210,10 @@ function FollowUpScenario({ scenario, run, reset, delayLabel, message, language,
   );
 }
 
-function ScenarioStep({ active, current, number, title, copy }) {
-  return <div className={`rounded-2xl border p-3 transition-all ${current ? "border-[var(--color-primary)] bg-[var(--color-primary-light)] shadow-sm" : active ? "border-[var(--color-border)] bg-white" : "border-[var(--color-border)] bg-[var(--color-bg)] opacity-55"}`}><span className={`flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-bold ${active ? "bg-[var(--color-primary)] text-white" : "bg-slate-200 text-slate-500"}`}>{number}</span><strong className="mt-2 block text-[10px]">{title}</strong><small className="mt-1 block text-[9px] leading-4 text-[var(--color-text-muted)]">{copy}</small></div>;
-}
+function ScenarioStep({ active, current, number, title, copy }) { return <div className={`rounded-2xl border p-3 transition-all ${current ? "border-[var(--color-primary)] bg-[var(--color-primary-light)] shadow-sm" : active ? "border-[var(--color-border)] bg-white" : "border-[var(--color-border)] bg-[var(--color-bg)] opacity-55"}`}><span className={`flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-bold ${active ? "bg-[var(--color-primary)] text-white" : "bg-slate-200 text-slate-500"}`}>{number}</span><strong className="mt-2 block text-[10px]">{title}</strong><small className="mt-1 block text-[9px] leading-4 text-[var(--color-text-muted)]">{copy}</small></div>; }
 function Check({ label, active }) { return <div className={`flex items-center gap-2 rounded-xl px-2.5 py-2 text-[9px] font-semibold ${active ? "bg-[var(--color-primary-light)] text-[var(--color-primary)]" : "bg-[var(--color-bg)] text-[var(--color-text-muted)]"}`}><span>{active ? "✓" : "○"}</span>{label}</div>; }
 function StatusBubble({ children }) { return <div className="mx-auto w-fit animate-pulse rounded-full bg-white px-3 py-1.5 text-[9px] font-semibold text-[var(--color-text-muted)] shadow-sm">{children}</div>; }
-
-function ToolNav({ active, setActive }) {
-  return <div className="space-y-2"><button onClick={() => setActive("followUp")} className={navClass(active === "followUp")}><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-primary-light)] text-[var(--color-primary)]">↗</span><span className="min-w-0"><strong className="block text-xs">Automated follow-up</strong><small className="mt-0.5 block text-[10px] font-normal opacity-70">Reconnect quiet enquiries</small></span></button><button onClick={() => setActive("scoring")} className={navClass(active === "scoring")}><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-accent-light)] text-[#8a641f]">●</span><span><strong className="block text-xs">Automatic Lead Temperature</strong><small className="mt-0.5 block text-[10px] font-normal opacity-70">Hot / Warm / Cold</small></span></button><div className="mt-5 border-t border-[var(--color-border)] pt-4"><p className="px-3 text-[9px] font-bold uppercase tracking-[.14em] text-[var(--color-text-muted)]">Coming next</p>{["Appointment reminders", "Promotional campaigns", "Review requests"].map((item) => <div key={item} className="mt-1 rounded-xl px-3 py-2.5 text-xs text-[var(--color-text-muted)]">{item}</div>)}</div></div>;
-}
+function ToolNav({ active, setActive }) { return <div className="space-y-2"><button onClick={() => setActive("followUp")} className={navClass(active === "followUp")}><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-primary-light)] text-[var(--color-primary)]">↗</span><span className="min-w-0"><strong className="block text-xs">Automated follow-up</strong><small className="mt-0.5 block text-[10px] font-normal opacity-70">Reconnect quiet enquiries</small></span></button><button onClick={() => setActive("scoring")} className={navClass(active === "scoring")}><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-accent-light)] text-[#8a641f]">●</span><span><strong className="block text-xs">Automatic Lead Temperature</strong><small className="mt-0.5 block text-[10px] font-normal opacity-70">Hot / Warm / Cold</small></span></button><div className="mt-5 border-t border-[var(--color-border)] pt-4"><p className="px-3 text-[9px] font-bold uppercase tracking-[.14em] text-[var(--color-text-muted)]">Coming next</p>{TOOL_PROFILE.comingNext.map((item) => <div key={item} className="mt-1 rounded-xl px-3 py-2.5 text-xs text-[var(--color-text-muted)]">{item}</div>)}</div></div>; }
 function navClass(active) { return `flex w-full items-center gap-3 rounded-2xl p-3 text-left transition ${active ? "bg-[var(--color-primary-light)] text-[var(--color-text)] shadow-[inset_0_0_0_1px_rgba(47,111,98,.12)]" : "hover:bg-[var(--color-bg)] text-[var(--color-text-muted)]"}`; }
 function mobileClass(active) { return `shrink-0 rounded-full px-3 py-1.5 text-[10px] font-semibold ${active ? "bg-[var(--color-primary)] text-white" : "border border-[var(--color-border)] bg-white"}`; }
 function PageHead({ eyebrow, title, copy, active }) { return <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[9px] font-bold uppercase tracking-[.14em] text-[var(--color-primary)]">{eyebrow}</p><h1 className="mt-1 font-display text-2xl font-bold tracking-[-.02em]">{title}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--color-text-muted)]">{copy}</p></div><span className={`rounded-full px-3 py-1.5 text-[10px] font-bold ${active ? "bg-[var(--color-primary-light)] text-[var(--color-primary)]" : "bg-slate-100 text-slate-500"}`}>{active ? "Active" : "Paused"}</span></div>; }
