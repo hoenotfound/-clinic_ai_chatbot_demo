@@ -6,6 +6,9 @@ const QUOTE_INTENT_PATTERN = /exact\s+(?:price|quote|quotation)|proper\s+(?:quot
 const TECHNICAL_PATTERN = /load[- ]?bearing|structural|hack(?:ing)?\s+(?:wall|beam|column)|electrical|rewir(?:e|ing)|plumb(?:ing)?|waterproof(?:ing)?|gas\s+(?:pipe|line)|permit|authority|approval|承重墙|承重牆|敲墙|敲牆|电线|電線|水管|防水|kelulusan|struktur|pendawaian|paip/i;
 const COMPLAINT_PATTERN = /complaint|refund|defect|damage|poor workmanship|wrong colour|wrong color|not happy|very disappointed|投诉|投訴|退款|瑕疵|做坏|做壞|rosak|aduan/i;
 const PRICE_PATTERN = /price|how much|cost|quotation|quote|budget|harga|berapa|kos|sebut harga|多少钱|多少錢|价格|價格|价钱|價錢|报价|報價|预算|預算/i;
+const BUDGET_PROMPT_PATTERN = /budget|bajet|预算|預算/i;
+const MEASUREMENT_PATTERN = /\b\d+(?:\.\d+)?\s*(?:ft|feet|foot|mm|cm|m|meter|metre)s?\b|floor\s*plan|layout\s*plan|尺寸|平面图|平面圖|ukuran|pelan/i;
+const TIMELINE_PATTERN = /move\s*in|moving|collect(?:ed|ing)?\s+keys?|handover|complete\s+by|finish\s+by|next\s+(?:week|month)|this\s+(?:week|month)|within\s+\d+\s+(?:week|weeks|month|months)|baru\s+dapat\s+kunci|dapat\s+kunci|nak\s+siap|pindah|拿钥匙|拿鑰匙|交房|入住|搬家|完工/i;
 
 function userTexts(messages) {
   return (messages || []).filter((message) => message.role === "user").map((message) => String(message.content || "").trim()).filter(Boolean);
@@ -20,9 +23,54 @@ function conversationText(messages) {
 }
 
 function languageOf(text) {
-  if (/[一-鿿]/.test(text)) return "zh";
-  if (/\b(?:saya|nak|mahu|boleh|berapa|harga|rumah|kabinet|dapur|ukur|bajet|baru dapat kunci)\b/i.test(text)) return "ms";
+  const value = String(text || "").trim();
+  if (!value) return null;
+  if (/[一-鿿]/.test(value)) return "zh";
+  if (/\b(?:saya|nak|mahu|boleh|berapa|harga|rumah|kabinet|dapur|ukur|bajet|baru dapat kunci)\b/i.test(value)) return "ms";
+  if (/[a-z]/i.test(value)) return "en";
+  return null;
+}
+
+function conversationLanguage(messages) {
+  const texts = userTexts(messages);
+  for (let index = texts.length - 1; index >= 0; index -= 1) {
+    const language = languageOf(texts[index]);
+    if (language) return language;
+  }
   return "en";
+}
+
+function previousAssistantText(messages) {
+  const items = messages || [];
+  let latestUserIndex = -1;
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (items[index].role === "user") {
+      latestUserIndex = index;
+      break;
+    }
+  }
+  if (latestUserIndex <= 0) return "";
+  for (let index = latestUserIndex - 1; index >= 0; index -= 1) {
+    if (items[index].role === "assistant") return String(items[index].content || "");
+    if (items[index].role === "user") return "";
+  }
+  return "";
+}
+
+function parseBareBudget(text) {
+  const match = String(text || "").trim().match(/^(?:rm\s*)?(\d{1,3}(?:[,.]\d{3})+|\d+(?:\.\d+)?)\s*(k)?$/i);
+  if (!match) return null;
+  const numeric = Number(String(match[1]).replace(/,/g, ""));
+  if (!Number.isFinite(numeric)) return null;
+  const value = match[2] ? numeric * 1000 : numeric;
+  if (value < 500) return null;
+  return `RM${Math.round(value).toLocaleString("en-MY")}`;
+}
+
+function detectContextualBudget(messages) {
+  const previousAssistant = previousAssistantText(messages);
+  if (!BUDGET_PROMPT_PATTERN.test(previousAssistant)) return null;
+  return parseBareBudget(latestUserText(messages));
 }
 
 function detectService(text) {
@@ -96,6 +144,39 @@ function genericServiceReply(service, language, contextText) {
   return `Yes, ${service.name} is within the carpentry scope. If you have rough measurements or a floor plan, that's the next useful detail for quotation planning.`;
 }
 
+function budgetReply(budget, language, contextText) {
+  let nextQuestion = null;
+  if (!hasPropertyType(contextText)) {
+    nextQuestion = language === "zh"
+      ? "你的房子是 condo、landed 还是 commercial？"
+      : language === "ms"
+        ? "Property anda condo, landed atau commercial?"
+        : "Is the property a condo, landed home, or commercial unit?";
+  } else if (!hasArea(contextText)) {
+    nextQuestion = language === "zh"
+      ? "项目在哪个地区？"
+      : language === "ms"
+        ? "Project ini area mana?"
+        : "Which area is the project in?";
+  } else if (!MEASUREMENT_PATTERN.test(contextText)) {
+    nextQuestion = language === "zh"
+      ? "你有大概尺寸或 floor plan 吗？"
+      : language === "ms"
+        ? "Ada rough measurement atau floor plan tak?"
+        : "Do you have rough measurements or a floor plan?";
+  } else if (!TIMELINE_PATTERN.test(contextText)) {
+    nextQuestion = language === "zh"
+      ? "你大概希望什么时候完成？"
+      : language === "ms"
+        ? "Target nak siap bila?"
+        : "When are you hoping to have it completed?";
+  }
+
+  if (language === "zh") return `收到，我先记下预算大概 ${budget}。${nextQuestion || "这个预算会作为后面整理报价范围的参考。"}`;
+  if (language === "ms") return `Okay, saya catat bajet sekitar ${budget}. ${nextQuestion || "Bajet ini akan jadi rujukan bila susun scope quotation nanti."}`;
+  return `Got it, I'll note a budget of around ${budget}. ${nextQuestion || "I'll keep that as the working budget when narrowing the quotation scope."}`;
+}
+
 function genericReply(language) {
   if (language === "zh") return "可以，我可以先帮你了解木工装修需求和大概报价方向。你主要想做厨房柜、衣柜、电视柜、鞋柜，还是全屋木工？";
   if (language === "ms") return "Boleh, saya boleh bantu faham scope carpentry dan quotation dulu. Anda nak buat kitchen cabinet, wardrobe, TV cabinet, shoe cabinet atau full-house carpentry?";
@@ -105,7 +186,7 @@ function genericReply(language) {
 function buildFallbackReply(messages) {
   const text = latestUserText(messages);
   const contextText = conversationText(messages);
-  const language = languageOf(text || contextText);
+  const language = conversationLanguage(messages);
 
   if (!text) return genericReply(language);
   if (COMPLAINT_PATTERN.test(text)) return handoffReply(language, "complaint");
@@ -113,6 +194,9 @@ function buildFallbackReply(messages) {
   if (SITE_VISIT_PATTERN.test(text)) return handoffReply(language, "quote");
   if (QUOTE_INTENT_PATTERN.test(text)) return handoffReply(language, "quote");
   if (HUMAN_REQUEST_PATTERN.test(text)) return handoffReply(language, "human");
+
+  const contextualBudget = detectContextualBudget(messages);
+  if (contextualBudget) return budgetReply(contextualBudget, language, contextText);
 
   const service = detectService(text) || detectKnownService(messages);
   if (service && PRICE_PATTERN.test(text)) return servicePriceReply(service, language, contextText);
