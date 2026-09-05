@@ -1,226 +1,170 @@
 (() => {
-  const RENOVATION_NAME = "Oakline Demo Renovation & Carpentry";
-
-  const textReplacements = [
-    ["LIVE AI RECEPTIONIST DEMO", "LIVE AI RENOVATION SALES DEMO"],
-    ["Turn every clinic enquiry into a ", "Turn every renovation enquiry into a "],
-    ["Try the same journey your customer would experience, then open the Clinic Dashboard to see how the AI turns the conversation into clear sales context for your team.", "Try the same journey a renovation customer would experience, then open the Sales Dashboard to see how the AI turns the chat into project scope, budget, area, timeline and buying intent for your team."],
-    ["Fictional sample clinic", "Fictional sample renovation company"],
-    ["No real patient data", "No real customer data"],
-    ["Nova Demo Aesthetic Clinic", RENOVATION_NAME],
-    ["Nova Demo Clinic", "Oakline Demo Renovation"],
-    ["AI receptionist online", "AI sales assistant online"],
-    ["Hi, how much is HIFU?", "Hi, kitchen cabinet how much?"],
-    ["Our HIFU treatment starts from RM888. Are you looking at face lifting or jawline definition?", "Kitchen cabinets start from RM6,800 for a compact sample package. Is this for a condo or landed house?"],
-    ["Jawline. Can I come Saturday in KL?", "New condo in Puchong, around 12ft. Can come measure Saturday?"],
-    ["BOOKING INTENT DETECTED", "SITE MEASUREMENT INTENT"],
-    ["Hot lead · HIFU · KL · Saturday", "Hot lead · Kitchen · Puchong · Saturday"],
-    ["Try it as a patient. See what your clinic gets.", "Try it as a customer. See what your renovation team gets."],
-    ["Start with a real enquiry, then switch to the Clinic Dashboard to see the lead details, intent signals and conversation context your team receives.", "Start with a real renovation enquiry, then switch to the Sales Dashboard to see the project details, budget signals and conversation context your team receives."],
-    ["Patient View", "Customer View"],
-    ["Clinic Dashboard", "Sales Dashboard"],
-    ["See the same lead from staff side", "See the same lead from your team side"],
-    ["Start with a patient question", "Start with a renovation question"],
-    ["Try a price or treatment enquiry", "Try a price or carpentry enquiry"],
-    ["Show booking intent", "Show site-measurement intent"],
-    ["Ask for a day or branch", "Ask for site measurement or quotation"],
-    ["Open Clinic Dashboard", "Open Sales Dashboard"],
-    ["Continue as clinic staff", "Continue as renovation staff"],
-    ["Start the conversation as if you were a patient messaging the clinic.", "Start the conversation as if you were a homeowner messaging a renovation company."],
-    ["Interactive fictional sample clinic", "Interactive fictional renovation company"],
-    ["Demo only — please don’t enter real patient information or sensitive personal data.", "Demo only — please don’t enter real customer information, addresses or sensitive personal data."],
-    ["Use a sample enquiry", "Use a sample renovation enquiry"],
-    ["How much is HIFU?", "Kitchen cabinet price?"],
-    ["I have pigmentation", "I need a wardrobe"],
-    ["Can I come Saturday?", "Can you measure Saturday?"],
-    ["Speak to a human", "Speak to a designer"],
-    ["Treatment", "Project"],
-    ["Branch", "Area"],
-    ["Timing", "Timeline"],
-    ["Booking", "Site visit"],
-    ["HIFU", "Kitchen Cabinets"],
-    ["Switch to Clinic Dashboard to see these signals update with the conversation.", "Switch to Sales Dashboard to see these project signals update with the conversation."],
-    ["Patient enquiry", "Customer enquiry"],
-    ["Answers with your clinic knowledge and rules", "Answers with your renovation services, pricing rules and sales process"],
-    ["Clinic staff", "Renovation staff"],
-    ["clinic staff", "renovation staff"],
-    ["patient", "customer"],
-    ["Patient", "Customer"],
-    ["clinic", "renovation company"],
-    ["Clinic", "Renovation Company"],
-    ["Booking intent detected", "Site-measurement intent detected"],
-  ];
-
-  const renovationAcquisitionPresets = {
-    "hifu-facebook": {
-      key: "hifu-facebook",
-      label: "Kitchen Cabinets Facebook Ad",
-      source: "Meta Ads",
-      campaign: "Kitchen Cabinets Demo Campaign",
-      treatment: "Kitchen Cabinets",
-      channel: "facebook",
-    },
-    "pico-instagram": {
-      key: "pico-instagram",
-      label: "Wardrobe Instagram Ad",
-      source: "Meta Ads",
-      campaign: "Built-in Wardrobe Demo Campaign",
-      treatment: "Built-in Wardrobes",
-      channel: "instagram",
-    },
-    "organic-whatsapp": {
-      key: "organic-whatsapp",
-      label: "Organic WhatsApp",
-      source: "Organic",
-      campaign: null,
-      treatment: null,
-      channel: "whatsapp",
-    },
-    referral: {
-      key: "referral",
-      label: "Referral",
-      source: "Referral",
-      campaign: null,
-      treatment: null,
-      channel: "whatsapp",
-    },
-  };
-
-  function replaceText(value) {
-    let next = String(value || "");
-    for (const [from, to] of textReplacements) next = next.split(from).join(to);
-    return next;
+  function setText(selector, value, root = document) {
+    const element = root.querySelector(selector);
+    if (element && value != null) element.textContent = value;
+    return element;
   }
 
-  function setText(element, value) {
-    if (element && element.textContent !== value) element.textContent = value;
+  function setMeta(name, value) {
+    const element = document.querySelector(`meta[name="${name}"]`);
+    if (element && value) element.setAttribute("content", value);
   }
 
-  function shouldPreserveTextNode(node) {
-    const parent = node?.parentElement;
-    return Boolean(parent?.closest("#messages, #typingIndicator"));
-  }
+  function renderHero(experience) {
+    const badge = document.querySelector(".scaling-pill");
+    if (badge) badge.innerHTML = `<span class="status-dot"></span>${experience.badge}`;
 
-  function adaptText(root) {
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-    const nodes = [];
-    while (walker.nextNode()) nodes.push(walker.currentNode);
-    for (const node of nodes) {
-      if (shouldPreserveTextNode(node)) continue;
-      const next = replaceText(node.nodeValue);
-      if (next !== node.nodeValue) node.nodeValue = next;
+    const heading = document.querySelector(".hero-main h1");
+    if (heading) {
+      heading.replaceChildren(
+        document.createTextNode(experience.hero.headlinePrefix),
+        Object.assign(document.createElement("span"), { className: "text-gradient", textContent: experience.hero.headlineAccent })
+      );
     }
-    root.querySelectorAll?.("[aria-label], [title], input[placeholder], textarea[placeholder]").forEach((element) => {
-      if (element.closest("#messages, #typingIndicator")) return;
-      for (const attr of ["aria-label", "title", "placeholder"]) {
-        const value = element.getAttribute(attr);
-        if (!value) continue;
-        const next = replaceText(value);
-        if (next !== value) element.setAttribute(attr, next);
-      }
+    setText(".hero-copy", experience.hero.copy);
+
+    const footnotes = document.querySelectorAll(".hero-footnote span");
+    if (footnotes[1]) footnotes[1].textContent = experience.hero.footnotes[0];
+    if (footnotes[2]) footnotes[2].textContent = experience.hero.footnotes[1];
+
+    setText(".hero-product-topbar strong", experience.hero.shortBusinessName);
+    setText(".hero-product-topbar span", experience.hero.assistantStatus);
+    const heroMessages = document.querySelectorAll(".hero-chat-flow .hero-message");
+    experience.hero.messages.forEach((message, index) => {
+      if (heroMessages[index]) heroMessages[index].textContent = message;
     });
+    setText(".hero-lead-card span", experience.hero.intentLabel);
+    setText(".hero-lead-card strong", experience.hero.leadSummary);
   }
 
-  function configureSuggestions() {
-    const chips = [...document.querySelectorAll(".prompt-panel .suggestion-chip")];
-    const suggestions = [
-      { message: "Hi, kitchen cabinet how much?", label: "Kitchen cabinet price?", kind: "Price" },
-      { message: "New condo in Cheras. I need kitchen cabinet and wardrobe, budget around RM20k.", label: "I need kitchen + wardrobe", kind: "Project" },
-      { message: "I am in Puchong. Can your team come for site measurement this Saturday?", label: "Can you measure Saturday?", kind: "Site visit" },
-      { message: "Can I speak to a human designer?", label: "Speak to a designer", kind: "Handoff" },
-    ];
-    chips.forEach((chip, index) => {
-      const item = suggestions[index];
-      if (!item) return;
-      if (chip.dataset.message !== item.message) chip.dataset.message = item.message;
-      setText(chip.querySelector("span"), item.kind);
-      setText(chip.querySelector("strong"), item.label);
-    });
-  }
+  function renderLiveDemo(experience) {
+    setText("#demoSectionTitle", experience.section.title);
+    setText(".demo-section > .section-heading > p", experience.section.copy);
+    setText(".experience-status strong", experience.chat.businessName);
 
-  function configureAcquisitionPresets() {
-    document.querySelectorAll("[data-acquisition-key]").forEach((button) => {
-      const preset = renovationAcquisitionPresets[button.dataset.acquisitionKey];
-      if (!preset) return;
-      const kicker = preset.source === "Meta Ads" ? "Meta Ads" : preset.source;
-      setText(button.querySelector("span"), kicker);
-      setText(button.querySelector("strong"), preset.label);
-    });
-  }
+    setText("#patientTab strong", experience.view.customerTab);
+    setText("#dashboardTab strong", experience.view.dashboardTab);
+    setText("#dashboardTab small", experience.view.dashboardHint);
 
-  function configureCapturePreview() {
-    const values = document.querySelectorAll(".capture-preview-grid span");
-    const rows = [
-      ["Project", "Kitchen Cabinets"],
-      ["Area", "Puchong"],
-      ["Budget", "RM10k"],
-      ["Intent", "Site measurement"],
-    ];
-    values.forEach((element, index) => {
-      const row = rows[index];
+    setText("#tourStatus", experience.tour.startStatus);
+    setText("#tourStep1 small", experience.tour.firstHint);
+    setText("#tourStep2 strong", experience.tour.intentTitle);
+    setText("#tourStep2 small", experience.tour.intentHint);
+    setText("#tourStep3 strong", experience.tour.dashboardTitle);
+    setText("#tourStep4 small", experience.tour.staffHint);
+
+    document.querySelectorAll(".clinic-avatar, .empty-logo, .hero-product-avatar").forEach((element) => {
+      element.textContent = experience.chat.businessName.charAt(0).toUpperCase();
+    });
+    setText(".chat-title strong", experience.chat.businessName);
+    setText("#emptyChat strong", experience.chat.businessName);
+    setText("#emptyChat p", experience.chat.emptyText);
+    setText("#emptyChat span", experience.chat.emptyBadge);
+    setText(".privacy-note", experience.chat.privacy);
+    setText(".prompt-panel .guide-label strong", experience.chat.suggestionHeading);
+
+    const chips = document.querySelectorAll(".prompt-panel .suggestion-chip");
+    experience.suggestions.forEach((item, index) => {
+      const chip = chips[index];
+      if (!chip) return;
+      chip.dataset.message = item.message;
+      setText("span", item.kind, chip);
+      setText("strong", item.label, chip);
+    });
+
+    const captureRows = document.querySelectorAll(".capture-preview-grid span");
+    experience.capture.rows.forEach(([label, value], index) => {
+      const row = captureRows[index];
       if (!row) return;
-      setText(element.querySelector("small"), row[0]);
-      setText(element.querySelector("strong"), row[1]);
+      setText("small", label, row);
+      setText("strong", value, row);
+    });
+    setText(".capture-preview-note", experience.capture.note);
+  }
+
+  function renderWorkflow(experience) {
+    const steps = document.querySelectorAll("#how-it-works article");
+    experience.workflow.forEach(([title, detail], index) => {
+      const step = steps[index];
+      if (!step) return;
+      setText("strong", title, step);
+      setText("small", detail, step);
     });
   }
 
-  function configureBranding() {
-    document.title = "AI Renovation Chatbot Demo | DA Smarketing";
-    const description = document.querySelector('meta[name="description"]');
-    const metaText = "Try DA Smarketing's live AI renovation and carpentry chatbot demo across WhatsApp, Instagram and Messenger, from first enquiry to quotation qualification and human takeover.";
-    if (description && description.content !== metaText) description.content = metaText;
-    document.querySelectorAll(".clinic-avatar, .empty-logo, .hero-product-avatar").forEach((element) => setText(element, "O"));
-    adaptText(document.body);
-    configureSuggestions();
-    configureAcquisitionPresets();
-    configureCapturePreview();
+  function renderCapabilities(experience) {
+    const cards = document.querySelectorAll(".capability-card");
+    experience.capabilities.forEach(([title, copy, bullets], index) => {
+      const card = cards[index];
+      if (!card) return;
+      setText("h3", title, card);
+      setText("p", copy, card);
+      const items = card.querySelectorAll("li");
+      bullets.forEach((bullet, bulletIndex) => {
+        if (items[bulletIndex]) items[bulletIndex].textContent = bullet;
+      });
+    });
   }
 
-  function bindRenovationAcquisitionPersistence() {
-    if (document.documentElement.dataset.renovationAcquisitionBound === "true") return;
-    document.documentElement.dataset.renovationAcquisitionBound = "true";
-    document.addEventListener("click", (event) => {
-      const button = event.target?.closest?.("[data-acquisition-key]");
-      if (!button) return;
-      const preset = renovationAcquisitionPresets[button.dataset.acquisitionKey];
+  function renderSales(experience) {
+    const sales = experience.sales;
+    setText(".sales-kicker", sales.kicker);
+    const heading = document.querySelector(".sales-cta-copy h2");
+    if (heading) {
+      heading.replaceChildren(
+        document.createTextNode(sales.headingPrefix),
+        Object.assign(document.createElement("span"), { className: "sales-cta-ai-accent", textContent: sales.headingAccent }),
+        document.createTextNode("?")
+      );
+    }
+    setText(".sales-cta-copy > p:not(.sales-kicker)", sales.copy);
+    const trust = document.querySelectorAll(".sales-cta-trust span");
+    sales.trust.forEach((item, index) => {
+      if (trust[index]) trust[index].textContent = item;
+    });
+    setText(".sales-cta-actions small", sales.footer);
+  }
+
+  function renderAcquisitionCopy(config) {
+    const presets = Object.values(config.acquisitionPresets || {});
+    const buttons = document.querySelectorAll("[data-acquisition-key]");
+    buttons.forEach((button) => {
+      const preset = config.acquisitionPresets?.[button.dataset.acquisitionKey];
       if (!preset) return;
-      // channel-experience.js owns the original click handler. Persist the
-      // industry-specific equivalent immediately afterwards so the dashboard
-      // receives renovation campaign/project context instead of clinic values.
-      setTimeout(() => {
-        try {
-          sessionStorage.setItem("clinicDemoAcquisition", JSON.stringify(preset));
-          window.postMessage({ type: "clinic-demo-acquisition-updated" }, window.location.origin);
-        } catch {}
-      }, 0);
+      setText("span", preset.source, button);
+      setText("strong", preset.label, button);
     });
+    if (presets.length) {
+      const helper = document.querySelector("[data-acquisition-selector] .prompt-helper");
+      if (helper && config.publicExperience?.acquisitionHelper) helper.textContent = config.publicExperience.acquisitionHelper;
+    }
   }
 
-  async function init() {
+  function applyConfig(config) {
+    if (!config?.industryKey || !config.publicExperience) return;
+    window.demoIndustryConfig = config;
+    document.documentElement.dataset.demoIndustry = config.industryKey;
+    document.title = config.publicExperience.title;
+    setMeta("description", config.publicExperience.metaDescription);
+    renderHero(config.publicExperience);
+    renderLiveDemo(config.publicExperience);
+    renderWorkflow(config.publicExperience);
+    renderCapabilities(config.publicExperience);
+    renderSales(config.publicExperience);
+    renderAcquisitionCopy(config);
+    window.dispatchEvent(new CustomEvent("demo-industry-config", { detail: config }));
+  }
+
+  async function loadConfig() {
+    if (window.demoIndustryConfig?.industryKey) return applyConfig(window.demoIndustryConfig);
     try {
       const response = await fetch("/api/demo/config", { headers: { Accept: "application/json" } });
       if (!response.ok) return;
-      const config = await response.json();
-      if (!/Oakline Demo Renovation/i.test(String(config.clinicName || ""))) return;
-      document.documentElement.dataset.demoIndustry = "renovation";
-      bindRenovationAcquisitionPersistence();
-      configureBranding();
-      let queued = false;
-      const observer = new MutationObserver(() => {
-        if (queued) return;
-        queued = true;
-        requestAnimationFrame(() => {
-          queued = false;
-          adaptText(document.body);
-          configureSuggestions();
-          configureAcquisitionPresets();
-          configureCapturePreview();
-        });
-      });
-      observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["aria-label", "title", "placeholder"] });
+      applyConfig(await response.json());
     } catch {}
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init, { once: true });
-  else init();
+  window.applyDemoIndustryExperience = applyConfig;
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", loadConfig, { once: true });
+  else loadConfig();
 })();
