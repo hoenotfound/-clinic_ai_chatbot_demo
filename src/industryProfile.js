@@ -1,5 +1,7 @@
 const { AsyncLocalStorage } = require("async_hooks");
 const { publicExperienceFor } = require("./publicExperienceProfiles");
+const { applyEstablishedLanguageContext } = require("./conversationLanguage");
+const { currentConversationContext } = require("./aiMemoryContext");
 
 const renovationAliases = new Set(["renovation", "home-renovation", "carpentry"]);
 const industryContext = new AsyncLocalStorage();
@@ -7,6 +9,31 @@ const industryContext = new AsyncLocalStorage();
 function normalizeIndustryKey(value) {
   const selected = String(value || "clinic").trim().toLowerCase();
   return renovationAliases.has(selected) ? "renovation" : "clinic";
+}
+
+function fullConversationMessages(messages) {
+  const fullMessages = currentConversationContext()?.fullMessages;
+  return Array.isArray(fullMessages) && fullMessages.length ? fullMessages : (messages || []);
+}
+
+function withClinicConversationContext(handler) {
+  return (messages, ...args) => handler(
+    applyEstablishedLanguageContext(fullConversationMessages(messages)),
+    ...args
+  );
+}
+
+function withFullConversationContext(handler) {
+  return (messages, ...args) => handler(fullConversationMessages(messages), ...args);
+}
+
+function withStructuredMemoryPrompt(builder) {
+  return (...args) => {
+    const prompt = builder(...args);
+    const memory = String(currentConversationContext()?.memory || "").trim();
+    if (!memory) return prompt;
+    return `${prompt}\n\nSILENT STRUCTURED CONVERSATION MEMORY:\n${memory}\n- Treat this memory as internal context only. Never quote the heading or describe hidden memory to the visitor.\n- New explicit information in the latest customer message overrides an older remembered value.`;
+  };
 }
 
 function clinicProfile() {
@@ -38,11 +65,11 @@ function clinicProfile() {
       staff: "Clinic staff",
     },
     highIntentFields: ["bookingIntent"],
-    buildSystemPrompt,
-    buildFallbackReply,
-    buildConcernFallback,
-    enforceBookingRules,
-    enforceSafetyRules,
+    buildSystemPrompt: withStructuredMemoryPrompt(buildSystemPrompt),
+    buildFallbackReply: withClinicConversationContext(buildFallbackReply),
+    buildConcernFallback: withClinicConversationContext(buildConcernFallback),
+    enforceBookingRules: withClinicConversationContext(enforceBookingRules),
+    enforceSafetyRules: withClinicConversationContext(enforceSafetyRules),
     concernGuidanceForPrompt,
     bookingRulesForPrompt,
     salesCtaDefault: "Set up my clinic",
@@ -81,8 +108,8 @@ function renovationProfile() {
       staff: "Renovation staff",
     },
     highIntentFields: ["quotationIntent", "siteMeasurementIntent", "humanRequest", "technicalHandoff"],
-    buildSystemPrompt,
-    buildFallbackReply,
+    buildSystemPrompt: withStructuredMemoryPrompt(buildSystemPrompt),
+    buildFallbackReply: withFullConversationContext(buildFallbackReply),
     buildConcernFallback: () => null,
     enforceBookingRules: () => null,
     enforceSafetyRules: () => null,
@@ -179,9 +206,6 @@ for (const property of ["key", "selector", "labels", "highIntentFields", "salesC
   });
 }
 
-// Preserve the deployment-level CTA behaviour for dedicated single-industry
-// deployments. Runtime-selected sessions still get a profile-aware default in
-// server publicConfig().
 const configuredSalesCtaLabel = String(process.env.SALES_CTA_LABEL || "").trim();
 if (defaultIndustryKey !== "clinic" && configuredSalesCtaLabel === "Set up my clinic") {
   process.env.SALES_CTA_LABEL = getIndustryProfile(defaultIndustryKey).salesCtaDefault;

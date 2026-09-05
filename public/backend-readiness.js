@@ -15,6 +15,23 @@
     ...document.querySelectorAll(".channel-button, .suggestion-chip"),
   ].filter(Boolean);
 
+  function selectedIndustry() {
+    try {
+      const locationValue = window.location?.href || window.location?.origin || "http://localhost";
+      const query = new URL(locationValue, window.location?.origin || "http://localhost").searchParams.get("industry");
+      if (String(query || "").toLowerCase() === "renovation") return "renovation";
+    } catch {}
+    try {
+      const stored = window.sessionStorage?.getItem("demoIndustry") || window.localStorage?.getItem("demoIndustryPreference");
+      if (String(stored || "").toLowerCase() === "renovation") return "renovation";
+    } catch {}
+    return "clinic";
+  }
+
+  function assistantRole() {
+    return selectedIndustry() === "renovation" ? "AI RENOVATION ASSISTANT" : "AI RECEPTIONIST";
+  }
+
   const retryButton = (() => {
     const parent = statusLabel?.parentElement;
     if (!parent) return null;
@@ -45,7 +62,7 @@
     if (statusLabel) {
       statusLabel.textContent = attempt >= 2
         ? "AI IS WAKING UP — EXPLORE THE DASHBOARD"
-        : "STARTING LIVE AI RECEPTIONIST…";
+        : `STARTING LIVE ${assistantRole()}…`;
     }
     statusDot?.classList.remove("backend-ready", "backend-unavailable");
     statusDot?.classList.add("backend-starting");
@@ -65,13 +82,11 @@
 
   function setReadyCopy() {
     ready = true;
-    if (statusLabel) statusLabel.textContent = "AI RECEPTIONIST ONLINE";
+    if (statusLabel) statusLabel.textContent = `${assistantRole()} ONLINE`;
     statusDot?.classList.remove("backend-starting", "backend-unavailable");
     statusDot?.classList.add("backend-ready");
     if (channelStatus) channelStatus.textContent = "online";
     if (retryButton) retryButton.hidden = true;
-    // Do not re-enable the controls here. app.js does that only after the
-    // private demo session has been restored or created successfully.
   }
 
   function sleep(ms) {
@@ -148,10 +163,7 @@
             setReadyCopy();
             return response;
           }
-        } catch {
-          // A sleeping Render service can outlive Netlify's proxy request. The
-          // request still wakes it, so retry with increasing delays.
-        }
+        } catch {}
 
         if (attempt < MAX_AUTOMATIC_ATTEMPTS) {
           setStartingCopy();

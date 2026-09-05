@@ -23,7 +23,7 @@ function forwardedHeaders(req, context = {}) {
     const value = req.headers.get(name);
     if (value) headers.set(name, value);
   }
-  const clientIp = req.headers.get("x-forwarded-for") || req.headers.get("x-nf-client-connection-ip") || context.ip;
+  const clientIp = req.headers.get("x-nf-client-connection-ip") || context.ip || req.headers.get("x-forwarded-for");
   if (clientIp) headers.set("x-forwarded-for", clientIp);
 
   const geo = context.geo || {};

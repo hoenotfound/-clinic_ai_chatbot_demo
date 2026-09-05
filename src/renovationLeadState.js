@@ -24,11 +24,14 @@ function detectServices(text) {
 function detectBudget(text, { allowBare = false } = {}) {
   const source = String(text || "");
   const matches = [...source.matchAll(/(?:rm\s*)?(\d{1,3}(?:[,.]\d{3})+|\d+(?:\.\d+)?)\s*(k)?/gi)];
-  for (const match of matches) {
+  for (let index = matches.length - 1; index >= 0; index -= 1) {
+    const match = matches[index];
     const numeric = Number(String(match[1]).replace(/,/g, ""));
     if (!Number.isFinite(numeric)) continue;
     const value = match[2] ? numeric * 1000 : numeric;
     if (value < 500) continue;
+    const suffix = source.slice(match.index + match[0].length, match.index + match[0].length + 10);
+    if (/^\s*(?:mm|cm|m|meter|metre|ft|feet|foot)\b/i.test(suffix)) continue;
     const nearby = source.slice(Math.max(0, match.index - 20), Math.min(source.length, match.index + match[0].length + 25));
     if (!/rm|budget|bajet|预算|預算/i.test(nearby) && !match[2] && !allowBare) continue;
     return `RM${Math.round(value).toLocaleString("en-MY")}`;
@@ -48,26 +51,68 @@ function previousAssistantAskedForBudget(session) {
   return false;
 }
 
-function detectPropertyType(text) {
+function lastPatternIndex(value, pattern) {
+  const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+  const globalPattern = new RegExp(pattern.source, flags);
+  let lastIndex = -1;
+  for (const match of value.matchAll(globalPattern)) lastIndex = match.index;
+  return lastIndex;
+}
+
+function latestPatternLabel(text, entries) {
   const value = String(text || "");
-  if (/landed|terrace|semi[- ]?d|bungalow|link\s+house|rumah\s+landed|排屋|双层|雙層|独立屋|獨立屋/i.test(value)) return "Landed house";
-  if (/commercial|office|shop|retail|办公|辦公|店面|pejabat|kedai/i.test(value)) return "Commercial / office";
-  if (/condo|minium|apartment|service\s+residence|flat|公寓|condominium/i.test(value)) return "Condo / apartment";
-  return null;
+  let winner = null;
+  let winnerIndex = -1;
+  for (const [pattern, label] of entries) {
+    const index = lastPatternIndex(value, pattern);
+    if (index >= winnerIndex && index >= 0) {
+      winner = label;
+      winnerIndex = index;
+    }
+  }
+  return winner;
+}
+
+function detectPropertyType(text) {
+  return latestPatternLabel(text, [
+    [/landed|terrace|semi[- ]?d|bungalow|link\s+house|rumah\s+landed|排屋|双层|雙層|独立屋|獨立屋/i, "Landed house"],
+    [/commercial|office|shop|retail|办公|辦公|店面|pejabat|kedai/i, "Commercial / office"],
+    [/condo|minium|apartment|service\s+residence|flat|公寓|condominium/i, "Condo / apartment"],
+  ]);
 }
 
 function detectPropertyStatus(text) {
-  const value = String(text || "");
-  if (/subsale|existing\s+home|existing\s+unit|old\s+house|rumah\s+lama|二手房|旧屋|舊屋/i.test(value)) return "Subsale / existing home";
-  if (/new\s+(?:condo|unit|project|home|house)|newly\s+completed|just\s+(?:got|collected)\s+keys|baru\s+dapat\s+kunci|新房|新屋|新公寓/i.test(value)) return "New project";
-  return null;
+  return latestPatternLabel(text, [
+    [/subsale|existing\s+home|existing\s+unit|old\s+house|rumah\s+lama|二手房|旧屋|舊屋/i, "Subsale / existing home"],
+    [/new\s+(?:condo|unit|project|home|house)|newly\s+completed|just\s+(?:got|collected)\s+keys|baru\s+dapat\s+kunci|新房|新屋|新公寓/i, "New project"],
+  ]);
 }
 
 function detectArea(text) {
-  const value = String(text || "");
-  if (/puchong|cheras|kajang|蒲种|蒲種|蕉赖|蕉賴|加影/i.test(value)) return "Cheras / Kajang / Puchong";
-  if (/petaling\s+jaya|\bpj\b|subang|shah\s+alam|ara\s+damansara|damansara|八打灵再也|八打靈再也|梳邦|莎阿南/i.test(value)) return "Petaling Jaya / Subang / Shah Alam";
-  if (/kuala\s+lumpur|\bkl\b|mont\s+kiara|bukit\s+bintang|bukit\s+jalil|setapak|old\s+klang\s+road|吉隆坡/i.test(value)) return "Kuala Lumpur";
+  return latestPatternLabel(text, [
+    [/puchong|cheras|kajang|蒲种|蒲種|蕉赖|蕉賴|加影/i, "Cheras / Kajang / Puchong"],
+    [/petaling\s+jaya|\bpj\b|subang|shah\s+alam|ara\s+damansara|damansara|八打灵再也|八打靈再也|梳邦|莎阿南/i, "Petaling Jaya / Subang / Shah Alam"],
+    [/kuala\s+lumpur|\bkl\b|mont\s+kiara|bukit\s+bintang|bukit\s+jalil|setapak|old\s+klang\s+road|吉隆坡/i, "Kuala Lumpur"],
+  ]);
+}
+
+function latestDetected(messages, detector) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const detected = detector(messages[index]?.content || "");
+    if (detected) return detected;
+  }
+  return null;
+}
+
+function latestBudget(messages, session) {
+  const latestIndex = messages.length - 1;
+  const allowBareLatest = previousAssistantAskedForBudget(session);
+  for (let index = latestIndex; index >= 0; index -= 1) {
+    const detected = detectBudget(messages[index]?.content || "", {
+      allowBare: allowBareLatest && index === latestIndex,
+    });
+    if (detected) return detected;
+  }
   return null;
 }
 
@@ -133,16 +178,18 @@ function updateRenovationLead(session) {
   const technicalHandoff = !negative && TECHNICAL_PATTERN.test(activeText);
   const bookingIntent = siteMeasurementIntent || quotationIntent;
   const askedPrice = !negative && PRICE_PATTERN.test(activeText);
-  const latestCustomerText = activeMessages.at(-1)?.content || "";
-  const contextualBareBudget = previousAssistantAskedForBudget(session)
-    ? detectBudget(latestCustomerText, { allowBare: true })
-    : null;
   const budget = !negative
-    ? detectBudget(activeText) || contextualBareBudget || session.lead?.budget || null
+    ? latestBudget(activeMessages, session) || session.lead?.budget || null
     : session.lead?.budget || null;
-  const propertyType = !negative ? detectPropertyType(activeText) || session.lead?.propertyType || null : session.lead?.propertyType || null;
-  const propertyStatus = !negative ? detectPropertyStatus(activeText) || session.lead?.propertyStatus || null : session.lead?.propertyStatus || null;
-  const area = !negative ? detectArea(activeText) || session.lead?.preferredBranch || null : session.lead?.preferredBranch || null;
+  const propertyType = !negative
+    ? latestDetected(activeMessages, detectPropertyType) || session.lead?.propertyType || null
+    : session.lead?.propertyType || null;
+  const propertyStatus = !negative
+    ? latestDetected(activeMessages, detectPropertyStatus) || session.lead?.propertyStatus || null
+    : session.lead?.propertyStatus || null;
+  const area = !negative
+    ? latestDetected(activeMessages, detectArea) || session.lead?.preferredBranch || null
+    : session.lead?.preferredBranch || null;
   const measurementsKnown = !negative && (MEASUREMENT_PATTERN.test(activeText) || Boolean(session.lead?.measurementsKnown));
   const timelineMentioned = !negative && (TIMELINE_PATTERN.test(activeText) || Boolean(session.lead?.timelineMentioned));
 
