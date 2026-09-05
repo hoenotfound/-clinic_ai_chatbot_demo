@@ -16,6 +16,7 @@ test("first-time industry chooser switches between isolated renovation and clini
   await expect(picker.getByRole("heading", { name: "Choose an industry to explore" })).toBeVisible();
   await expect(picker.locator('[data-industry="clinic"]')).toContainText("Aesthetic Clinic");
   await expect(picker.locator('[data-industry="renovation"]')).toContainText("Home Renovation & Carpentry");
+  await page.screenshot({ path: "visual-artifacts/industry-selector-desktop.png", fullPage: true });
 
   await picker.locator('[data-industry="renovation"]').click();
   await expect(page).toHaveURL(/industry=renovation/);
@@ -24,11 +25,12 @@ test("first-time industry chooser switches between isolated renovation and clini
   await expect(page.locator("#patientTab strong")).toHaveText("Customer View");
   await expect(page.locator("#dashboardTab strong")).toHaveText("Sales Dashboard");
 
-  const renovationSessionId = await expect.poll(async () => page.evaluate(() => sessionStorage.getItem("clinicDemoSessionId"))).not.toBeNull();
+  await expect.poll(async () => page.evaluate(() => sessionStorage.getItem("clinicDemoSessionId"))).not.toBeNull();
   const renovationId = await page.evaluate(() => sessionStorage.getItem("clinicDemoSessionId"));
   expect(renovationId).toBeTruthy();
   await expect(page.locator("#reactDashboardFrame")).toHaveAttribute("src", /industry=renovation/);
   await expect(page.frameLocator("#reactDashboardFrame").getByText("Oakline Demo Renovation", { exact: false }).first()).toBeVisible();
+  await page.screenshot({ path: "visual-artifacts/runtime-renovation-demo.png", fullPage: true });
 
   await page.getByRole("button", { name: "Switch demo industry" }).click();
   await expect(page.locator("[data-industry-picker]")).toBeVisible();
@@ -42,7 +44,7 @@ test("first-time industry chooser switches between isolated renovation and clini
   await expect(page.locator("#dashboardTab strong")).toHaveText("Clinic Dashboard");
   await expect(page.locator("#reactDashboardFrame")).toHaveAttribute("src", /industry=clinic/);
 
-  const clinicId = await expect.poll(async () => page.evaluate(() => sessionStorage.getItem("clinicDemoSessionId"))).not.toBeNull();
+  await expect.poll(async () => page.evaluate(() => sessionStorage.getItem("clinicDemoSessionId"))).not.toBeNull();
   const clinicSessionId = await page.evaluate(() => sessionStorage.getItem("clinicDemoSessionId"));
   expect(clinicSessionId).toBeTruthy();
   expect(clinicSessionId).not.toBe(renovationId);
@@ -60,4 +62,30 @@ test("first-time industry chooser switches between isolated renovation and clini
   expect(configs[1].businessName).toMatch(/Oakline Demo Renovation/i);
 
   expect(browserErrors).toEqual([]);
+});
+
+test("industry selector is usable on a narrow mobile viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+
+  const picker = page.locator("[data-industry-picker]");
+  await expect(picker).toBeVisible();
+  const dialog = picker.locator(".industry-picker-dialog");
+  await expect(dialog).toBeVisible();
+  await expect(picker.locator('[data-industry="clinic"]')).toBeVisible();
+  await expect(picker.locator('[data-industry="renovation"]')).toBeVisible();
+
+  const layout = await page.evaluate(() => ({
+    bodyWidth: document.body.scrollWidth,
+    viewportWidth: window.innerWidth,
+    dialogBottom: document.querySelector(".industry-picker-dialog")?.getBoundingClientRect().bottom || 0,
+    viewportHeight: window.innerHeight,
+  }));
+  expect(layout.bodyWidth).toBeLessThanOrEqual(layout.viewportWidth + 1);
+  expect(layout.dialogBottom).toBeLessThanOrEqual(layout.viewportHeight + 1);
+  await page.screenshot({ path: "visual-artifacts/industry-selector-mobile.png", fullPage: true });
+
+  await picker.locator('[data-industry="renovation"]').click();
+  await expect(page.getByRole("button", { name: "Switch demo industry" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Switch demo industry" })).toContainText("Home Renovation");
 });
