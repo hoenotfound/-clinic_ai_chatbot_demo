@@ -1,3 +1,5 @@
+const { publicExperienceFor } = require("./publicExperienceProfiles");
+
 const selected = String(process.env.DEMO_INDUSTRY || "clinic").trim().toLowerCase();
 const renovationAliases = new Set(["renovation", "home-renovation", "carpentry"]);
 const key = renovationAliases.has(selected) ? "renovation" : "clinic";
@@ -18,9 +20,12 @@ function clinicProfile() {
       customer: "Patient",
       service: "Treatment",
       location: "Branch",
+      timing: "Timing",
       appointment: "Appointment",
+      dashboard: "Clinic Dashboard",
       staff: "Clinic staff",
     },
+    highIntentFields: ["bookingIntent"],
     buildSystemPrompt,
     buildFallbackReply,
     buildConcernFallback,
@@ -35,6 +40,7 @@ function clinicProfile() {
       "organic-whatsapp": { key: "organic-whatsapp", label: "Organic WhatsApp", source: "Organic", campaign: null, treatment: null, channel: "whatsapp" },
       referral: { key: "referral", label: "Referral", source: "Referral", campaign: null, treatment: null, channel: "whatsapp" },
     },
+    publicExperience: publicExperienceFor("clinic"),
   };
 }
 
@@ -50,9 +56,12 @@ function renovationProfile() {
       customer: "Customer",
       service: "Project",
       location: "Area",
+      timing: "Timeline",
       appointment: "Site measurement",
+      dashboard: "Sales Dashboard",
       staff: "Renovation staff",
     },
+    highIntentFields: ["quotationIntent", "siteMeasurementIntent", "humanRequest", "technicalHandoff"],
     buildSystemPrompt,
     buildFallbackReply,
     buildConcernFallback: () => null,
@@ -76,6 +85,7 @@ function renovationProfile() {
       "organic-whatsapp": { key: "organic-whatsapp", label: "Organic WhatsApp", source: "Organic", campaign: null, treatment: null, channel: "whatsapp" },
       referral: { key: "referral", label: "Referral", source: "Referral", campaign: null, treatment: null, channel: "whatsapp" },
     },
+    publicExperience: publicExperienceFor("renovation"),
   };
 }
 
