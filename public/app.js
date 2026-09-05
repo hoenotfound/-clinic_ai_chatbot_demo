@@ -46,6 +46,28 @@ const channelMeta = {
   facebook: { label: "Messenger", theme: "facebook-theme", status: "Active now", caption: "Messenger customer experience" },
 };
 
+function profileLabels() {
+  return state.config?.labels || {
+    customer: "Patient",
+    service: "Treatment",
+    location: "Branch",
+    timing: "Timing",
+    appointment: "Appointment",
+    dashboard: "Clinic Dashboard",
+    staff: "Clinic staff",
+  };
+}
+
+function publicExperience() {
+  return state.config?.publicExperience || null;
+}
+
+function hasHighIntent(lead = state.session?.lead) {
+  if (!lead) return false;
+  const fields = state.config?.highIntentFields || ["bookingIntent"];
+  return fields.some((field) => Boolean(lead[field]));
+}
+
 function createVisitorId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   return `visitor-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
@@ -82,6 +104,7 @@ function showToast(message) {
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(() => els.toast.classList.add("hidden"), 3500);
 }
+window.showToast = showToast;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -169,7 +192,7 @@ function buildMessageBubble(message) {
   if (message.source === "staff") {
     const source = document.createElement("div");
     source.className = "message-source";
-    source.textContent = "Clinic staff";
+    source.textContent = profileLabels().staff;
     bubble.appendChild(source);
   }
   const time = document.createElement("small");
@@ -230,31 +253,32 @@ function renderAttention() {
 
 function renderTour() {
   if (!state.session || !els.tourStatus) return;
+  const experience = publicExperience();
   const asked = state.session.customerMessageCount > 0;
-  const booking = Boolean(state.session.lead?.bookingIntent);
+  const intent = hasHighIntent();
   const dashboard = state.hasViewedDashboard;
   const takeover = state.hasTakenOver || state.session.mode === "human" || state.session.messages.some((message) => message.source === "staff");
-  const steps = [asked, booking, dashboard, takeover];
+  const steps = [asked, intent, dashboard, takeover];
   [els.tourStep1, els.tourStep2, els.tourStep3, els.tourStep4].forEach((element, index) => {
     element?.classList.toggle("complete", steps[index]);
     element?.classList.toggle("current", !steps[index] && steps.slice(0, index).every(Boolean));
   });
   const completed = steps.filter(Boolean).length;
   if (els.tourProgress) els.tourProgress.textContent = `${completed} / 4`;
-  if (!asked) els.tourStatus.textContent = "Tap a sample question below";
-  else if (!booking) els.tourStatus.textContent = "Now try “Can I come Saturday?”";
-  else if (!dashboard) els.tourStatus.textContent = "Booking intent detected — open Clinic Dashboard";
+  if (!asked) els.tourStatus.textContent = experience?.tour?.startStatus || "Tap a sample question below";
+  else if (!intent) els.tourStatus.textContent = experience?.tour?.afterQuestion || "Continue the enquiry";
+  else if (!dashboard) els.tourStatus.textContent = experience?.tour?.intentDetected || `High intent detected — open ${profileLabels().dashboard}`;
   else if (!takeover) els.tourStatus.textContent = "Open the live conversation and try Take over";
   else els.tourStatus.textContent = "Full customer journey completed ✓";
 
-  const shouldHighlightDashboard = booking && !dashboard && state.activeView === "patient";
+  const shouldHighlightDashboard = intent && !dashboard && state.activeView === "patient";
   els.dashboardTab?.classList.toggle("guide-highlight", shouldHighlightDashboard);
   els.salesCta?.classList.toggle("guide-highlight-soft", takeover);
 }
 
 function configureSalesCta() {
   if (!els.salesCtaButton || !state.config?.salesCta) return;
-  els.salesCtaButton.textContent = state.config.salesCta.label || "Set up my clinic";
+  els.salesCtaButton.textContent = state.config.salesCta.label || "Set up my AI chatbot";
   const url = state.config.salesCta.url || "";
   if (url) {
     els.salesCtaButton.href = url;
@@ -322,9 +346,7 @@ async function syncSession() {
     renderAll();
   } catch (error) {
     if (state.session?.id !== sessionId) return;
-    if (/expired/i.test(error.message)) {
-      sessionStorage.removeItem("clinicDemoSessionId");
-    }
+    if (/expired/i.test(error.message)) sessionStorage.removeItem("clinicDemoSessionId");
   }
 }
 
@@ -361,9 +383,10 @@ async function sendCustomerMessage(rawMessage) {
     if (data.degraded) {
       showToast("The live AI provider had a temporary issue. The conversation was kept so you can try again.");
     } else if (state.session.needsAttention) {
-      showToast("The AI requested staff assistance. Open Clinic Dashboard to see the handoff.");
-    } else if (state.session.lead?.bookingIntent && !state.hasViewedDashboard) {
-      showToast("Booking intent detected. Open Clinic Dashboard to see what your team would see.");
+      showToast(`The AI requested staff assistance. Open ${profileLabels().dashboard} to see the handoff.`);
+    } else if (hasHighIntent(state.session.lead) && !state.hasViewedDashboard) {
+      const prefix = state.config?.industryKey === "clinic" ? "Booking intent detected." : "High-intent renovation enquiry detected.";
+      showToast(`${prefix} Open ${profileLabels().dashboard} to see what your team would see.`);
     }
   } catch (error) {
     if (state.session?.id === sessionId) {
@@ -455,21 +478,6 @@ function bindEvents() {
   });
 }
 
-async function init() {
-  bindEvents();
-  recordTelemetry("patient_view", "patient");
-  try {
-    state.config = await api("/api/demo/config");
-    configureSalesCta();
-    await restoreOrCreateSession();
-    refreshInteractionState();
-    state.syncTimer = setInterval(syncSession, 1800);
-    state.telemetryTimer = setInterval(() => recordTelemetry("heartbeat", state.activeView), 30_000);
-  } catch (error) {
-    showToast(error.message);
-  }
-}
-
 function loadChannelExperienceLayer() {
   if (!document.querySelector('link[data-channel-experience="styles"]')) {
     const stylesheet = document.createElement("link");
@@ -488,5 +496,22 @@ function loadChannelExperienceLayer() {
   }
 }
 
+async function init() {
+  bindEvents();
+  recordTelemetry("patient_view", "patient");
+  try {
+    state.config = window.demoIndustryConfig?.industryKey ? window.demoIndustryConfig : await api("/api/demo/config");
+    window.demoIndustryConfig = state.config;
+    window.applyDemoIndustryExperience?.(state.config);
+    configureSalesCta();
+    loadChannelExperienceLayer();
+    await restoreOrCreateSession();
+    refreshInteractionState();
+    state.syncTimer = setInterval(syncSession, 1800);
+    state.telemetryTimer = setInterval(() => recordTelemetry("heartbeat", state.activeView), 30_000);
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
 init();
-loadChannelExperienceLayer();
