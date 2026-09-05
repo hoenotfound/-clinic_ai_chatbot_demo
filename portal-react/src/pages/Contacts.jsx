@@ -16,6 +16,7 @@ export default function Contacts() {
   const [selectedId, setSelectedId] = useState(null);
   const contacts = useMemo(() => SAMPLE_LEADS.filter((lead) => [lead.name, lead.phone, lead.treatment, normalizedLocation(lead), lead.summary].join(" ").toLowerCase().includes(query.trim().toLowerCase())), [query]);
   const selected = SAMPLE_LEADS.find((lead) => lead.id === selectedId);
+  const searchPlaceholder = isRenovationDemo ? "Search by name, number, social ID or project…" : "Search by name, number or social ID…";
 
   return (
     <div className="flex h-full min-w-0 bg-[var(--color-bg)]">
@@ -25,7 +26,7 @@ export default function Contacts() {
             <div><h1 className="font-display text-lg font-bold">Contacts</h1><p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{contacts.length} contacts · sample demo data</p></div>
             <button disabled title="Available in production" className="inline-flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3 py-2 text-xs font-medium text-white opacity-60">+ Add · Production</button>
           </div>
-          <input className="mt-3 w-full rounded-xl border border-[var(--color-border)] bg-white px-3.5 py-2.5 text-xs leading-relaxed outline-none focus:ring-2 focus:ring-[var(--color-primary)]" placeholder="Search by name, number, social ID or project…" value={query} onChange={(event) => setQuery(event.target.value)} />
+          <input className="mt-3 w-full rounded-xl border border-[var(--color-border)] bg-white px-3.5 py-2.5 text-xs leading-relaxed outline-none focus:ring-2 focus:ring-[var(--color-primary)]" placeholder={searchPlaceholder} value={query} onChange={(event) => setQuery(event.target.value)} />
         </div>
         {contacts.map((contact) => (
           <button key={contact.id} onClick={() => setSelectedId(contact.id)} className={`relative w-full border-b border-[var(--color-border)] px-4 py-3.5 text-left transition sm:px-5 ${contact.id === selectedId ? "bg-[var(--color-primary-light)]" : contact.attention ? "bg-[var(--color-danger-light)]" : "hover:bg-[var(--color-bg)]"}`}>
