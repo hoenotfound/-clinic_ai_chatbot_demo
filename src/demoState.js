@@ -1,5 +1,7 @@
 const crypto = require("crypto");
-const clinic = require("./clinicConfig");
+const industry = require("./industryProfile");
+const business = industry.config;
+const { updateRenovationLead } = require("./renovationLeadState");
 
 const CHANNELS = new Set(["whatsapp", "instagram", "facebook"]);
 const sessions = new Map();
@@ -59,6 +61,28 @@ function enforceDailyMessageLimit() {
   dailyMessageCounts.set(key, count + 1);
 }
 
+function emptyLead() {
+  return {
+    temperature: "cold",
+    score: 0,
+    interests: [],
+    bookingIntent: false,
+    reducedInterest: false,
+    preferredTiming: null,
+    preferredBranch: null,
+    propertyType: null,
+    propertyStatus: null,
+    budget: null,
+    measurementsKnown: false,
+    timelineMentioned: false,
+    siteMeasurementIntent: false,
+    quotationIntent: false,
+    humanRequest: false,
+    technicalHandoff: false,
+    summary: "No conversation yet.",
+  };
+}
+
 function createSession({ channel = "whatsapp", ip = "unknown" } = {}) {
   enforceSessionCreationLimit(ip);
   const safeChannel = CHANNELS.has(channel) ? channel : "whatsapp";
@@ -79,16 +103,7 @@ function createSession({ channel = "whatsapp", ip = "unknown" } = {}) {
     attentionReason: null,
     promotionShown: false,
     promotionAfterMessageId: null,
-    lead: {
-      temperature: "cold",
-      score: 0,
-      interests: [],
-      bookingIntent: false,
-      reducedInterest: false,
-      preferredTiming: null,
-      preferredBranch: null,
-      summary: "No conversation yet.",
-    },
+    lead: emptyLead(),
   };
   sessions.set(session.id, session);
   return session;
@@ -148,9 +163,9 @@ function appendMessage(session, role, content, source) {
 
 function detectInterests(text) {
   const lower = String(text || "").toLowerCase();
-  return clinic.services
+  return business.services
     .filter((service) =>
-      [service.name, ...service.aliases].some((term) => lower.includes(term.toLowerCase()))
+      [service.name, ...(service.aliases || [])].some((term) => lower.includes(String(term).toLowerCase()))
     )
     .map((service) => service.name);
 }
@@ -192,7 +207,7 @@ function isRenewedInterestMessage(text) {
     detectInterests(text).length > 0;
 }
 
-function updateLead(session) {
+function updateClinicLead(session) {
   const customerMessages = session.messages.filter((message) => message.role === "user");
   const allText = customerMessages.map((message) => message.content).join(" \n");
 
@@ -212,7 +227,7 @@ function updateLead(session) {
   const activeMessages = lastNegativeIndex >= 0 ? messagesAfterNegative : customerMessages;
   const activeText = activeMessages.map((message) => message.content).join(" \n");
 
-  const historicalInterests = new Set(session.lead.interests);
+  const historicalInterests = new Set(session.lead?.interests || []);
   for (const interest of detectInterests(allText)) historicalInterests.add(interest);
   const activeInterests = detectInterests(activeText);
   const interestList = negativeIntentActive
@@ -236,11 +251,8 @@ function updateLead(session) {
   const latestTimingMessage = latestMatchingMessage(customerMessages, TIMING_PATTERN);
   if (latestTimingMessage) {
     const timing = latestTimingMessage.content.toLowerCase();
-    if (/weekend|saturday|sunday|hujung minggu|sabtu|ahad|周末|週末|周六|週六|星期六|周日|週日|星期日/i.test(timing)) {
-      preferredTiming = "Weekend";
-    } else if (/weekday|monday|tuesday|wednesday|thursday|friday|hari biasa|isnin|selasa|rabu|khamis|jumaat|平日|工作日|星期一|星期二|星期三|星期四|星期五/i.test(timing)) {
-      preferredTiming = "Weekday";
-    }
+    if (/weekend|saturday|sunday|hujung minggu|sabtu|ahad|周末|週末|周六|週六|星期六|周日|週日|星期日/i.test(timing)) preferredTiming = "Weekend";
+    else if (/weekday|monday|tuesday|wednesday|thursday|friday|hari biasa|isnin|selasa|rabu|khamis|jumaat|平日|工作日|星期一|星期二|星期三|星期四|星期五/i.test(timing)) preferredTiming = "Weekday";
     if (/morning|pagi|早上|上午/i.test(timing)) preferredTiming = preferredTiming ? `${preferredTiming}, morning` : "Morning";
     if (/afternoon|petang|下午/i.test(timing)) preferredTiming = preferredTiming ? `${preferredTiming}, afternoon` : "Afternoon";
     if (/evening|night|malam|晚上/i.test(timing)) preferredTiming = preferredTiming ? `${preferredTiming}, evening` : "Evening";
@@ -255,8 +267,9 @@ function updateLead(session) {
   }
 
   const temperature = bookingIntent || score >= 7 ? "hot" : score >= 3 ? "warm" : "cold";
-
   session.lead = {
+    ...emptyLead(),
+    ...session.lead,
     temperature,
     score,
     interests: interestList,
@@ -273,6 +286,11 @@ function updateLead(session) {
       askedPrice,
     }),
   };
+  return session.lead;
+}
+
+function updateLead(session) {
+  return industry.key === "renovation" ? updateRenovationLead(session) : updateClinicLead(session);
 }
 
 function addCustomerMessage(session, rawText) {
@@ -307,6 +325,7 @@ function addAssistantMessage(session, rawText) {
 }
 
 function shouldShowPromotion(session) {
+  if (industry.key !== "clinic") return false;
   return !session.promotionShown &&
     !session.lead.reducedInterest &&
     session.lead.interests.includes("HIFU Skin Lifting");
@@ -358,6 +377,8 @@ function restoreSession(session) {
   if (!Number.isFinite(session.expiresAt) || session.expiresAt <= Date.now()) return null;
   if (!Number.isFinite(session.staffMessageCount)) session.staffMessageCount = 0;
   if (!Number.isFinite(session.lastStaffMessageAt)) session.lastStaffMessageAt = 0;
+  session.lead = { ...emptyLead(), ...(session.lead || {}) };
+  updateLead(session);
   sessions.set(session.id, session);
   return session;
 }
