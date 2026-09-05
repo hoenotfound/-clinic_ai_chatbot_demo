@@ -19,6 +19,7 @@ async function sendCustomerMessage(page, message) {
 }
 
 test("renovation profile stays industry-specific across customer view and dashboard", async ({ page }) => {
+  test.skip(process.env.DEMO_INDUSTRY !== "renovation", "Renovation profile only");
   const browserErrors = collectBrowserErrors(page);
   await page.goto("/");
 
