@@ -22,16 +22,16 @@ function detectServices(text) {
 function detectBudget(text) {
   const source = String(text || "");
   const matches = [...source.matchAll(/(?:rm\s*)?(\d{1,3}(?:[,.]\d{3})+|\d+(?:\.\d+)?)\s*(k)?/gi)];
-  const candidate = matches.find((match) => {
+  for (const match of matches) {
+    const numeric = Number(String(match[1]).replace(/,/g, ""));
+    if (!Number.isFinite(numeric)) continue;
+    const value = match[2] ? numeric * 1000 : numeric;
+    if (value < 500) continue;
     const nearby = source.slice(Math.max(0, match.index - 20), Math.min(source.length, match.index + match[0].length + 25));
-    return /rm|budget|bajet|预算|預算/i.test(nearby) || match[2];
-  });
-  if (!candidate) return null;
-  const numeric = Number(String(candidate[1]).replace(/,/g, ""));
-  if (!Number.isFinite(numeric)) return null;
-  const value = candidate[2] ? numeric * 1000 : numeric;
-  if (value < 500) return null;
-  return `RM${Math.round(value).toLocaleString("en-MY")}`;
+    if (!/rm|budget|bajet|预算|預算/i.test(nearby) && !match[2]) continue;
+    return `RM${Math.round(value).toLocaleString("en-MY")}`;
+  }
+  return null;
 }
 
 function detectPropertyType(text) {
