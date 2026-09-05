@@ -49,7 +49,7 @@ test("clinic fallback keeps Chinese and Bahasa Malaysia across neutral short rep
 test("booking-rule replies also inherit established Chinese for neutral timing answers", () => {
   const reply = industry.runWithIndustry("clinic", () => industry.enforceBookingRules([
     message("user", "我想预约 HIFU"),
-    message("assistant", "你想几点来？"),
+    message("assistant", "你想什么时候来？"),
     message("user", "8pm"),
   ]));
   assert.match(reply, /[\p{Script=Han}]/u);
