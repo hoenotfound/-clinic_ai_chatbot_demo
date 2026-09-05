@@ -1,6 +1,7 @@
 const renovation = require("./renovationConfig");
 
 const PRICE_PATTERN = /price|how much|cost|quotation|quote|budget|harga|berapa|kos|sebut harga|多少钱|多少錢|价格|價格|价钱|價錢|报价|報價|预算|預算/i;
+const BUDGET_PROMPT_PATTERN = /budget|bajet|预算|預算/i;
 const SITE_PATTERN = /site\s*(?:visit|measurement|measure)|come\s+(?:and\s+)?measure|come\s+measure|arrange\s+(?:a\s+)?measurement|home\s+visit|datang\s+ukur|ukur\s+rumah|上门量尺|上門量尺|现场测量|現場測量|量尺/i;
 const QUOTE_INTENT_PATTERN = /exact\s+(?:price|quote|quotation)|proper\s+(?:quote|quotation)|send\s+(?:me\s+)?(?:a\s+)?quote|prepare\s+(?:a\s+)?quotation|can\s+(?:you\s+)?quote|nak\s+quotation|mahu\s+quotation|buat\s+quotation|正式报价|正式報價|给我报价|給我報價|出报价|出報價/i;
 const HUMAN_REQUEST_PATTERN = /(?:speak|talk|chat|connect)\s+(?:me\s+)?(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:can|could)\s+i\s+(?:speak|talk)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:need|want)\s+(?:a\s+)?(?:human|designer|salesperson|project manager)|human\s+(?:please|pls)|真人|人工|转人工|轉人工|找设计师|找設計師|联系顾问|聯繫顧問|nak\s+cakap\s+dengan\s+(?:staff|designer|sales)|mahu\s+cakap\s+dengan\s+(?:staff|designer|sales)/i;
@@ -20,7 +21,7 @@ function detectServices(text) {
     .map((service) => service.name);
 }
 
-function detectBudget(text) {
+function detectBudget(text, { allowBare = false } = {}) {
   const source = String(text || "");
   const matches = [...source.matchAll(/(?:rm\s*)?(\d{1,3}(?:[,.]\d{3})+|\d+(?:\.\d+)?)\s*(k)?/gi)];
   for (const match of matches) {
@@ -29,10 +30,22 @@ function detectBudget(text) {
     const value = match[2] ? numeric * 1000 : numeric;
     if (value < 500) continue;
     const nearby = source.slice(Math.max(0, match.index - 20), Math.min(source.length, match.index + match[0].length + 25));
-    if (!/rm|budget|bajet|预算|預算/i.test(nearby) && !match[2]) continue;
+    if (!/rm|budget|bajet|预算|預算/i.test(nearby) && !match[2] && !allowBare) continue;
     return `RM${Math.round(value).toLocaleString("en-MY")}`;
   }
   return null;
+}
+
+function previousAssistantAskedForBudget(session) {
+  const messages = session.messages || [];
+  const latestUserIndex = [...messages].map((message) => message.role).lastIndexOf("user");
+  if (latestUserIndex <= 0) return false;
+  for (let index = latestUserIndex - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role === "assistant") return BUDGET_PROMPT_PATTERN.test(message.content || "");
+    if (message.role === "user") return false;
+  }
+  return false;
 }
 
 function detectPropertyType(text) {
@@ -120,7 +133,13 @@ function updateRenovationLead(session) {
   const technicalHandoff = !negative && TECHNICAL_PATTERN.test(activeText);
   const bookingIntent = siteMeasurementIntent || quotationIntent;
   const askedPrice = !negative && PRICE_PATTERN.test(activeText);
-  const budget = !negative ? detectBudget(activeText) || session.lead?.budget || null : session.lead?.budget || null;
+  const latestCustomerText = activeMessages.at(-1)?.content || "";
+  const contextualBareBudget = previousAssistantAskedForBudget(session)
+    ? detectBudget(latestCustomerText, { allowBare: true })
+    : null;
+  const budget = !negative
+    ? detectBudget(activeText) || contextualBareBudget || session.lead?.budget || null
+    : session.lead?.budget || null;
   const propertyType = !negative ? detectPropertyType(activeText) || session.lead?.propertyType || null : session.lead?.propertyType || null;
   const propertyStatus = !negative ? detectPropertyStatus(activeText) || session.lead?.propertyStatus || null : session.lead?.propertyStatus || null;
   const area = !negative ? detectArea(activeText) || session.lead?.preferredBranch || null : session.lead?.preferredBranch || null;
