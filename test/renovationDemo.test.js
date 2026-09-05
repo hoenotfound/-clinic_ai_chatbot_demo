@@ -71,7 +71,7 @@ test("live renovation lead remembers project, property, area and budget", () => 
 test("site measurement request becomes high-intent live lead", () => {
   const session = state.createSession({ channel: "instagram", ip: `renovation-test-${Date.now()}-site` });
   state.addCustomerMessage(session, "I want wardrobe for my condo in PJ");
-  state.lastCustomerMessageAt = 0;
+  session.lastCustomerMessageAt = 0;
   state.addCustomerMessage(session, "Budget around 8k. Can your team come for site measurement Saturday morning?");
   assert.equal(session.lead.bookingIntent, true);
   assert.equal(session.lead.temperature, "hot");
