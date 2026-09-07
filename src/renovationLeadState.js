@@ -1,4 +1,4 @@
-const renovation = require("./renovationConfig");
+const { detectServices } = require("./renovationServiceDetection");
 
 const PRICE_PATTERN = /price|how much|cost|quotation|quote|budget|harga|berapa|kos|sebut harga|多少钱|多少錢|价格|價格|价钱|價錢|报价|報價|预算|預算/i;
 const BUDGET_QUESTION_PATTERN = /(?:do you (?:already )?have|what(?:'s| is)|how much).{0,30}\bbudget\b|\bbudget\b.{0,30}(?:range|in mind|roughly|approximately|around how much)|\bbudget\s*\?|\bbajet\b.{0,24}(?:berapa|range|anggaran)|(?:berapa|anggaran).{0,24}\bbajet\b|\bbajet\s*\?|(?:预算|預算).{0,12}(?:多少|几|幾|范围|範圍)|(?:多少|几|幾).{0,12}(?:预算|預算)|(?:预算|預算)\s*[?？]/i;
@@ -12,13 +12,6 @@ const TIMELINE_PATTERN = /move\s*in|moving|collect(?:ed|ing)?\s+keys?|get(?:ting
 
 function customerMessages(session) {
   return (session.messages || []).filter((message) => message.role === "user");
-}
-
-function detectServices(text) {
-  const lower = String(text || "").toLowerCase();
-  return renovation.services
-    .filter((service) => [service.name, ...(service.aliases || [])].some((term) => lower.includes(String(term).toLowerCase())))
-    .map((service) => service.name);
 }
 
 function detectBudget(text, { allowBare = false } = {}) {
