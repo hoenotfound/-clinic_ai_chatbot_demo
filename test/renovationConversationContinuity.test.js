@@ -68,7 +68,7 @@ test("short renovation tokens and measurements inherit the established customer 
     { role: "user", content: "condo" },
   ]);
   assert.match(condoReply, /[一-鿿]/);
-  assert.doesNotMatch(conddoReply, /^Sure,/i);
+  assert.doesNotMatch(condoReply, /^Sure,/i);
 
   const measurementReply = ai.getFallbackReply([
     { role: "user", content: "我想做厨房柜，新 condo 在 Puchong。" },
