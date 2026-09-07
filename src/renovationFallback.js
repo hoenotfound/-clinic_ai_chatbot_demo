@@ -1,5 +1,5 @@
 const renovation = require("./renovationConfig");
-const { detectService } = require("./renovationServiceDetection");
+const { detectService, isUnconfiguredServiceRequest } = require("./renovationServiceDetection");
 
 const HUMAN_REQUEST_PATTERN = /(?:speak|talk|chat|connect)\s+(?:me\s+)?(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:can|could)\s+i\s+(?:speak|talk)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:need|want)\s+(?:a\s+)?(?:human|designer|salesperson|project manager)|human\s+(?:please|pls)|真人|人工|转人工|轉人工|找设计师|找設計師|联系顾问|聯繫顧問|nak\s+cakap\s+dengan\s+(?:staff|designer|sales)|mahu\s+cakap\s+dengan\s+(?:staff|designer|sales)/i;
 const SITE_VISIT_PATTERN = /site\s*(?:visit|measurement|measure)|come\s+(?:and\s+)?measure|come\s+measure|measure\s+(?:my|the)\s+(?:house|home|unit|place)|arrange\s+(?:a\s+)?measurement|quotation\s+appointment|home\s+visit|上门量尺|上門量尺|量尺|现场测量|現場測量|datang\s+ukur|site\s+measurement|ukur\s+rumah/i;
@@ -235,20 +235,20 @@ function nextQualificationQuestion(language, messages, contextText, { avoidKind 
 function handoffReply(language, reason = "quote") {
   if (language === "zh") {
     if (reason === "technical") return "这个需要团队看实际现场后才能给准确意见，我不应该在聊天里猜。让我转给团队继续帮你。 [[HANDOFF]]";
-    if (reason === "scope") return "这个示范主要做定制木工和柜体，我不应该把瓷砖、油漆或其他装修项目当成厨房柜。这个需求需要团队确认，我帮你转给他们。 [[HANDOFF]]";
+    if (reason === "scope") return "这个示范只配置了列出的定制木工项目。没有配置的装修工种或柜体类型我不应该自己猜有没有做，我帮你转给团队确认实际范围。 [[HANDOFF]]";
     if (reason === "complaint") return "明白，这种情况需要由团队直接跟进会比较合适。我帮你转给他们处理。 [[HANDOFF]]";
     if (reason === "human") return "可以，我帮你转给装修团队，让设计或销售人员直接继续跟你聊。 [[HANDOFF]]";
     return "可以，我帮你把这个询问转给装修团队，让他们继续跟进实际报价或量尺安排。 [[HANDOFF]]";
   }
   if (language === "ms") {
     if (reason === "technical") return "Yang ini team perlu tengok keadaan site sebenar dulu, jadi saya tak patut agak dari chat. Saya pass kepada team untuk sambung dengan anda. [[HANDOFF]]";
-    if (reason === "scope") return "Demo ini fokus pada custom carpentry dan cabinet. Saya tak patut anggap kerja tile, cat atau renovation lain sebagai kitchen cabinet, jadi saya pass kepada team untuk semak scope sebenar. [[HANDOFF]]";
+    if (reason === "scope") return "Demo ini hanya dikonfigurasi untuk servis custom carpentry yang disenaraikan. Untuk trade atau jenis cabinet yang tak dikonfigurasi, saya tak patut teka sama ada team cover atau tidak, jadi saya pass kepada team untuk sahkan scope sebenar. [[HANDOFF]]";
     if (reason === "complaint") return "Faham. Untuk isu macam ini lebih baik team sendiri follow up terus. Saya pass conversation ini kepada mereka. [[HANDOFF]]";
     if (reason === "human") return "Boleh. Saya pass kepada team renovation supaya designer atau sales boleh sambung terus dengan anda. [[HANDOFF]]";
     return "Boleh. Saya pass kepada team renovation untuk sambung quotation atau arrangement site measurement sebenar dengan anda. [[HANDOFF]]";
   }
   if (reason === "technical") return "That needs the team to check the actual site, so I shouldn't guess from chat. I'll pass this to them for proper advice. [[HANDOFF]]";
-  if (reason === "scope") return "This demo focuses on custom carpentry and cabinets. I shouldn't turn tiling, painting or another renovation trade into a cabinet enquiry, so I'll pass this to the team to confirm the actual scope. [[HANDOFF]]";
+  if (reason === "scope") return "This demo is configured only for the listed custom-carpentry services. I shouldn't guess whether an unlisted renovation trade or cabinet type is covered, so I'll pass this to the team to confirm the actual scope. [[HANDOFF]]";
   if (reason === "complaint") return "Understood. This is better handled directly by the team, so I'll pass the conversation to them. [[HANDOFF]]";
   if (reason === "human") return "Sure. I'll pass this to the renovation team so a designer or salesperson can continue with you directly. [[HANDOFF]]";
   return "Sure. I'll pass this to the renovation team so they can continue with the actual quotation or site-measurement arrangement. [[HANDOFF]]";
@@ -343,6 +343,7 @@ function buildFallbackReply(messages) {
   if (SITE_VISIT_PATTERN.test(text)) return handoffReply(language, "quote");
   if (QUOTE_INTENT_PATTERN.test(text)) return handoffReply(language, "quote");
   if (HUMAN_REQUEST_PATTERN.test(text)) return handoffReply(language, "human");
+  if (!directService && isUnconfiguredServiceRequest(text)) return handoffReply(language, "scope");
 
   const contextualBudget = detectContextualBudget(messages);
   if (contextualBudget) return budgetReply(contextualBudget, language, messages, contextText);
