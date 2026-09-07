@@ -153,7 +153,7 @@ function correctionSegments(text) {
     /\binstead(?:\s+of)?\b\s+([^,.;!?]+)/gi,
     /\bsorry[, ]+\s*([^,.;!?]+)/gi,
     /(?:其实|其實|改成|改做|换成|換成|应该是|應該是)\s*([^，。！？,!?]+)/g,
-    /(?:\bnot\b|\bbukan\b|不是)\s+[^,，;]+[,，;]\s*(?:是|要|做|nak|mahu)?\s*([^,，;.!?]+)/gi,
+    /(?:(?:\bnot\b|\bbukan\b)\s+|不是\s*)[^,，;]+[,，;]\s*(?:是|要|做|nak|mahu)?\s*([^,，;.!?]+)/gi,
   ];
 
   for (const pattern of patterns) {
