@@ -184,7 +184,7 @@ test("Gemini rotates immediately from a quota-limited key instead of retrying th
 
   assert.equal(reply, "Reply from key 2");
   assert.deepEqual(calls, ["key-one", "key-two"]);
-  assert.equal(aiService._test.keyCooldown("key-one")?.reason, "quota");
+  assert.equal(aiService._test.keyCooldown("key-one", "gemini-2.5-flash")?.reason, "quota");
 });
 
 test("Gemini cooldown skips a known exhausted key on the next customer message", async () => {
@@ -229,7 +229,7 @@ test("Gemini model-unavailable error switches to Flash-Lite without wasting the 
   assert.equal(calls.filter((call) => call.url.includes("gemini-2.5-flash-lite:generateContent")).length, 1);
 });
 
-test("Gemini quota exhaustion uses one attempt per key then falls back without wasting calls on Flash-Lite", async () => {
+test("Gemini quota exhaustion still tries Flash-Lite because model quotas can differ", async () => {
   const calls = [];
   global.fetch = async (url, options) => {
     calls.push({ url, key: options.headers["x-goog-api-key"] });
@@ -239,9 +239,11 @@ test("Gemini quota exhaustion uses one attempt per key then falls back without w
   const reply = await aiService.getReply([{ role: "user", content: "How much is HIFU?" }], false);
 
   assert.match(reply, /RM 888/);
-  assert.equal(calls.length, 2);
-  assert.deepEqual(calls.map((call) => call.key), ["test-key-1", "test-key-2"]);
-  assert.ok(calls.every((call) => call.url.includes("gemini-2.5-flash:generateContent")));
+  assert.equal(calls.length, 4);
+  assert.deepEqual(calls.slice(0, 2).map((call) => call.key), ["test-key-1", "test-key-2"]);
+  assert.ok(calls.slice(0, 2).every((call) => call.url.includes("gemini-2.5-flash:generateContent")));
+  assert.deepEqual(calls.slice(2).map((call) => call.key), ["test-key-1", "test-key-2"]);
+  assert.ok(calls.slice(2).every((call) => call.url.includes("gemini-2.5-flash-lite:generateContent")));
 });
 
 test("Gemini rotates after hung requests while respecting the shared failover budget", async () => {
