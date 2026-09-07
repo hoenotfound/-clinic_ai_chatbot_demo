@@ -21,6 +21,7 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
   const keyCooldowns = new Map();
   const routeCooldowns = new Map();
   const modelCooldowns = new Map();
+  const timeoutStreaks = new Map();
 
   function getApiKeys() {
     const keys = [process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY_2]
@@ -161,6 +162,7 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
     keyCooldowns.clear();
     routeCooldowns.clear();
     modelCooldowns.clear();
+    timeoutStreaks.clear();
   }
 
   function cooldownSeconds(entry) {
@@ -169,8 +171,23 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
 
   function applyCooldown(key, model, error) {
     const type = classify(error);
-    if (type === "quota") routeCooldowns.set(routeKey(key, model), { reason: type, until: Date.now() + quotaCooldownMs });
-    else if (type === "rate_limit") routeCooldowns.set(routeKey(key, model), { reason: type, until: Date.now() + keyCooldownMs });
+    const route = routeKey(key, model);
+
+    if (type === "timeout") {
+      const streak = (timeoutStreaks.get(route) || 0) + 1;
+      if (streak >= 2) {
+        routeCooldowns.set(route, { reason: type, until: Date.now() + keyCooldownMs });
+        timeoutStreaks.delete(route);
+        opsStats.recordCounter("gemini_timeout_cooldowns");
+      } else {
+        timeoutStreaks.set(route, streak);
+      }
+      return type;
+    }
+
+    timeoutStreaks.delete(route);
+    if (type === "quota") routeCooldowns.set(route, { reason: type, until: Date.now() + quotaCooldownMs });
+    else if (type === "rate_limit") routeCooldowns.set(route, { reason: type, until: Date.now() + keyCooldownMs });
     else if (type === "auth") keyCooldowns.set(key, { reason: type, until: Date.now() + quotaCooldownMs });
     else if (type === "unavailable") modelCooldowns.set(model, { reason: type, until: Date.now() + modelCooldownMs });
     return type;
@@ -232,6 +249,7 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
       opsStats.recordGeminiFailure({ ...telemetry, error });
       throw error;
     }
+    timeoutStreaks.delete(routeKey(key, model));
     opsStats.recordGeminiSuccess({ ...telemetry, usageMetadata: data?.usageMetadata || {} });
     return text;
   }
