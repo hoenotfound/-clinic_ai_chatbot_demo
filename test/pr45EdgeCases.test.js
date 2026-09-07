@@ -4,6 +4,8 @@ const assert = require("node:assert/strict");
 const {
   detectService,
   detectServices,
+  detectCorrectedService,
+  isUnconfiguredServiceRequest,
 } = require("../src/renovationServiceDetection");
 const { updateRenovationLead } = require("../src/renovationLeadState");
 const { buildFallbackReply } = require("../src/renovationFallback");
@@ -16,10 +18,13 @@ test("room shorthand plus useful project details still resolves to kitchen cabin
   assert.deepEqual(detectServices("kitchen tiles in Puchong"), []);
 });
 
-test("explicit service corrections prefer the corrected scope", () => {
+test("explicit service corrections prefer the replacement scope without treating normal detail updates as replacements", () => {
   assert.equal(detectService("actually wardrobe, not kitchen cabinet")?.name, "Built-in Wardrobes");
   assert.equal(detectService("not kitchen cabinet, actually wardrobe")?.name, "Built-in Wardrobes");
+  assert.equal(detectService("wardrobe instead of kitchen cabinet")?.name, "Built-in Wardrobes");
+  assert.equal(detectService("I want wardrobe, not kitchen cabinet")?.name, "Built-in Wardrobes");
   assert.equal(detectService("不是厨房柜，是衣柜")?.name, "Built-in Wardrobes");
+  assert.equal(detectCorrectedService("actually kitchen is about 12ft"), null);
 
   const session = {
     messages: [
@@ -37,6 +42,20 @@ test("explicit service corrections prefer the corrected scope", () => {
   updateRenovationLead(session);
   assert.deepEqual(session.lead.interests.sort(), ["Built-in Wardrobes", "Shoe Cabinet & Entrance Storage"].sort());
   assert.equal(session.lead.interests.includes("Kitchen Cabinets"), false);
+
+  const multiScopeSession = {
+    messages: [
+      { role: "user", content: "I want kitchen cabinet and wardrobe" },
+    ],
+    lead: { interests: [] },
+  };
+  updateRenovationLead(multiScopeSession);
+  assert.deepEqual(multiScopeSession.lead.interests.sort(), ["Kitchen Cabinets", "Built-in Wardrobes"].sort());
+
+  multiScopeSession.messages.push({ role: "assistant", content: "Do you have rough measurements?" });
+  multiScopeSession.messages.push({ role: "user", content: "actually kitchen is about 12ft" });
+  updateRenovationLead(multiScopeSession);
+  assert.deepEqual(multiScopeSession.lead.interests.sort(), ["Kitchen Cabinets", "Built-in Wardrobes"].sort());
 });
 
 test("cabinet paint-finish questions stay in carpentry while real painting scope still hands off", () => {
@@ -50,6 +69,29 @@ test("cabinet paint-finish questions stay in carpentry while real painting scope
     { role: "user", content: "Do you do kitchen painting and wall painting?" },
   ]);
   assert.match(paintingReply, /\[\[HANDOFF\]\]/);
+});
+
+test("a new unconfigured cabinet scope is not answered as the previously known service", () => {
+  assert.equal(isUnconfiguredServiceRequest("Do you also build reception cabinets for a clinic?"), true);
+  assert.equal(isUnconfiguredServiceRequest("Do you do reception cabinets?"), true);
+  assert.equal(isUnconfiguredServiceRequest("Can you make the cabinet taller?"), false);
+
+  const reply = buildFallbackReply([
+    { role: "user", content: "I want kitchen cabinet" },
+    { role: "assistant", content: "Is this for a condo or landed home?" },
+    { role: "user", content: "Do you also build reception cabinets for a clinic?" },
+  ]);
+
+  assert.match(reply, /\[\[HANDOFF\]\]/);
+  assert.match(reply, /unlisted|listed custom-carpentry|confirm the actual scope/i);
+  assert.doesNotMatch(reply, /I've got Kitchen Cabinets as the project/i);
+
+  const followUpReply = buildFallbackReply([
+    { role: "user", content: "I want kitchen cabinet" },
+    { role: "assistant", content: "Is this for a condo or landed home?" },
+    { role: "user", content: "Can you make the cabinet taller?" },
+  ]);
+  assert.doesNotMatch(followUpReply, /\[\[HANDOFF\]\]/);
 });
 
 test("a Gemini route is cooled only after repeated timeouts, then skipped on the next message", async () => {
