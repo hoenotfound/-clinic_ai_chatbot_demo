@@ -6,6 +6,7 @@ const SITE_VISIT_PATTERN = /site\s*(?:visit|measurement|measure)|come\s+(?:and\s
 const QUOTE_INTENT_PATTERN = /exact\s+(?:price|quote|quotation)|proper\s+(?:quote|quotation)|send\s+(?:me\s+)?(?:a\s+)?quote|prepare\s+(?:a\s+)?quotation|can\s+(?:you\s+)?quote|nak\s+quotation|mahu\s+quotation|buat\s+quotation|正式报价|正式報價|给我报价|給我報價|出报价|出報價/i;
 const TECHNICAL_PATTERN = /load[- ]?bearing|structural|hack(?:ing)?\s+(?:wall|beam|column)|electrical|rewir(?:e|ing)|plumb(?:ing)?|waterproof(?:ing)?|gas\s+(?:pipe|line)|permit|authority|approval|承重墙|承重牆|敲墙|敲牆|电线|電線|水管|防水|kelulusan|struktur|pendawaian|paip/i;
 const OUT_OF_SCOPE_PATTERN = /\b(?:tiles?|tiling|floor(?:ing)?|paint(?:ing)?|ceiling|plaster(?:ing)?|wallpaper|masonry|wet\s*works?|bathroom\s+renovation|toilet\s+renovation|kitchen\s+renovation|jubin|lantai|siling|renovasi\s+(?:dapur|bilik\s+air))\b|瓷砖|瓷磚|地砖|地磚|地板|油漆|天花|墙纸|牆紙|泥水|厨房(?:装修|裝修|翻新)|廚房(?:裝修|翻新)|厕所(?:装修|裝修)|廁所裝修|浴室(?:装修|裝修)/i;
+const SERVICE_FINISH_PATTERN = /\b(?:paint(?:ed)?|spray[- ]paint(?:ed)?|lacquer(?:ed)?)\s+(?:finish(?:es)?|colour|color|cabinet|door)|\b(?:finish|colour|color)\s+(?:with\s+)?(?:paint|spray[- ]paint|lacquer)|烤漆|喷漆|噴漆|油漆(?:面|柜门|櫃門|finish|颜色|顏色)/i;
 const COMPLAINT_PATTERN = /complaint|refund|defect|damage|poor workmanship|wrong colour|wrong color|not happy|very disappointed|投诉|投訴|退款|瑕疵|做坏|做壞|rosak|aduan/i;
 const PRICE_PATTERN = /price|how much|cost|quotation|quote|budget|harga|berapa|kos|sebut harga|多少钱|多少錢|价格|價格|价钱|價錢|报价|報價|预算|預算/i;
 const BUDGET_QUESTION_PATTERN = /(?:do you (?:already )?have|what(?:'s| is)|how much).{0,30}\bbudget\b|\bbudget\b.{0,30}(?:range|in mind|roughly|approximately|around how much)|\bbudget\s*\?|\bbajet\b.{0,24}(?:berapa|range|anggaran)|(?:berapa|anggaran).{0,24}\bbajet\b|\bbajet\s*\?|(?:预算|預算).{0,12}(?:多少|几|幾|范围|範圍)|(?:多少|几|幾).{0,12}(?:预算|預算)|(?:预算|預算)\s*[?？]/i;
@@ -333,7 +334,12 @@ function buildFallbackReply(messages) {
   if (!text) return genericReply(language);
   if (COMPLAINT_PATTERN.test(text)) return handoffReply(language, "complaint");
   if (TECHNICAL_PATTERN.test(text)) return handoffReply(language, "technical");
-  if (OUT_OF_SCOPE_PATTERN.test(text)) return handoffReply(language, "scope");
+
+  const allowBareScope = previousQuestionKind(messages) === "service";
+  const directService = detectService(text, { allowBareScope });
+  const serviceFinishQuestion = Boolean(directService && SERVICE_FINISH_PATTERN.test(text));
+
+  if (OUT_OF_SCOPE_PATTERN.test(text) && !serviceFinishQuestion) return handoffReply(language, "scope");
   if (SITE_VISIT_PATTERN.test(text)) return handoffReply(language, "quote");
   if (QUOTE_INTENT_PATTERN.test(text)) return handoffReply(language, "quote");
   if (HUMAN_REQUEST_PATTERN.test(text)) return handoffReply(language, "human");
@@ -341,8 +347,6 @@ function buildFallbackReply(messages) {
   const contextualBudget = detectContextualBudget(messages);
   if (contextualBudget) return budgetReply(contextualBudget, language, messages, contextText);
 
-  const allowBareScope = previousQuestionKind(messages) === "service";
-  const directService = detectService(text, { allowBareScope });
   const knownService = directService || detectKnownService(messages);
 
   let reply;
