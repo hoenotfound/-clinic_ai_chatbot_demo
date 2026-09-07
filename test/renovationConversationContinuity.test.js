@@ -38,6 +38,16 @@ test("renovation prompt explicitly preserves established language for number-onl
   assert.match(prompt, /4500/);
 });
 
+test("renovation prompt keeps important config-driven FAQ, sales and guardrail knowledge", () => {
+  const prompt = industry.buildSystemPrompt({ isFirstMessage: false });
+  assert.match(prompt, /Can I customise the internal wardrobe layout/i);
+  assert.match(prompt, /hanging sections, shelves, drawers/i);
+  assert.match(prompt, /Never claim to have viewed a customer's photo, drawing or floor plan/i);
+  assert.match(prompt, /Customer asks for an unconfigured service/i);
+  assert.match(prompt, /Do not dismiss a lower budget/i);
+  assert.match(prompt, /Customer: "4500"[\s\S]{0,160}什么时候完成/);
+});
+
 test("bare numbers are only treated as budget when the conversation context asks for budget", () => {
   assert.equal(detectBudget("4500"), null);
   assert.equal(detectBudget("4500", { allowBare: true }), "RM4,500");
@@ -90,6 +100,8 @@ test("an explicit request to switch to English still overrides earlier Chinese",
 
 test("厨房 shorthand is recognized as kitchen cabinets by reply and lead memory", () => {
   assert.deepEqual(detectServices("厨房"), ["Kitchen Cabinets"]);
+  assert.deepEqual(detectServices("想做厨房"), ["Kitchen Cabinets"]);
+  assert.deepEqual(detectServices("kitchen"), ["Kitchen Cabinets"]);
   assert.deepEqual(detectServices("想了解 aliminium cabinet"), ["Kitchen Cabinets"]);
 
   const reply = ai.getFallbackReply([
@@ -101,6 +113,22 @@ test("厨房 shorthand is recognized as kitchen cabinets by reply and lead memor
   assert.match(reply, /厨房柜/);
   assert.match(reply, /condo|landed|commercial/i);
   assert.doesNotMatch(reply, /衣柜、电视柜、鞋柜|wardrobes.*TV\/living-room/i);
+});
+
+test("room words do not misclassify other renovation trades as cabinet leads", () => {
+  assert.deepEqual(detectServices("Do you do kitchen tiles?"), []);
+  assert.deepEqual(detectServices("Need kitchen flooring and painting"), []);
+  assert.deepEqual(detectServices("厨房地砖"), []);
+  assert.deepEqual(detectServices("想做厨房装修"), []);
+
+  const leadSession = session("kitchen-tiles");
+  addCustomer(leadSession, "Do you do kitchen tiles and flooring?");
+  assert.equal(leadSession.lead.interests.includes("Kitchen Cabinets"), false);
+
+  const reply = ai.getFallbackReply([{ role: "user", content: "Do you do kitchen tiles?" }]);
+  assert.match(reply, /custom carpentry|cabinet/i);
+  assert.match(reply, /\[\[HANDOFF\]\]/);
+  assert.doesNotMatch(reply, /RM\s*6,800/i);
 });
 
 test("fallback acknowledges a repeated-detail complaint and advances instead of resetting", () => {
