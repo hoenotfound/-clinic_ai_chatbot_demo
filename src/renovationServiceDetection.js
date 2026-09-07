@@ -69,6 +69,7 @@ const CONTEXTUAL_SCOPE_ALIASES = {
 };
 
 const NON_CARPENTRY_ROOM_PATTERN = /\b(?:tiles?|tiling|floor(?:ing)?|paint(?:ing)?|ceiling|plaster(?:ing)?|wallpaper|plumb(?:ing)?|sink|tap|faucet|pipe|electrical|wiring|renovation|wet\s*works?|masonry|jubin|lantai|siling|paip|elektrik|renovasi)\b|瓷砖|瓷磚|地砖|地磚|地板|油漆|天花|水管|水喉|电线|電線|装修|裝修|翻新/i;
+const PROJECT_DETAIL_PATTERN = /\b(?:condo(?:minium)?|apartment|landed|terrace|semi[- ]?d|bungalow|commercial|office|shop|retail|puchong|cheras|kajang|petaling\s+jaya|pj|subang|shah\s+alam|kuala\s+lumpur|kl|mont\s+kiara|bukit\s+jalil|setapak)\b|\b(?:rm\s*)?\d+(?:[,.]\d+)?\s*(?:k|ft|feet|foot|mm|cm|m|meter|metre)?\b|公寓|排屋|独立屋|獨立屋|蒲种|蒲種|蕉赖|蕉賴|加影|八打灵再也|八打靈再也|吉隆坡|预算|預算|尺寸|平面图|平面圖/i;
 
 function normalizeText(value) {
   return String(value || "")
@@ -126,7 +127,7 @@ function contextualAliasMatches(text, term, allowBareScope) {
   const normalized = normalizeText(text);
   if (!normalized || NON_CARPENTRY_ROOM_PATTERN.test(normalized)) return false;
   if (!containsTerm(normalized, term)) return false;
-  return Boolean(allowBareScope) || isStandaloneScopeReply(normalized, term);
+  return Boolean(allowBareScope) || isStandaloneScopeReply(normalized, term) || PROJECT_DETAIL_PATTERN.test(normalized);
 }
 
 function detectServiceObjects(text, { allowBareScope = false } = {}) {
@@ -143,18 +144,47 @@ function detectServiceObjects(text, { allowBareScope = false } = {}) {
   return matches;
 }
 
+function correctionSegments(text) {
+  const normalized = normalizeText(text);
+  if (!normalized) return [];
+  const segments = [];
+  const patterns = [
+    /\bactually\b\s+([^,.;!?]+)/gi,
+    /\binstead(?:\s+of)?\b\s+([^,.;!?]+)/gi,
+    /\bsorry[, ]+\s*([^,.;!?]+)/gi,
+    /(?:其实|其實|改成|改做|换成|換成|应该是|應該是)\s*([^，。！？,!?]+)/g,
+    /(?:\bnot\b|\bbukan\b|不是)\s+[^,，;]+[,，;]\s*(?:是|要|做|nak|mahu)?\s*([^,，;.!?]+)/gi,
+  ];
+
+  for (const pattern of patterns) {
+    for (const match of normalized.matchAll(pattern)) {
+      if (match[1]) segments.push({ index: match.index || 0, text: match[1] });
+    }
+  }
+  return segments.sort((left, right) => right.index - left.index);
+}
+
+function detectCorrectedService(text) {
+  for (const segment of correctionSegments(text)) {
+    const matches = detectServiceObjects(segment.text, { allowBareScope: true });
+    if (matches.length) return matches[0];
+  }
+  return null;
+}
+
 function detectServices(text, options) {
   return detectServiceObjects(text, options).map((service) => service.name);
 }
 
 function detectService(text, options) {
-  return detectServiceObjects(text, options)[0] || null;
+  return detectCorrectedService(text) || detectServiceObjects(text, options)[0] || null;
 }
 
 module.exports = {
   detectService,
   detectServices,
   detectServiceObjects,
+  detectCorrectedService,
   normalizeText,
   isStandaloneScopeReply,
 };
