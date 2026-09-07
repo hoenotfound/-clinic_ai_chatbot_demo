@@ -1,4 +1,4 @@
-const { detectServices } = require("./renovationServiceDetection");
+const { detectServices, detectCorrectedService } = require("./renovationServiceDetection");
 
 const PRICE_PATTERN = /price|how much|cost|quotation|quote|budget|harga|berapa|kos|sebut harga|多少钱|多少錢|价格|價格|价钱|價錢|报价|報價|预算|預算/i;
 const BUDGET_QUESTION_PATTERN = /(?:do you (?:already )?have|what(?:'s| is)|how much).{0,30}\bbudget\b|\bbudget\b.{0,30}(?:range|in mind|roughly|approximately|around how much)|\bbudget\s*\?|\bbajet\b.{0,24}(?:berapa|range|anggaran)|(?:berapa|anggaran).{0,24}\bbajet\b|\bbajet\s*\?|(?:预算|預算).{0,12}(?:多少|几|幾|范围|範圍)|(?:多少|几|幾).{0,12}(?:预算|預算)|(?:预算|預算)\s*[?？]/i;
@@ -128,6 +128,20 @@ function hasRenewedInterest(messages, negativeIndex) {
   });
 }
 
+function resolveServices(messages, initialServices = []) {
+  let services = new Set(initialServices || []);
+  for (const message of messages || []) {
+    const text = message?.content || "";
+    const corrected = detectCorrectedService(text);
+    if (corrected) {
+      services = new Set([corrected.name]);
+      continue;
+    }
+    for (const service of detectServices(text)) services.add(service);
+  }
+  return Array.from(services);
+}
+
 function buildSummary({ services, siteMeasurementIntent, quotationIntent, humanRequest, area, propertyType, propertyStatus, budget, measurementsKnown, timing, negative }) {
   if (negative) return "The customer has paused or declined the renovation enquiry for now.";
   const parts = [];
@@ -147,7 +161,6 @@ function buildSummary({ services, siteMeasurementIntent, quotationIntent, humanR
 
 function updateRenovationLead(session) {
   const messages = customerMessages(session);
-  const allText = messages.map((message) => message.content || "").join(" \n");
 
   let lastNegativeIndex = -1;
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -160,10 +173,7 @@ function updateRenovationLead(session) {
   const activeMessages = negative ? [] : lastNegativeIndex >= 0 ? messages.slice(lastNegativeIndex + 1) : messages;
   const activeText = activeMessages.map((message) => message.content || "").join(" \n");
 
-  const historical = new Set(session.lead?.interests || []);
-  for (const service of detectServices(allText)) historical.add(service);
-  const activeServices = detectServices(activeText);
-  const services = activeServices.length ? activeServices : Array.from(historical);
+  const services = resolveServices(activeMessages, session.lead?.interests || []);
 
   const siteMeasurementIntent = !negative && SITE_PATTERN.test(activeText);
   const quotationIntent = !negative && QUOTE_INTENT_PATTERN.test(activeText);
