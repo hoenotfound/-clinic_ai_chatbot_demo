@@ -5,6 +5,7 @@ const HUMAN_REQUEST_PATTERN = /(?:speak|talk|chat|connect)\s+(?:me\s+)?(?:to|wit
 const SITE_VISIT_PATTERN = /site\s*(?:visit|measurement|measure)|come\s+(?:and\s+)?measure|come\s+measure|measure\s+(?:my|the)\s+(?:house|home|unit|place)|arrange\s+(?:a\s+)?measurement|quotation\s+appointment|home\s+visit|上门量尺|上門量尺|量尺|现场测量|現場測量|datang\s+ukur|site\s+measurement|ukur\s+rumah/i;
 const QUOTE_INTENT_PATTERN = /exact\s+(?:price|quote|quotation)|proper\s+(?:quote|quotation)|send\s+(?:me\s+)?(?:a\s+)?quote|prepare\s+(?:a\s+)?quotation|can\s+(?:you\s+)?quote|nak\s+quotation|mahu\s+quotation|buat\s+quotation|正式报价|正式報價|给我报价|給我報價|出报价|出報價/i;
 const TECHNICAL_PATTERN = /load[- ]?bearing|structural|hack(?:ing)?\s+(?:wall|beam|column)|electrical|rewir(?:e|ing)|plumb(?:ing)?|waterproof(?:ing)?|gas\s+(?:pipe|line)|permit|authority|approval|承重墙|承重牆|敲墙|敲牆|电线|電線|水管|防水|kelulusan|struktur|pendawaian|paip/i;
+const OUT_OF_SCOPE_PATTERN = /\b(?:tiles?|tiling|floor(?:ing)?|paint(?:ing)?|ceiling|plaster(?:ing)?|wallpaper|masonry|wet\s*works?|bathroom\s+renovation|toilet\s+renovation|kitchen\s+renovation|jubin|lantai|siling|renovasi\s+(?:dapur|bilik\s+air))\b|瓷砖|瓷磚|地砖|地磚|地板|油漆|天花|墙纸|牆紙|泥水|厨房(?:装修|裝修|翻新)|廚房(?:裝修|翻新)|厕所(?:装修|裝修)|廁所裝修|浴室(?:装修|裝修)/i;
 const COMPLAINT_PATTERN = /complaint|refund|defect|damage|poor workmanship|wrong colour|wrong color|not happy|very disappointed|投诉|投訴|退款|瑕疵|做坏|做壞|rosak|aduan/i;
 const PRICE_PATTERN = /price|how much|cost|quotation|quote|budget|harga|berapa|kos|sebut harga|多少钱|多少錢|价格|價格|价钱|價錢|报价|報價|预算|預算/i;
 const BUDGET_QUESTION_PATTERN = /(?:do you (?:already )?have|what(?:'s| is)|how much).{0,30}\bbudget\b|\bbudget\b.{0,30}(?:range|in mind|roughly|approximately|around how much)|\bbudget\s*\?|\bbajet\b.{0,24}(?:berapa|range|anggaran)|(?:berapa|anggaran).{0,24}\bbajet\b|\bbajet\s*\?|(?:预算|預算).{0,12}(?:多少|几|幾|范围|範圍)|(?:多少|几|幾).{0,12}(?:预算|預算)|(?:预算|預算)\s*[?？]/i;
@@ -128,9 +129,13 @@ function detectKnownBudget(messages) {
 }
 
 function detectKnownService(messages) {
-  const texts = userTexts(messages);
-  for (let index = texts.length - 1; index >= 0; index -= 1) {
-    const service = detectService(texts[index]);
+  const items = messages || [];
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (items[index]?.role !== "user") continue;
+    const previousAssistant = previousAssistantText(items, index);
+    const service = detectService(items[index].content || "", {
+      allowBareScope: SERVICE_QUESTION_PATTERN.test(previousAssistant),
+    });
     if (service) return service;
   }
   return null;
@@ -158,15 +163,29 @@ function previousQuestionKind(messages) {
 
 function serviceNameForLanguage(service, language) {
   if (!service) return "the carpentry project";
-  if (service.name === "Kitchen Cabinets") {
-    if (language === "zh") return "厨房柜";
-    if (language === "ms") return "kitchen cabinet";
+  const localized = {
+    "Kitchen Cabinets": { zh: "厨房柜", ms: "kitchen cabinet" },
+    "Built-in Wardrobes": { zh: "衣柜", ms: "wardrobe" },
+    "TV Console & Living Room Carpentry": { zh: "电视柜 / 客厅木工", ms: "TV console / living-room carpentry" },
+    "Shoe Cabinet & Entrance Storage": { zh: "鞋柜 / 玄关收纳", ms: "shoe cabinet / entrance storage" },
+    "Study, Display & Storage Cabinets": { zh: "书房 / 展示 / 收纳柜", ms: "study / display / storage cabinets" },
+    "Full-Home Custom Carpentry": { zh: "全屋木工", ms: "full-home carpentry" },
+  };
+  return localized[service.name]?.[language] || service.name;
+}
+
+function priceGuideForLanguage(service, language) {
+  const raw = String(service?.price || service?.priceRange || "").trim();
+  if (/custom quotation/i.test(raw)) {
+    if (language === "zh") return "需要根据实际项目报价";
+    if (language === "ms") return "quotation ikut scope sebenar";
+    return "Custom quotation";
   }
-  if (service.name === "Built-in Wardrobes") {
-    if (language === "zh") return "衣柜";
-    if (language === "ms") return "wardrobe";
-  }
-  return service.name;
+  const amount = raw.match(/RM\s*[\d,]+/i)?.[0];
+  if (!amount) return raw;
+  if (language === "zh") return `从 ${amount} 起`;
+  if (language === "ms") return `dari ${amount}`;
+  return `From ${amount}`;
 }
 
 function questionFor(kind, language) {
@@ -215,17 +234,20 @@ function nextQualificationQuestion(language, messages, contextText, { avoidKind 
 function handoffReply(language, reason = "quote") {
   if (language === "zh") {
     if (reason === "technical") return "这个需要团队看实际现场后才能给准确意见，我不应该在聊天里猜。让我转给团队继续帮你。 [[HANDOFF]]";
+    if (reason === "scope") return "这个示范主要做定制木工和柜体，我不应该把瓷砖、油漆或其他装修项目当成厨房柜。这个需求需要团队确认，我帮你转给他们。 [[HANDOFF]]";
     if (reason === "complaint") return "明白，这种情况需要由团队直接跟进会比较合适。我帮你转给他们处理。 [[HANDOFF]]";
     if (reason === "human") return "可以，我帮你转给装修团队，让设计或销售人员直接继续跟你聊。 [[HANDOFF]]";
     return "可以，我帮你把这个询问转给装修团队，让他们继续跟进实际报价或量尺安排。 [[HANDOFF]]";
   }
   if (language === "ms") {
     if (reason === "technical") return "Yang ini team perlu tengok keadaan site sebenar dulu, jadi saya tak patut agak dari chat. Saya pass kepada team untuk sambung dengan anda. [[HANDOFF]]";
+    if (reason === "scope") return "Demo ini fokus pada custom carpentry dan cabinet. Saya tak patut anggap kerja tile, cat atau renovation lain sebagai kitchen cabinet, jadi saya pass kepada team untuk semak scope sebenar. [[HANDOFF]]";
     if (reason === "complaint") return "Faham. Untuk isu macam ini lebih baik team sendiri follow up terus. Saya pass conversation ini kepada mereka. [[HANDOFF]]";
     if (reason === "human") return "Boleh. Saya pass kepada team renovation supaya designer atau sales boleh sambung terus dengan anda. [[HANDOFF]]";
     return "Boleh. Saya pass kepada team renovation untuk sambung quotation atau arrangement site measurement sebenar dengan anda. [[HANDOFF]]";
   }
   if (reason === "technical") return "That needs the team to check the actual site, so I shouldn't guess from chat. I'll pass this to them for proper advice. [[HANDOFF]]";
+  if (reason === "scope") return "This demo focuses on custom carpentry and cabinets. I shouldn't turn tiling, painting or another renovation trade into a cabinet enquiry, so I'll pass this to the team to confirm the actual scope. [[HANDOFF]]";
   if (reason === "complaint") return "Understood. This is better handled directly by the team, so I'll pass the conversation to them. [[HANDOFF]]";
   if (reason === "human") return "Sure. I'll pass this to the renovation team so a designer or salesperson can continue with you directly. [[HANDOFF]]";
   return "Sure. I'll pass this to the renovation team so they can continue with the actual quotation or site-measurement arrangement. [[HANDOFF]]";
@@ -233,9 +255,11 @@ function handoffReply(language, reason = "quote") {
 
 function servicePriceReply(service, language, messages, contextText) {
   const next = nextQualificationQuestion(language, messages, contextText);
-  if (language === "zh") return `${serviceNameForLanguage(service, language)}的示范价格是 ${service.priceRange}。最后报价会看实际尺寸、材料、五金和设计细节。${next?.text || "如果你要拿正式报价，我可以继续帮你整理资料。"}`;
-  if (language === "ms") return `${service.name} dalam demo ini ${service.priceRange}. Harga akhir bergantung pada ukuran, material, hardware dan design. ${next?.text || "Kalau anda nak quotation sebenar, saya boleh terus susun detail yang team perlukan."}`;
-  return `${service.name} ${service.priceRange}. The final quote depends on actual measurements, materials, hardware and design details. ${next?.text || "If you want a proper quotation, I can keep narrowing the details the team needs."}`;
+  const label = serviceNameForLanguage(service, language);
+  const guide = priceGuideForLanguage(service, language);
+  if (language === "zh") return `${label}的参考价格${guide}。最后报价会看实际尺寸、材料、五金和设计细节。${next?.text || "如果你要拿正式报价，我可以继续帮你整理资料。"}`;
+  if (language === "ms") return `${label} ${guide}. Harga akhir bergantung pada ukuran, material, hardware dan design. ${next?.text || "Kalau anda nak quotation sebenar, saya boleh terus susun detail yang team perlukan."}`;
+  return `${label}: ${guide}. The final quote depends on actual measurements, materials, hardware and design details. ${next?.text || "If you want a proper quotation, I can keep narrowing the details the team needs."}`;
 }
 
 function genericServiceReply(service, language, messages, contextText) {
@@ -275,16 +299,16 @@ function budgetReply(budget, language, messages, contextText) {
 function genericReply(language, repeated = false) {
   if (language === "zh") {
     return repeated
-      ? "我刚才的问题重复了。你只要告诉我主要想做哪个区域，例如厨房、衣柜或全屋木工，我会直接从那里继续。"
+      ? "我刚才的问题重复了。你只要告诉我主要想做哪个木工区域，例如厨房柜、衣柜或全屋木工，我会直接从那里继续。"
       : "可以，我可以先帮你了解木工装修需求和大概报价方向。你主要想做厨房柜、衣柜、电视柜、鞋柜，还是全屋木工？";
   }
   if (language === "ms") {
     return repeated
-      ? "Soalan saya tadi berulang. Beritahu saya satu area utama sahaja, contohnya kitchen, wardrobe atau full-house carpentry, dan saya teruskan dari situ."
+      ? "Soalan saya tadi berulang. Beritahu saya satu scope carpentry utama sahaja, contohnya kitchen cabinet, wardrobe atau full-house carpentry, dan saya teruskan dari situ."
       : "Boleh, saya boleh bantu faham scope carpentry dan quotation dulu. Anda nak buat kitchen cabinet, wardrobe, TV cabinet, shoe cabinet atau full-house carpentry?";
   }
   return repeated
-    ? "I repeated the same question. Just tell me the main area once, such as kitchen, wardrobe or full-home carpentry, and I'll continue from there."
+    ? "I repeated the same question. Just tell me the main carpentry scope once, such as kitchen cabinets, wardrobes or full-home carpentry, and I'll continue from there."
     : "Sure, I can help narrow down the carpentry scope and quotation first. Are you looking at kitchen cabinets, wardrobes, TV/living-room carpentry, shoe cabinets, or full-home carpentry?";
 }
 
@@ -309,6 +333,7 @@ function buildFallbackReply(messages) {
   if (!text) return genericReply(language);
   if (COMPLAINT_PATTERN.test(text)) return handoffReply(language, "complaint");
   if (TECHNICAL_PATTERN.test(text)) return handoffReply(language, "technical");
+  if (OUT_OF_SCOPE_PATTERN.test(text)) return handoffReply(language, "scope");
   if (SITE_VISIT_PATTERN.test(text)) return handoffReply(language, "quote");
   if (QUOTE_INTENT_PATTERN.test(text)) return handoffReply(language, "quote");
   if (HUMAN_REQUEST_PATTERN.test(text)) return handoffReply(language, "human");
@@ -316,7 +341,8 @@ function buildFallbackReply(messages) {
   const contextualBudget = detectContextualBudget(messages);
   if (contextualBudget) return budgetReply(contextualBudget, language, messages, contextText);
 
-  const directService = detectService(text);
+  const allowBareScope = previousQuestionKind(messages) === "service";
+  const directService = detectService(text, { allowBareScope });
   const knownService = directService || detectKnownService(messages);
 
   let reply;
@@ -329,9 +355,9 @@ function buildFallbackReply(messages) {
   } else if (knownService) {
     reply = contextualServiceReply(knownService, language, messages, contextText);
   } else if (PRICE_PATTERN.test(text)) {
-    if (language === "zh") reply = "可以先给你价格方向，不过木工最后报价需要看项目、尺寸和材料。你主要想做哪一个区域？";
-    else if (language === "ms") reply = "Boleh bagi price direction dulu, tapi quotation akhir carpentry kena tengok scope, ukuran dan material. Anda nak buat area mana dulu?";
-    else reply = "I can give you a price direction first, but the final carpentry quote depends on scope, measurements and materials. Which area are you planning first?";
+    if (language === "zh") reply = "可以先给你价格方向，不过木工最后报价需要看项目、尺寸和材料。你主要想做哪一个木工区域？";
+    else if (language === "ms") reply = "Boleh bagi price direction dulu, tapi quotation akhir carpentry kena tengok scope, ukuran dan material. Anda nak buat scope carpentry mana dulu?";
+    else reply = "I can give you a price direction first, but the final carpentry quote depends on scope, measurements and materials. Which carpentry area are you planning first?";
   } else {
     reply = genericReply(language, FRUSTRATION_PATTERN.test(text) || previousQuestionKind(messages) === "service");
   }
