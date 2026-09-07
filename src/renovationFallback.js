@@ -137,7 +137,7 @@ function detectKnownService(messages) {
 }
 
 function hasPropertyType(text) {
-  return /condo|minium|apartment|service\s+residence|flat|landed|terrace|semi[- ]?d|bungalow|commercial|office|shop|retail|公寓|排屋|独立屋|獨立屋|rumah\s+landed/i.test(String(text || ""));
+  return /condo(?:minium)?|apartment|service\s+residence|flat|landed|terrace|semi[- ]?d|bungalow|commercial|office|shop|retail|公寓|排屋|独立屋|獨立屋|rumah\s+landed/i.test(String(text || ""));
 }
 
 function hasArea(text) {
