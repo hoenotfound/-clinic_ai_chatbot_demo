@@ -70,7 +70,7 @@ function detectPropertyType(text) {
   return latestPatternLabel(text, [
     [/landed|terrace|semi[- ]?d|bungalow|link\s+house|rumah\s+landed|排屋|双层|雙層|独立屋|獨立屋/i, "Landed house"],
     [/commercial|office|shop|retail|办公|辦公|店面|pejabat|kedai/i, "Commercial / office"],
-    [/condo|minium|apartment|service\s+residence|flat|公寓|condominium/i, "Condo / apartment"],
+    [/condo(?:minium)?|apartment|service\s+residence|flat|公寓/i, "Condo / apartment"],
   ]);
 }
 
