@@ -19,6 +19,7 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
   const modelCooldownMs = positiveIntEnv("GEMINI_MODEL_COOLDOWN_MS", 60000);
 
   const keyCooldowns = new Map();
+  const routeCooldowns = new Map();
   const modelCooldowns = new Map();
 
   function getApiKeys() {
@@ -63,7 +64,7 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
   }
 
   function noAvailableKeysError() {
-    const error = new Error("All configured Gemini keys are temporarily cooling down.");
+    const error = new Error("All configured Gemini keys are temporarily cooling down for this model.");
     error.code = "GEMINI_NO_AVAILABLE_KEYS";
     error.statusCode = 429;
     return error;
@@ -142,8 +143,14 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
     return entry;
   }
 
-  function keyCooldown(key) {
-    return activeCooldown(keyCooldowns, key);
+  function routeKey(key, model) {
+    return `${key}\u0000${model}`;
+  }
+
+  function keyCooldown(key, model = null) {
+    const global = activeCooldown(keyCooldowns, key);
+    if (global || !model) return global;
+    return activeCooldown(routeCooldowns, routeKey(key, model));
   }
 
   function modelCooldown(model) {
@@ -152,6 +159,7 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
 
   function resetCooldowns() {
     keyCooldowns.clear();
+    routeCooldowns.clear();
     modelCooldowns.clear();
   }
 
@@ -161,8 +169,9 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
 
   function applyCooldown(key, model, error) {
     const type = classify(error);
-    if (type === "quota" || type === "auth") keyCooldowns.set(key, { reason: type, until: Date.now() + quotaCooldownMs });
-    else if (type === "rate_limit") keyCooldowns.set(key, { reason: type, until: Date.now() + keyCooldownMs });
+    if (type === "quota") routeCooldowns.set(routeKey(key, model), { reason: type, until: Date.now() + quotaCooldownMs });
+    else if (type === "rate_limit") routeCooldowns.set(routeKey(key, model), { reason: type, until: Date.now() + keyCooldownMs });
+    else if (type === "auth") keyCooldowns.set(key, { reason: type, until: Date.now() + quotaCooldownMs });
     else if (type === "unavailable") modelCooldowns.set(model, { reason: type, until: Date.now() + modelCooldownMs });
     return type;
   }
@@ -242,10 +251,10 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
     let attempted = 0;
     for (let index = 0; index < keys.length; index += 1) {
       if (Number.isFinite(deadline) && remainingBudgetMs(deadline) <= 0) throw failoverBudgetError();
-      const cooledKey = keyCooldown(keys[index]);
+      const cooledKey = keyCooldown(keys[index], model);
       if (cooledKey) {
         opsStats.recordCounter("gemini_key_cooldown_skips");
-        console.warn(`Gemini key ${index + 1} skipped [${cooledKey.reason}] for another ${cooldownSeconds(cooledKey)}s.`);
+        console.warn(`Gemini key ${index + 1} skipped for ${model} [${cooledKey.reason}] for another ${cooldownSeconds(cooledKey)}s.`);
         continue;
       }
       if (attempted > 0) opsStats.recordCounter("gemini_key_failovers");
@@ -262,8 +271,8 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
           logFailure(label, model, error, `cooling this model for ${cooldownSeconds(state)}s and switching model`);
           break;
         }
-        const state = keyCooldown(keys[index]);
-        if (state) logFailure(label, model, error, `cooling this key for ${cooldownSeconds(state)}s and rotating immediately`);
+        const state = keyCooldown(keys[index], model);
+        if (state) logFailure(label, model, error, `cooling this key/model route for ${cooldownSeconds(state)}s and rotating immediately`);
         else logFailure(label, model, error, "rotating immediately");
       }
     }
