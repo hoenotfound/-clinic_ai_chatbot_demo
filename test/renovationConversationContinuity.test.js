@@ -7,7 +7,7 @@ process.env.AI_PROVIDER = "mock";
 const industry = require("../src/industryProfile");
 const ai = require("../src/aiService");
 const state = require("../src/demoState");
-const { detectBudget } = require("../src/renovationLeadState");
+const { detectBudget, detectServices } = require("../src/renovationLeadState");
 
 function session(suffix) {
   return state.createSession({
@@ -68,7 +68,7 @@ test("short renovation tokens and measurements inherit the established customer 
     { role: "user", content: "condo" },
   ]);
   assert.match(condoReply, /[一-鿿]/);
-  assert.doesNotMatch(condoReply, /^Sure,/i);
+  assert.doesNotMatch(conddoReply, /^Sure,/i);
 
   const measurementReply = ai.getFallbackReply([
     { role: "user", content: "我想做厨房柜，新 condo 在 Puchong。" },
@@ -86,6 +86,47 @@ test("an explicit request to switch to English still overrides earlier Chinese",
     { role: "user", content: "Please reply in English" },
   ]);
   assert.match(reply, /^Sure,|I can|Yes,/i);
+});
+
+test("厨房 shorthand is recognized as kitchen cabinets by reply and lead memory", () => {
+  assert.deepEqual(detectServices("厨房"), ["Kitchen Cabinets"]);
+  assert.deepEqual(detectServices("想了解 aliminium cabinet"), ["Kitchen Cabinets"]);
+
+  const reply = ai.getFallbackReply([
+    { role: "user", content: "你好 想了解 Aliminium Cabinet 厨" },
+    { role: "assistant", content: "可以，我可以先帮你了解木工装修需求和大概报价方向。你主要想做厨房柜、衣柜、电视柜、鞋柜，还是全屋木工？" },
+    { role: "user", content: "厨房" },
+  ]);
+
+  assert.match(reply, /厨房柜/);
+  assert.match(reply, /condo|landed|commercial/i);
+  assert.doesNotMatch(reply, /衣柜、电视柜、鞋柜|wardrobes.*TV\/living-room/i);
+});
+
+test("fallback acknowledges a repeated-detail complaint and advances instead of resetting", () => {
+  const reply = ai.getFallbackReply([
+    { role: "user", content: "你好 想了解 Aluminium Cabinet 厨房" },
+    { role: "assistant", content: "你主要想做厨房柜、衣柜、电视柜、鞋柜，还是全屋木工？" },
+    { role: "user", content: "厨房" },
+    { role: "assistant", content: "你主要想做厨房柜、衣柜、电视柜、鞋柜，还是全屋木工？" },
+    { role: "user", content: "我不是说了吗？" },
+  ]);
+
+  assert.match(reply, /已经说了|记住了|厨房柜/);
+  assert.match(reply, /condo|landed|commercial|地区|尺寸|floor plan|预算/i);
+  assert.doesNotMatch(reply, /你主要想做厨房柜、衣柜、电视柜、鞋柜，还是全屋木工/);
+});
+
+test("English frustration keeps the known kitchen context instead of restarting scope", () => {
+  const reply = ai.getFallbackReply([
+    { role: "user", content: "我想了解厨房柜" },
+    { role: "assistant", content: "你主要想做厨房柜、衣柜、电视柜、鞋柜，还是全屋木工？" },
+    { role: "user", content: "you want i repeat how many time?" },
+  ]);
+
+  assert.match(reply, /already said|Kitchen Cabinets|kitchen cabinet/i);
+  assert.match(reply, /condo|landed|commercial|area|measurement|budget/i);
+  assert.doesNotMatch(reply, /Are you looking at kitchen cabinets, wardrobes/i);
 });
 
 test("numeric answer after a budget question is stored in renovation lead memory", () => {
