@@ -70,6 +70,10 @@ const CONTEXTUAL_SCOPE_ALIASES = {
 
 const NON_CARPENTRY_ROOM_PATTERN = /\b(?:tiles?|tiling|floor(?:ing)?|paint(?:ing)?|ceiling|plaster(?:ing)?|wallpaper|plumb(?:ing)?|sink|tap|faucet|pipe|electrical|wiring|renovation|wet\s*works?|masonry|jubin|lantai|siling|paip|elektrik|renovasi)\b|瓷砖|瓷磚|地砖|地磚|地板|油漆|天花|水管|水喉|电线|電線|装修|裝修|翻新/i;
 const PROJECT_DETAIL_PATTERN = /\b(?:condo(?:minium)?|apartment|landed|terrace|semi[- ]?d|bungalow|commercial|office|shop|retail|puchong|cheras|kajang|petaling\s+jaya|pj|subang|shah\s+alam|kuala\s+lumpur|kl|mont\s+kiara|bukit\s+jalil|setapak)\b|\b(?:rm\s*)?\d+(?:[,.]\d+)?\s*(?:k|ft|feet|foot|mm|cm|m|meter|metre)?\b|公寓|排屋|独立屋|獨立屋|蒲种|蒲種|蕉赖|蕉賴|加影|八打灵再也|八打靈再也|吉隆坡|预算|預算|尺寸|平面图|平面圖/i;
+const CARPENTRY_SCOPE_NOUN_PATTERN = /\b(?:cabinet(?:s)?|carpentry|built[- ]?ins?|counter(?:s)?)\b|柜|櫃|木工|收纳|收納/i;
+const NEW_SCOPE_REQUEST_PATTERN = /\b(?:do|does|can|could|would)\s+(?:you|your\s+team)\s+(?:also\s+)?(?:do|build|make|provide|offer)|\b(?:i|we)\s+(?:also\s+)?(?:want|need|am\s+looking\s+for|are\s+looking\s+for)|\b(?:also\s+)?(?:need|want)\s+(?:a\s+|some\s+)?(?:new\s+)?|\b(?:ada|boleh|nak|mahu)\s+(?:buat|buatkan)?\b|(?:有做|也做|可以做|能做|想做|要做)/i;
+const UNCONFIGURED_SCOPE_HINT_PATTERN = /\b(?:reception|vanity|bathroom|toilet|laundry|altar|prayer|bar|clinic|reception\s+counter|cashier\s+counter)\b|接待|前台|浴室|厕所|廁所|洗衣|神台|祈祷|祈禱|诊所|診所/i;
+const KNOWN_SCOPE_REFERENCE_PATTERN = /\b(?:this|that|the|same|my|our|existing)\s+(?:cabinet(?:s)?|carpentry|built[- ]?in)\b|这个柜|這個櫃|同一个柜|同一個櫃|这个木工|這個木工/i;
 
 function normalizeText(value) {
   return String(value || "")
@@ -144,32 +148,73 @@ function detectServiceObjects(text, { allowBareScope = false } = {}) {
   return matches;
 }
 
-function correctionSegments(text) {
-  const normalized = normalizeText(text);
-  if (!normalized) return [];
-  const segments = [];
-  const patterns = [
-    /\bactually\b\s+([^,.;!?]+)/gi,
-    /\binstead(?:\s+of)?\b\s+([^,.;!?]+)/gi,
-    /\bsorry[, ]+\s*([^,.;!?]+)/gi,
-    /(?:其实|其實|改成|改做|换成|換成|应该是|應該是)\s*([^，。！？,!?]+)/g,
-    /(?:(?:\bnot\b|\bbukan\b)\s+|不是\s*)[^,，;]+[,，;]\s*(?:是|要|做|nak|mahu)?\s*([^,，;.!?]+)/gi,
-  ];
+function serviceFromSegment(segment) {
+  return detectServiceObjects(segment, { allowBareScope: true })[0] || null;
+}
 
-  for (const pattern of patterns) {
-    for (const match of normalized.matchAll(pattern)) {
-      if (match[1]) segments.push({ index: match.index || 0, text: match[1] });
-    }
-  }
-  return segments.sort((left, right) => right.index - left.index);
+function correctedPair(targetText, rejectedText) {
+  const target = serviceFromSegment(targetText);
+  const rejected = serviceFromSegment(rejectedText);
+  if (!target || !rejected || target.name === rejected.name) return null;
+  return target;
 }
 
 function detectCorrectedService(text) {
-  for (const segment of correctionSegments(text)) {
-    const matches = detectServiceObjects(segment.text, { allowBareScope: true });
-    if (matches.length) return matches[0];
+  const normalized = normalizeText(text);
+  if (!normalized) return null;
+
+  // Explicit replacement phrases. The wanted service is on the LEFT.
+  for (const pattern of [
+    /^(.+?)\s+instead\s+of\s+(.+)$/i,
+    /^(.+?)\s+rather\s+than\s+(.+)$/i,
+    /^(.+?)[,;]\s*(?:not|bukan)\s+(.+)$/i,
+    /^(.+?)\s+(?:not|bukan)\s+(.+)$/i,
+    /^(.+?)\s*(?:而不是|而非)\s*(.+)$/i,
+    /^(.+?)[,，;]\s*(?:不是|不要)\s*(.+)$/i,
+  ]) {
+    const match = normalized.match(pattern);
+    if (!match) continue;
+    const corrected = correctedPair(match[1], match[2]);
+    if (corrected) return corrected;
   }
+
+  // Explicit rejection followed by the replacement. The wanted service is on the RIGHT.
+  for (const pattern of [
+    /^(?:not|bukan)\s+(.+?)[,;]\s*(?:actually\s+|but\s+|instead\s+)?(.+)$/i,
+    /^(?:not|bukan)\s+(.+?)\s+(?:but|actually|instead)\s+(.+)$/i,
+    /^(?:不是|不要)\s*(.+?)[,，;]\s*(?:而是|是|要|改做|改成)?\s*(.+)$/i,
+  ]) {
+    const match = normalized.match(pattern);
+    if (!match) continue;
+    const corrected = correctedPair(match[2], match[1]);
+    if (corrected) return corrected;
+  }
+
+  // Direct switch/change wording can replace scope even when the old service is omitted.
+  for (const pattern of [
+    /\b(?:switch|change)\s+(?:it\s+)?to\s+([^,.;!?]+)/i,
+    /(?:改成|改做|换成|換成|应该是|應該是)\s*([^，。！？,!?]+)/i,
+  ]) {
+    const match = normalized.match(pattern);
+    if (!match) continue;
+    const target = serviceFromSegment(match[1]);
+    if (target) return target;
+  }
+
   return null;
+}
+
+function isUnconfiguredServiceRequest(text) {
+  const normalized = normalizeText(text);
+  if (!normalized) return false;
+  if (detectServiceObjects(normalized, { allowBareScope: false }).length) return false;
+  if (!CARPENTRY_SCOPE_NOUN_PATTERN.test(normalized) || !NEW_SCOPE_REQUEST_PATTERN.test(normalized)) return false;
+
+  // A reference such as "make the cabinet taller" is a follow-up about the known
+  // project, not a new service request. "Also" or a clearly unsupported cabinet
+  // type, however, indicates a new scope that the configured demo cannot confirm.
+  if (KNOWN_SCOPE_REFERENCE_PATTERN.test(normalized) && !/\balso\b|也|另外|tambahan|juga/i.test(normalized)) return false;
+  return /\balso\b|也|另外|tambahan|juga/i.test(normalized) || UNCONFIGURED_SCOPE_HINT_PATTERN.test(normalized);
 }
 
 function detectServices(text, options) {
@@ -185,6 +230,7 @@ module.exports = {
   detectServices,
   detectServiceObjects,
   detectCorrectedService,
+  isUnconfiguredServiceRequest,
   normalizeText,
   isStandaloneScopeReply,
 };
