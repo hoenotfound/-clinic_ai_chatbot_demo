@@ -1,9 +1,12 @@
 const base = require("./renovationIntakeFlowBase");
 const { detectCorrectedService } = require("./renovationServiceDetection");
 const { correctionTargetText } = require("./renovationConversationIntent");
+const { hasKnownBudget } = require("./renovationBudgetContext");
+const {
+  isStandaloneUnconfiguredCabinetRequest,
+  sanitizeLegacyRoutingMessages,
+} = require("./renovationRoutingIntent");
 
-const EXPLICIT_HUMAN_REQUEST_PATTERN = /(?:speak|talk|chat|connect)\s+(?:me\s+)?(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project\s+manager)|(?:can|could|may)\s+i\s+(?:speak|talk|chat)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project\s+manager)|(?:want|need)\s+to\s+(?:speak|talk|chat|connect)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project\s+manager)|(?:want|need)\s+(?:a\s+)?(?:human|designer|salesperson|project\s+manager)\s+(?:to\s+)?(?:contact|call|reply|help)|human\s+(?:please|pls)|\u771f\u4eba|\u4eba\u5de5|\u8f6c\u4eba\u5de5|\u8f49\u4eba\u5de5|\u627e\u8bbe\u8ba1\u5e08|\u627e\u8a2d\u8a08\u5e2b|\u8054\u7cfb\u987e\u95ee|\u806f\u7e6b\u9867\u554f|nak\s+cakap\s+dengan\s+(?:staff|designer|sales)|mahu\s+cakap\s+dengan\s+(?:staff|designer|sales)/i;
-const BUDGET_PATTERN = /\b(?:budget|bajet)\b.{0,30}(?:rm\s*)?\d+(?:[,.]\d+)?\s*k?\b|\b(?:rm\s*)\d+(?:[,.]\d+)?\s*k?\b|\b\d+(?:\.\d+)?\s*k\s*(?:budget|bajet)\b|(?:\u9884\u7b97|\u9810\u7b97).{0,16}(?:rm\s*)?\d+(?:[,.]\d+)?\s*k?/i;
 const ALL_CLEAR_PATTERN = /no\s+(?:other\s+)?obstruction|nothing\s+(?:else|there)|all\s+clear|tiada\s+halangan|tak\s+ada\s+halangan|\u6ca1\u6709(?:\u5176\u4ed6)?\u963b\u788d|\u6c92\u6709(?:\u5176\u4ed6)?\u963b\u7919/i;
 
 const GROUP_PATTERNS = {
@@ -32,19 +35,6 @@ function lastUserText(messages) {
     if (messages[index]?.role === "user") return String(messages[index].content || "");
   }
   return "";
-}
-
-function sanitizeNonRequestDesignerMention(messages) {
-  const latest = lastUserText(messages);
-  if (!/\bdesigner\b/i.test(latest) || EXPLICIT_HUMAN_REQUEST_PATTERN.test(latest)) return messages;
-  let replaced = false;
-  return (messages || []).map((message, index, items) => {
-    if (replaced || message?.role !== "user") return message;
-    const isLatestUser = !items.slice(index + 1).some((item) => item?.role === "user");
-    if (!isLatestUser) return message;
-    replaced = true;
-    return { ...message, content: String(message.content || "").replace(/\bdesigner\b/ig, "design consultant") };
-  });
 }
 
 function scopedUserText(state) {
@@ -119,8 +109,7 @@ function missingConstraintQuestion(language, missing) {
 }
 
 function budgetKnown(state) {
-  const text = (state.projectMessages || []).filter((message) => message?.role === "user").map((message) => String(message.content || "")).join(" \n");
-  return BUDGET_PATTERN.test(text);
+  return hasKnownBudget(state.projectMessages || []);
 }
 
 function removeRepeatedBudgetQuestion(reply, language) {
@@ -164,10 +153,14 @@ function enhancePlan(plan) {
   return next;
 }
 
+function bypassPlan() {
+  return { reply: null, adviceReply: null, appendAfterAnswer: null, bypass: true, answerFirst: false };
+}
+
 function buildRenovationIntakePlan(messages, options = {}) {
   const latest = lastUserText(messages);
-  if (EXPLICIT_HUMAN_REQUEST_PATTERN.test(latest)) return base.buildRenovationIntakePlan(messages, options);
-  const sourceMessages = sanitizeNonRequestDesignerMention(messages);
+  if (isStandaloneUnconfiguredCabinetRequest(latest)) return bypassPlan();
+  const sourceMessages = sanitizeLegacyRoutingMessages(messages);
   return enhancePlan(base.buildRenovationIntakePlan(sourceMessages, options));
 }
 
