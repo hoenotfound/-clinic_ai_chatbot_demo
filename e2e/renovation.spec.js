@@ -29,12 +29,12 @@ test("renovation profile stays industry-specific across customer view and the co
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/");
 
-  await expect(page.getByText("Oakline Demo Renovation & Carpentry").first()).toBeVisible();
+  await expect(page.getByText("Oakline Demo Renovation").first()).toBeVisible();
 
   const leadCard = page.locator(".hero-lead-card");
   const journeyCaption = page.locator(".hero-product-caption");
-  await expect(leadCard).toContainText("SITE MEASUREMENT INTENT");
-  await expect(leadCard).toContainText("Hot lead · Kitchen Cabinets · Puchong · Saturday");
+  await expect(leadCard).toContainText("PROJECT DETAILS CAPTURED");
+  await expect(leadCard).toContainText("Kitchen Cabinets · 12ft · Puchong");
   await expect(journeyCaption).toContainText("AI-POWERED CUSTOMER JOURNEY");
   await expect(journeyCaption).toContainText("Reply. Qualify. Hand off.");
   await expect(page.locator('link[data-hero-showcase-layout="true"]')).toHaveCount(1);
@@ -68,13 +68,32 @@ test("renovation profile stays industry-specific across customer view and the co
     channel: "facebook",
   });
 
-  const priceChip = page.locator(".prompt-panel .suggestion-chip").filter({ hasText: "Kitchen cabinet price?" });
-  await expect(priceChip).toHaveCount(1);
-  await expect(priceChip).toHaveAttribute("data-message", "Hi, kitchen cabinet how much?");
-  await priceChip.click();
-  await expect(page.locator("#messages")).toContainText("RM 6,800");
+  const startChip = page.locator(".prompt-panel .suggestion-chip").filter({ hasText: "Start renovation enquiry" });
+  await expect(startChip).toHaveCount(1);
+  await expect(startChip).toHaveAttribute("data-message", "Hi, I want to ask about cabinets.");
+  await startChip.click();
+  await expect(page.locator("#messages")).toContainText("Site photo:");
+  await expect(page.locator("#messages")).toContainText("Rough size:");
+  await expect(page.locator("#messages")).toContainText("Location:");
 
-  await sendCustomerMessage(page, "New condo in Puchong, kitchen around 12ft. Budget RM10k.");
+  await sendCustomerMessage(page, "Site photo available. Rough size: 12ft. Location: Puchong.");
+  await expect(page.locator("#messages")).toContainText("upper + lower kitchen cabinets");
+  await expect(page.locator("#messages")).toContainText("wardrobe cabinet");
+  await expect(page.locator("#messages")).toContainText("TV cabinet");
+  await expect(page.locator("#messages")).toContainText("shoe cabinet");
+
+  await sendCustomerMessage(page, "Upper and lower kitchen cabinet");
+  await expect(page.locator("#messages")).toContainText("switches or plug points");
+  await expect(page.locator("#messages")).toContainText("sink/water points");
+  await expect(page.locator("#messages")).toContainText("beams/columns");
+
+  await sendCustomerMessage(page, "The wall is clear except 2 plug points and a sink in the middle. No window.");
+  await expect(page.locator("#messages")).toContainText("Preliminary advice");
+  await expect(page.locator("#messages")).toContainText("melamine/MFC");
+  await expect(page.locator("#messages")).toContainText("plywood");
+  await expect(page.locator("#messages")).toContainText("budget range");
+
+  await sendCustomerMessage(page, "Budget RM10k.");
   const literalCustomerMessage = "Do you also build reception cabinets for a clinic?";
   await sendCustomerMessage(page, literalCustomerMessage);
 
