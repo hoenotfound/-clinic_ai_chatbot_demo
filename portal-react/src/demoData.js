@@ -7,9 +7,10 @@ const active = isRenovationDemo ? renovation : clinic;
 function renovationDisplayCopy(value) {
   if (!isRenovationDemo) return value;
   return String(value || "")
-    .replace(/full[- ]home custom carpentry/gi, "full-home cabinets")
+    .replace(/full[- ]home custom carpentry/gi, "Full-Home Cabinets")
     .replace(/full[- ]home carpentry/gi, "full-home cabinets")
     .replace(/full[- ]house carpentry/gi, "full-house cabinets")
+    .replace(/tv console & living room carpentry/gi, "TV / Living Room Cabinets")
     .replace(/living[- ]room carpentry/gi, "living-room cabinets")
     .replace(/wet and dry kitchen carpentry/gi, "wet and dry kitchen cabinets")
     .replace(/full carpentry lead/gi, "full-home cabinet lead")
@@ -24,6 +25,7 @@ function displayLead(lead) {
   if (!isRenovationDemo) return lead;
   return {
     ...lead,
+    treatment: renovationDisplayCopy(lead.treatment),
     summary: renovationDisplayCopy(lead.summary),
     messages: (lead.messages || []).map((message) => {
       if (!Array.isArray(message) || message[0] === "user") return message;
