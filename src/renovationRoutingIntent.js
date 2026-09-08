@@ -18,7 +18,7 @@ const TECHNICAL_REQUEST_PATTERNS = [
   /\bplumb(?:ing)?\s+(?:work|works|relocation|rerout(?:e|ing)|alteration|changes?)\b|(?:move|relocate|shift|reroute|change)\s+(?:the\s+)?(?:sink|water\s*point|pipe|pipes|plumbing)\b/i,
   /waterproof(?:ing)?|gas\s+(?:pipe|line)|permit|authority\s+approval|building\s+approval/i,
   /\u627f\u91cd\u5899|\u627f\u91cd\u7246|\u6572(?:\u8fd9\u4e2a|\u9019\u500b|\u8fd9\u9762|\u9019\u9762)?(?:\u5899|\u7246|\u6881|\u67f1)|\u62c6(?:\u5899|\u7246|\u6881|\u67f1)|\u6539\u7535|\u6539\u96fb|\u79fb\u63d2\u5ea7|\u79fb\u5f00\u5173|\u79fb\u958b\u95dc|\u6539\u6c34\u7ba1|\u79fb\u6c34\u4f4d|\u9632\u6c34|\u7164\u6c14|\u7164\u6c23|\u71c3\u6c14|\u71c3\u6c23/i,
-  /kerja\s+(?:elektrik|pendawaian)|(?:ubah|alih|pindah|tambah)\s+(?:pendawaian|suis|soket|plug|paip|water\s*point)|waterproof|kelulusan\s+(?:majlis|pihak\s+berkuasa)|struktur\s+(?:dinding|beam|column)/i,
+  /(?:buat|kerja)\s+(?:elektrik|pendawaian|plumbing)|(?:ubah|alih|pindah|tambah)\s+(?:pendawaian|suis|soket|plug|paip|water\s*point)|waterproof|kelulusan\s+(?:majlis|pihak\s+berkuasa)|struktur\s+(?:dinding|beam|column)/i,
 ];
 
 const PASSIVE_ROLE_REPLACEMENTS = [
