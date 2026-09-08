@@ -24,8 +24,12 @@ test("explicit service corrections prefer the replacement scope without treating
   assert.equal(detectService("wardrobe instead of kitchen cabinet")?.name, "Built-in Wardrobes");
   assert.equal(detectService("I want wardrobe, not kitchen cabinet")?.name, "Built-in Wardrobes");
   assert.equal(detectService("I don't want kitchen cabinet, I want wardrobe")?.name, "Built-in Wardrobes");
+  assert.equal(detectService("I don't want kitchen cabinet. I want wardrobe.")?.name, "Built-in Wardrobes");
+  assert.equal(detectService("I don't want kitchen cabinet but I want wardrobe")?.name, "Built-in Wardrobes");
   assert.equal(detectService("cancel kitchen cabinet, I want wardrobe instead")?.name, "Built-in Wardrobes");
+  assert.equal(detectService("cancel kitchen cabinet. I want wardrobe instead.")?.name, "Built-in Wardrobes");
   assert.equal(detectService("tak nak kitchen cabinet, nak wardrobe")?.name, "Built-in Wardrobes");
+  assert.equal(detectService("tak nak kitchen cabinet tapi nak wardrobe")?.name, "Built-in Wardrobes");
   assert.equal(detectService("不是厨房柜，是衣柜")?.name, "Built-in Wardrobes");
   assert.equal(detectCorrectedService("actually kitchen is about 12ft"), null);
 
@@ -93,6 +97,48 @@ test("same-message rejection plus replacement stays an active lead and preserves
   assert.deepEqual(cancelSession.lead.interests, ["Built-in Wardrobes"]);
   assert.equal(cancelSession.lead.preferredBranch, "Petaling Jaya / Subang / Shah Alam");
   assert.equal(cancelSession.lead.budget, "RM20,000");
+
+  const punctuationSession = {
+    messages: [
+      { role: "user", content: "Kitchen cabinet in Puchong, budget RM18k" },
+      { role: "assistant", content: "Noted." },
+      { role: "user", content: "I don't want kitchen cabinet. I want wardrobe." },
+    ],
+    lead: { interests: [] },
+  };
+  updateRenovationLead(punctuationSession);
+  assert.equal(punctuationSession.lead.reducedInterest, false);
+  assert.deepEqual(punctuationSession.lead.interests, ["Built-in Wardrobes"]);
+  assert.equal(punctuationSession.lead.preferredBranch, "Cheras / Kajang / Puchong");
+  assert.equal(punctuationSession.lead.budget, "RM18,000");
+});
+
+test("service corrections reset old scope measurements while keeping project-level facts", () => {
+  const session = {
+    messages: [
+      { role: "user", content: "Kitchen cabinet for my Puchong condo, around 12ft, budget RM15k" },
+      { role: "assistant", content: "Noted." },
+      { role: "user", content: "I don't want kitchen cabinet. I want wardrobe." },
+    ],
+    lead: { interests: [] },
+  };
+
+  updateRenovationLead(session);
+  assert.deepEqual(session.lead.interests, ["Built-in Wardrobes"]);
+  assert.equal(session.lead.preferredBranch, "Cheras / Kajang / Puchong");
+  assert.equal(session.lead.propertyType, "Condo / apartment");
+  assert.equal(session.lead.budget, "RM15,000");
+  assert.equal(session.lead.measurementsKnown, false);
+
+  const reply = buildFallbackReply(session.messages);
+  assert.match(reply, /Built-in Wardrobes|wardrobe/i);
+  assert.match(reply, /rough measurements|floor plan/i);
+  assert.doesNotMatch(reply, /leave the renovation enquiry here/i);
+
+  session.messages.push({ role: "assistant", content: reply });
+  session.messages.push({ role: "user", content: "Wardrobe is about 9ft" });
+  updateRenovationLead(session);
+  assert.equal(session.lead.measurementsKnown, true);
 });
 
 test("cabinet paint-finish questions stay in carpentry while real painting scope still hands off", () => {
@@ -108,12 +154,15 @@ test("cabinet paint-finish questions stay in carpentry while real painting scope
   assert.match(paintingReply, /\[\[HANDOFF\]\]/);
 });
 
-test("unconfigured cabinet scope is caught even when mixed with a configured service", () => {
+test("unconfigured cabinet scope is caught even when mixed with a configured service or written as shorthand", () => {
   assert.equal(isUnconfiguredServiceRequest("Do you also build reception cabinets for a clinic?"), true);
   assert.equal(isUnconfiguredServiceRequest("Do you do reception cabinets?"), true);
   assert.equal(isUnconfiguredServiceRequest("Do you do office cabinets?"), true);
   assert.equal(isUnconfiguredServiceRequest("Do you do bathroom vanity?"), true);
   assert.equal(isUnconfiguredServiceRequest("Do you do kitchen cabinets and bathroom vanity?"), true);
+  assert.equal(isUnconfiguredServiceRequest("office cabinets"), true);
+  assert.equal(isUnconfiguredServiceRequest("bathroom vanity"), true);
+  assert.equal(isUnconfiguredServiceRequest("kitchen cabinets and bathroom vanity"), true);
   assert.equal(isUnconfiguredServiceRequest("Can you make the cabinet taller?"), false);
   assert.equal(isUnconfiguredServiceRequest("Can you also make the cabinet taller?"), false);
 
@@ -134,12 +183,39 @@ test("unconfigured cabinet scope is caught even when mixed with a configured ser
   assert.match(mixedReply, /Kitchen Cabinets/i);
   assert.match(mixedReply, /another cabinet|isn't configured|confirm/i);
 
+  const shorthandReply = buildFallbackReply([
+    { role: "user", content: "I want kitchen cabinet" },
+    { role: "assistant", content: "Is this for a condo or landed home?" },
+    { role: "user", content: "bathroom vanity" },
+  ]);
+  assert.match(shorthandReply, /\[\[HANDOFF\]\]/);
+  assert.doesNotMatch(shorthandReply, /I've got Kitchen Cabinets as the project/i);
+
   const followUpReply = buildFallbackReply([
     { role: "user", content: "I want kitchen cabinet" },
     { role: "assistant", content: "Is this for a condo or landed home?" },
     { role: "user", content: "Can you make the cabinet taller?" },
   ]);
   assert.doesNotMatch(followUpReply, /\[\[HANDOFF\]\]/);
+});
+
+test("genuine renovation rejection stops deterministic qualification while replacement wording continues", () => {
+  const rejectionReply = buildFallbackReply([
+    { role: "user", content: "I want kitchen cabinets" },
+    { role: "assistant", content: "Is the property a condo or landed home?" },
+    { role: "user", content: "Not interested anymore, no thanks" },
+  ]);
+  assert.match(rejectionReply, /No problem|leave the renovation enquiry here/i);
+  assert.doesNotMatch(rejectionReply, /condo|landed|budget|rough measurements|floor plan/i);
+  assert.doesNotMatch(rejectionReply, /\[\[HANDOFF\]\]/);
+
+  const replacementReply = buildFallbackReply([
+    { role: "user", content: "Kitchen cabinet in Puchong condo, 12ft, budget RM15k" },
+    { role: "assistant", content: "Noted." },
+    { role: "user", content: "I don't want kitchen cabinet but I want wardrobe" },
+  ]);
+  assert.match(replacementReply, /Built-in Wardrobes|wardrobe/i);
+  assert.doesNotMatch(replacementReply, /leave the renovation enquiry here/i);
 });
 
 test("a Gemini route is cooled only after repeated timeouts, then skipped on the next message", async () => {
