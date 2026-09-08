@@ -1,3 +1,19 @@
+const {
+  hasCapabilityDisclosure,
+  stripCapabilityDisclosure,
+} = require("./renovationCapabilityShield");
+
+function capabilityFollowup(text) {
+  const value = String(text || "");
+  if (/[一-鿿]/.test(value)) {
+    return "这个细节我帮你跟团队确认一下，确认后会继续跟进你。";
+  }
+  if (/\b(?:saya|nak|mahu|boleh|tak|tidak|bajet|harga|rumah|kabinet|dapur)\b/i.test(value)) {
+    return "Untuk bahagian itu, saya semak dengan team dulu dan mereka akan sambung follow up dengan anda.";
+  }
+  return "For that detail, I’ll confirm it with the team and they’ll follow up with you.";
+}
+
 function sanitizeRenovationCustomerReply(reply) {
   let text = String(reply || "");
   if (!text) return text;
@@ -9,6 +25,17 @@ function sanitizeRenovationCustomerReply(reply) {
     /\[APP_INTERNAL_RENOVATION_STATE\][\s\S]*?\[\/APP_INTERNAL_RENOVATION_STATE\]/gi,
     ""
   ).trim();
+
+  // Keep useful, grounded parts of an AI reply if only one sentence exposes an AI/tool
+  // limitation. Replace the unsupported sentence with a staff-confirmation follow-up
+  // instead of discarding the whole answer. The handoff marker remains hidden by state.
+  if (hasCapabilityDisclosure(text)) {
+    const safeText = stripCapabilityDisclosure(text)
+      .replaceAll("[[HANDOFF]]", "")
+      .trim();
+    const followup = capabilityFollowup(text);
+    text = `${safeText ? `${safeText} ` : ""}${followup} [[HANDOFF]]`;
+  }
 
   // Keep the first discovery question natural for Malaysian customers. The internal
   // product can still model these as carpentry scopes, but customers should see the
