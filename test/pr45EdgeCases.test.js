@@ -23,6 +23,9 @@ test("explicit service corrections prefer the replacement scope without treating
   assert.equal(detectService("not kitchen cabinet, actually wardrobe")?.name, "Built-in Wardrobes");
   assert.equal(detectService("wardrobe instead of kitchen cabinet")?.name, "Built-in Wardrobes");
   assert.equal(detectService("I want wardrobe, not kitchen cabinet")?.name, "Built-in Wardrobes");
+  assert.equal(detectService("I don't want kitchen cabinet, I want wardrobe")?.name, "Built-in Wardrobes");
+  assert.equal(detectService("cancel kitchen cabinet, I want wardrobe instead")?.name, "Built-in Wardrobes");
+  assert.equal(detectService("tak nak kitchen cabinet, nak wardrobe")?.name, "Built-in Wardrobes");
   assert.equal(detectService("不是厨房柜，是衣柜")?.name, "Built-in Wardrobes");
   assert.equal(detectCorrectedService("actually kitchen is about 12ft"), null);
 
@@ -58,6 +61,40 @@ test("explicit service corrections prefer the replacement scope without treating
   assert.deepEqual(multiScopeSession.lead.interests.sort(), ["Kitchen Cabinets", "Built-in Wardrobes"].sort());
 });
 
+test("same-message rejection plus replacement stays an active lead and preserves earlier qualification", () => {
+  const session = {
+    messages: [
+      { role: "user", content: "I want kitchen cabinet in Puchong, budget RM15,000" },
+      { role: "assistant", content: "Sure, what size is the kitchen?" },
+      { role: "user", content: "I don't want kitchen cabinet, I want wardrobe" },
+    ],
+    lead: { interests: [] },
+  };
+
+  updateRenovationLead(session);
+
+  assert.equal(session.lead.reducedInterest, false);
+  assert.deepEqual(session.lead.interests, ["Built-in Wardrobes"]);
+  assert.equal(session.lead.preferredBranch, "Cheras / Kajang / Puchong");
+  assert.equal(session.lead.budget, "RM15,000");
+  assert.ok(session.lead.score > 0);
+  assert.notEqual(session.lead.temperature, "cold");
+
+  const cancelSession = {
+    messages: [
+      { role: "user", content: "Kitchen cabinet in PJ, budget RM20k" },
+      { role: "assistant", content: "Got it." },
+      { role: "user", content: "cancel kitchen cabinet, I want wardrobe instead" },
+    ],
+    lead: { interests: [] },
+  };
+  updateRenovationLead(cancelSession);
+  assert.equal(cancelSession.lead.reducedInterest, false);
+  assert.deepEqual(cancelSession.lead.interests, ["Built-in Wardrobes"]);
+  assert.equal(cancelSession.lead.preferredBranch, "Petaling Jaya / Subang / Shah Alam");
+  assert.equal(cancelSession.lead.budget, "RM20,000");
+});
+
 test("cabinet paint-finish questions stay in carpentry while real painting scope still hands off", () => {
   const finishReply = buildFallbackReply([
     { role: "user", content: "Can kitchen cabinet use paint finish?" },
@@ -71,10 +108,14 @@ test("cabinet paint-finish questions stay in carpentry while real painting scope
   assert.match(paintingReply, /\[\[HANDOFF\]\]/);
 });
 
-test("a new unconfigured cabinet scope is not answered as the previously known service", () => {
+test("unconfigured cabinet scope is caught even when mixed with a configured service", () => {
   assert.equal(isUnconfiguredServiceRequest("Do you also build reception cabinets for a clinic?"), true);
   assert.equal(isUnconfiguredServiceRequest("Do you do reception cabinets?"), true);
+  assert.equal(isUnconfiguredServiceRequest("Do you do office cabinets?"), true);
+  assert.equal(isUnconfiguredServiceRequest("Do you do bathroom vanity?"), true);
+  assert.equal(isUnconfiguredServiceRequest("Do you do kitchen cabinets and bathroom vanity?"), true);
   assert.equal(isUnconfiguredServiceRequest("Can you make the cabinet taller?"), false);
+  assert.equal(isUnconfiguredServiceRequest("Can you also make the cabinet taller?"), false);
 
   const reply = buildFallbackReply([
     { role: "user", content: "I want kitchen cabinet" },
@@ -85,6 +126,13 @@ test("a new unconfigured cabinet scope is not answered as the previously known s
   assert.match(reply, /\[\[HANDOFF\]\]/);
   assert.match(reply, /unlisted|listed custom-carpentry|confirm the actual scope/i);
   assert.doesNotMatch(reply, /I've got Kitchen Cabinets as the project/i);
+
+  const mixedReply = buildFallbackReply([
+    { role: "user", content: "Do you do kitchen cabinets and bathroom vanity?" },
+  ]);
+  assert.match(mixedReply, /\[\[HANDOFF\]\]/);
+  assert.match(mixedReply, /Kitchen Cabinets/i);
+  assert.match(mixedReply, /another cabinet|isn't configured|confirm/i);
 
   const followUpReply = buildFallbackReply([
     { role: "user", content: "I want kitchen cabinet" },
