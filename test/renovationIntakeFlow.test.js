@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const {
   OPENING_MESSAGE,
   buildRenovationIntakeReply,
+  _test: intakeHelpers,
 } = require("../src/renovationIntakeFlow");
 
 const BANNED_CUSTOMER_TERMS = /\bcarpentry\b|木工/i;
@@ -57,14 +58,14 @@ test("after cabinet type the bot checks site obstructions before advising", () =
   assert.doesNotMatch(reply, BANNED_CUSTOMER_TERMS);
 });
 
-test("after obstruction details the bot gives preliminary layout and material advice", () => {
+test("after obstruction details the real obstruction question advances to preliminary advice", () => {
   const messages = [
     { role: "user", content: "Hi" },
     { role: "assistant", content: OPENING_MESSAGE },
     { role: "user", content: "Rough size 12ft, Location Puchong, site photo available" },
     { role: "assistant", content: "Thanks 👍 What are you looking to do?" },
     { role: "user", content: "Upper and lower kitchen cabinet" },
-    { role: "assistant", content: "Any obstructions?" },
+    { role: "assistant", content: intakeHelpers.obstructionQuestion("en") },
     { role: "user", content: "There are 2 plug points, a sink in the middle and no window. Wall space is otherwise clear." },
   ];
 
