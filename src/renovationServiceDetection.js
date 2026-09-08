@@ -160,11 +160,11 @@ function correctedPair(targetText, rejectedText) {
   return target;
 }
 
-function detectCorrectedService(text) {
+function correctionSegments(text) {
   const normalized = normalizeText(text);
   if (!normalized) return null;
 
-  // Explicit replacement phrases. The wanted service is on the LEFT.
+  // Wanted service is on the left.
   for (const pattern of [
     /^(.+?)\s+instead\s+of\s+(.+)$/i,
     /^(.+?)\s+rather\s+than\s+(.+)$/i,
@@ -174,38 +174,46 @@ function detectCorrectedService(text) {
     /^(.+?)[,，;]\s*(?:不是|不要)\s*(.+)$/i,
   ]) {
     const match = normalized.match(pattern);
-    if (!match) continue;
-    const corrected = correctedPair(match[1], match[2]);
-    if (corrected) return corrected;
+    if (match) return { targetText: normalizeText(match[1]), rejectedText: normalizeText(match[2]) };
   }
 
-  // Explicit rejection followed by the replacement. The wanted service is on the RIGHT.
-  // Accept normal WhatsApp punctuation and "but"/"tapi" separators, not only commas.
+  // Wanted service is on the right.
   for (const pattern of [
     /^(?:i|we)\s+(?:don['’]?t|do\s+not)\s+want\s+(.+?)(?:[,;.!?]+\s*|\s+but\s+)(?:but\s+)?(?:i|we)\s+(?:want|need)\s+(.+?)(?:\s+instead)?[.!?]*$/i,
-    /^(?:cancel|drop|remove)\s+(.+?)(?:[,;.!?]+\s*|\s+but\s+)(?:but\s+)?(?:i|we)\s+(?:want|need)\s+(.+?)(?:\s+instead)?[.!?]*$/i,
+    /^(?:cancel|drop|remove)\s+(.+?)(?:[,;.!?]+\s*|\s+but\s+)(?:but\s+)?(?:(?:i|we)\s+)?(?:want|need)\s+(.+?)(?:\s+instead)?[.!?]*$/i,
+    /^(?:change|switch)\s+(?:from\s+)?(.+?)\s+to\s+(.+?)[.!?]*$/i,
     /^(?:tak|tidak)\s+(?:nak|mahu)\s+(.+?)(?:[,;.!?]+\s*|\s+(?:tapi|tetapi)\s+)(?:(?:tapi|tetapi)\s+)?(?:saya\s+)?(?:nak|mahu)\s+(.+?)(?:\s+sebaliknya)?[.!?]*$/i,
     /^(?:not|bukan)\s+(.+?)(?:[,;.!?]+\s*|\s+(?:but|actually|instead|tapi|tetapi)\s+)(?:(?:but|actually|instead|tapi|tetapi)\s+)?(.+?)[.!?]*$/i,
     /^(?:不是|不要)\s*(.+?)[,，;。！？]\s*(?:而是|是|要|改做|改成)?\s*(.+)$/i,
   ]) {
     const match = normalized.match(pattern);
-    if (!match) continue;
-    const corrected = correctedPair(match[2], match[1]);
-    if (corrected) return corrected;
+    if (match) return { targetText: normalizeText(match[2]), rejectedText: normalizeText(match[1]) };
   }
 
-  // Direct switch/change wording can replace scope even when the old service is omitted.
+  // Direct switch/change wording where the previous service is omitted.
   for (const pattern of [
     /\b(?:switch|change)\s+(?:it\s+)?to\s+([^,.;!?]+)/i,
     /(?:改成|改做|换成|換成|应该是|應該是)\s*([^，。！？,!?]+)/i,
   ]) {
     const match = normalized.match(pattern);
-    if (!match) continue;
-    const target = serviceFromSegment(match[1]);
-    if (target) return target;
+    if (match) return { targetText: normalizeText(match[1]), rejectedText: null };
   }
 
   return null;
+}
+
+function detectCorrectedService(text) {
+  const segments = correctionSegments(text);
+  if (!segments) return null;
+  if (segments.rejectedText) return correctedPair(segments.targetText, segments.rejectedText);
+  return serviceFromSegment(segments.targetText);
+}
+
+function correctionTargetText(text) {
+  const normalized = normalizeText(text);
+  if (!normalized) return normalized;
+  if (!detectCorrectedService(normalized)) return normalized;
+  return correctionSegments(normalized)?.targetText || normalized;
 }
 
 function isUnconfiguredServiceRequest(text) {
@@ -244,6 +252,7 @@ module.exports = {
   detectServices,
   detectServiceObjects,
   detectCorrectedService,
+  correctionTargetText,
   isUnconfiguredServiceRequest,
   normalizeText,
   isStandaloneScopeReply,
