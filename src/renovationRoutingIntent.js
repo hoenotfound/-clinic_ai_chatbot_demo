@@ -29,11 +29,13 @@ const PASSIVE_ROLE_REPLACEMENTS = [
 ];
 
 const BENIGN_TECH_REPLACEMENTS = [
+  [/\belectrical\s+outlets?\b/gi, "plug points"],
+  [/\bplumbing\s+points?\b/gi, "water point"],
   [/\belectrical\b/gi, "power"],
-  [/\bplumbing\b/gi, "water service"],
+  [/\bplumbing\b/gi, "water"],
   [/\bpendawaian\b/gi, "power point"],
   [/\bpaip\b/gi, "water point"],
-  [/\u7535\u7ebf|\u96fb\u7dda/g, "power cable"],
+  [/\u7535\u7ebf|\u96fb\u7dda/g, "power point"],
   [/\u6c34\u7ba1/g, "water point"],
 ];
 
