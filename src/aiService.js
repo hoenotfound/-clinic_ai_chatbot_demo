@@ -11,6 +11,7 @@ const {
 const opsStats = require("./opsStats");
 const { createGeminiFailover } = require("./geminiFailover");
 const { sanitizeRenovationCustomerReply } = require("./renovationCustomerLanguage");
+const { buildRenovationIntakeReply } = require("./renovationIntakeFlow");
 
 const provider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
 const SUPPORTED_PROVIDERS = new Set(["mock", "claude", "gemini"]);
@@ -22,10 +23,16 @@ function customerReply(reply) {
   return industry.key === "renovation" ? sanitizeRenovationCustomerReply(reply) : reply;
 }
 
+function renovationIntakeReply(messages, { isFirstMessage = false } = {}) {
+  if (industry.key !== "renovation") return null;
+  const reply = buildRenovationIntakeReply(messages, { isFirstMessage });
+  return reply ? customerReply(reply) : null;
+}
+
 function enhancedSystemPrompt(isFirstMessage) {
   const basePrompt = buildSystemPrompt({ isFirstMessage });
   if (industry.key === "renovation") {
-    return `${basePrompt}\n\nCUSTOMER-FACING WORDING:\n- Do not use the words "carpentry" or "木工" when speaking to customers. These are internal scope terms and sound unnatural in normal Malaysian customer chat.\n- Ask about the actual cabinet type instead: kitchen cabinet, wardrobe, TV cabinet or shoe cabinet.\n- In Chinese, use 厨房柜、衣柜、电视柜、鞋柜 and natural terms such as 柜子 / 装修需求. Do not say 木工装修、木工项目、木工区域 or 全屋木工.\n- For a fresh Chinese enquiry where the scope is still unknown, a natural question is: "可以，我可以先了解您的需求和 Budget 方面吗？您主要想做厨房柜、衣柜、电视柜还是鞋柜？"\n\nSTRUCTURED RENOVATION SALES KNOWLEDGE:\nUse only the configured services and price guides above. Preserve known project context and never invent a final quotation.\n\nDETERMINISTIC RENOVATION HANDOFF RULES:\nFollow the handoff conditions above. Never invent site availability, booking confirmation or technical conclusions.`;
+    return `${basePrompt}\n\nCUSTOMER-FACING WORDING:\n- Do not use the words "carpentry" or "木工" when speaking to customers. These are internal scope terms and sound unnatural in normal Malaysian customer chat.\n- Ask about the actual cabinet type instead: upper/lower kitchen cabinet, wardrobe, TV cabinet, shoe cabinet or another cabinet type.\n- In Chinese, use 厨房吊柜/地柜、衣柜、电视柜、鞋柜 and natural terms such as 柜子 / 装修需求. Do not say 木工装修、木工项目、木工区域 or 全屋木工.\n\nSITE-FIRST SALES FLOW:\n- The deterministic intake flow handles the opening site-details template and the first qualification steps. Once it hands the conversation back to you, preserve that order and do not reset it.\n- Site basics first: site photo if available, rough size, and project location.\n- Then identify what the customer wants to build: upper + lower kitchen cabinets, wardrobe, TV cabinet, shoe cabinet or another cabinet type.\n- Once scope and site basics are known, check practical obstructions such as usable wall space, windows/doors, switches, plug points, plumbing/water points, hob/hood, beams or columns.\n- Give preliminary layout/material direction only from information actually supplied. Never claim to see a photo unless its contents were provided to the model.\n- Material guidance is preliminary. Compare practical options according to budget, finish, moisture exposure and use; never claim one material is universally best.\n\nSTRUCTURED RENOVATION SALES KNOWLEDGE:\nUse only the configured services and price guides above. Preserve known project context and never invent a final quotation.\n\nDETERMINISTIC RENOVATION HANDOFF RULES:\nFollow the handoff conditions above. Never invent site availability, booking confirmation or technical conclusions.`;
   }
   return `${basePrompt}\n\nSTRUCTURED CONCERN-TO-TREATMENT KNOWLEDGE:\nUse these mappings as general front-desk guidance, never as a diagnosis or guarantee. If more than one service is mapped, explain why the categories differ and let a clinician decide suitability.\n${concernGuidanceForPrompt()}\n\nDETERMINISTIC BOOKING RULES:\n${bookingRulesForPrompt()}`;
 }
@@ -37,6 +44,11 @@ function getFallbackReply(messages) {
   if (ruleReply) return customerReply(ruleReply);
   const concernReply = buildConcernFallback(messages);
   if (concernReply) return customerReply(concernReply);
+  const intakeReply = renovationIntakeReply(messages, {
+    isFirstMessage: (messages || []).filter((message) => message?.role === "user").length === 1 &&
+      !(messages || []).some((message) => message?.role === "assistant"),
+  });
+  if (intakeReply) return intakeReply;
   return customerReply(buildFallbackReply(messages));
 }
 
@@ -125,6 +137,9 @@ async function getReply(messages, isFirstMessage = false) {
     const ruleReply = enforceBookingRules(messages);
     if (ruleReply) return customerReply(ruleReply);
 
+    const intakeReply = renovationIntakeReply(messages, { isFirstMessage });
+    if (intakeReply) return intakeReply;
+
     try {
       if (provider === "mock") return getFallbackReply(messages);
       if (provider === "claude") return customerReply(await getClaudeReply(messages, isFirstMessage));
@@ -150,6 +165,7 @@ module.exports = {
   _test: {
     enhancedSystemPrompt,
     customerReply,
+    renovationIntakeReply,
     geminiThinkingConfig: gemini.thinkingConfig,
     buildGeminiRequest: gemini.buildRequest,
     getGeminiApiKeys: gemini.getApiKeys,
