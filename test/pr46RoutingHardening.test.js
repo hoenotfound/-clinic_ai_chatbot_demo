@@ -34,9 +34,11 @@ test("ordinary electrical and plumbing site facts do not trigger technical hando
     { role: "user", content: "The plumbing point is under the sink and there are 2 electrical outlets." },
   ]);
   assert.doesNotMatch(routed[0].content, /\belectrical\b|\bplumbing\b/i);
+  assert.match(routed[0].content, /water point/i);
+  assert.match(routed[0].content, /plug points/i);
 });
 
-test("benign site-condition wording continues through the intake instead of bypassing", () => {
+test("benign site-condition wording continues through the intake and remains usable as site facts", () => {
   const messages = [
     { role: "user", content: "Hi" },
     { role: "assistant", content: OPENING_MESSAGE },
@@ -49,7 +51,11 @@ test("benign site-condition wording continues through the intake instead of bypa
   const plan = buildRenovationIntakePlan(messages);
   assert.equal(plan.bypass, false);
   assert.ok(plan.reply);
+  assert.equal(plan.state.facts.groups.has("power"), true);
+  assert.equal(plan.state.facts.groups.has("plumbing"), true);
   assert.doesNotMatch(plan.reply, /technical check|HANDOFF/i);
+  assert.doesNotMatch(plan.reply, /switches or plug points/i);
+  assert.doesNotMatch(plan.reply, /sink\/water points/i);
 });
 
 test("unlisted standalone cabinet types hand off instead of repeating the cabinet question", () => {
