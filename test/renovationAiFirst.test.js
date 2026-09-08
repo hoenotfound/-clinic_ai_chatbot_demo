@@ -117,6 +117,47 @@ test("natural Chinese contextual answers advance tracker state and still let AI 
   assert.match(sentText, /Power \/ plugs: answered\/discussed/i);
 });
 
+test("natural unmarked AI advice is remembered on the next turn instead of being repeated", () => {
+  const messages = [
+    { role: "user", content: "厨房柜大概10ft，Location在Cheras" },
+    { role: "assistant", content: "那里有没有 switch 或 plug？" },
+    { role: "user", content: "没有" },
+    { role: "assistant", content: "收到。再确认一下，这面墙的空间能不能用来做柜子？" },
+    { role: "user", content: "可以啊" },
+    {
+      role: "assistant",
+      content: "这个墙位可以先按连续柜体来规划，既然没有 switch / plug 要避开，布局会直接一点。材料可以按预算比较 plywood 和 aluminium。你大概想控制在什么 budget？",
+    },
+    { role: "user", content: "8000" },
+  ];
+
+  const rawPlan = ai._test.renovationIntakePlan(messages);
+  assert.equal(rawPlan.state.adviceSent, false, "legacy marker tracker should still be conservative");
+  assert.ok(rawPlan.adviceReply, "raw deterministic plan should otherwise try to send advice again");
+
+  const reconciled = ai._test.reconcileRenovationAdviceProgress(messages, rawPlan);
+  assert.equal(reconciled.state.adviceSent, true);
+  assert.equal(reconciled.adviceReply, null);
+  assert.equal(reconciled.state.budgetKnown, true);
+
+  const context = ai._test.buildRenovationAiContext(reconciled);
+  assert.match(context, /Preliminary advice already sent: yes/i);
+  assert.doesNotMatch(context, /Conservative next goals: useful preliminary advice/i);
+});
+
+test("a budget question alone is not mistaken for substantive preliminary advice", () => {
+  const messages = [
+    { role: "user", content: "Kitchen cabinet 10ft in Cheras. Wall usable, no plug points." },
+    { role: "assistant", content: "What budget range are you aiming for?" },
+    { role: "user", content: "8000" },
+  ];
+
+  const rawPlan = ai._test.renovationIntakePlan(messages);
+  const reconciled = ai._test.reconcileRenovationAdviceProgress(messages, rawPlan);
+  assert.equal(reconciled.state.adviceSent, false);
+  assert.ok(reconciled.adviceReply);
+});
+
 test("hard renovation technical handoffs still bypass the AI provider", async () => {
   let fetchCalls = 0;
   global.fetch = async () => {
