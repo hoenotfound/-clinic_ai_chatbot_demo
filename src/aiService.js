@@ -10,11 +10,16 @@ const {
 } = industry;
 const opsStats = require("./opsStats");
 const { createGeminiFailover } = require("./geminiFailover");
+const { sanitizeRenovationCustomerReply } = require("./renovationCustomerLanguage");
 
 const provider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
 const SUPPORTED_PROVIDERS = new Set(["mock", "claude", "gemini"]);
 if (!SUPPORTED_PROVIDERS.has(provider)) {
   throw new Error(`Unknown AI_PROVIDER: ${provider}`);
+}
+
+function customerReply(reply) {
+  return industry.key === "renovation" ? sanitizeRenovationCustomerReply(reply) : reply;
 }
 
 function enhancedSystemPrompt(isFirstMessage) {
@@ -27,12 +32,12 @@ function enhancedSystemPrompt(isFirstMessage) {
 
 function getFallbackReply(messages) {
   const safetyReply = enforceSafetyRules(messages);
-  if (safetyReply) return safetyReply;
+  if (safetyReply) return customerReply(safetyReply);
   const ruleReply = enforceBookingRules(messages);
-  if (ruleReply) return ruleReply;
+  if (ruleReply) return customerReply(ruleReply);
   const concernReply = buildConcernFallback(messages);
-  if (concernReply) return concernReply;
-  return buildFallbackReply(messages);
+  if (concernReply) return customerReply(concernReply);
+  return customerReply(buildFallbackReply(messages));
 }
 
 function fetchTimeoutMs() {
@@ -115,16 +120,16 @@ async function getReply(messages, isFirstMessage = false) {
   const startedAt = Date.now();
   try {
     const safetyReply = enforceSafetyRules(messages);
-    if (safetyReply) return safetyReply;
+    if (safetyReply) return customerReply(safetyReply);
 
     const ruleReply = enforceBookingRules(messages);
-    if (ruleReply) return ruleReply;
+    if (ruleReply) return customerReply(ruleReply);
 
     try {
       if (provider === "mock") return getFallbackReply(messages);
-      if (provider === "claude") return await getClaudeReply(messages, isFirstMessage);
+      if (provider === "claude") return customerReply(await getClaudeReply(messages, isFirstMessage));
       if (provider === "gemini") {
-        return await gemini.getReply(messages, isFirstMessage, () => getFallbackReply(messages));
+        return customerReply(await gemini.getReply(messages, isFirstMessage, () => getFallbackReply(messages)));
       }
       throw new Error(`Unknown AI_PROVIDER: ${provider}`);
     } catch (error) {
@@ -144,6 +149,7 @@ module.exports = {
   configured,
   _test: {
     enhancedSystemPrompt,
+    customerReply,
     geminiThinkingConfig: gemini.thinkingConfig,
     buildGeminiRequest: gemini.buildRequest,
     getGeminiApiKeys: gemini.getApiKeys,
