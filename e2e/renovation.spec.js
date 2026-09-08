@@ -98,7 +98,14 @@ test("renovation profile stays AI-first and industry-specific across customer vi
   const frame = page.frameLocator("#reactDashboardFrame");
   await expect(frame.getByRole("heading", { name: "Inbox", exact: true })).toBeVisible();
   await expect(frame.getByText("Kitchen Cabinets Demo Campaign", { exact: true }).first()).toBeVisible();
+  await expect(frame.getByText("Needs attention", { exact: true }).first()).toBeVisible();
+
+  // Inbox keeps intent inside the contact Details panel. Verify the real live intent
+  // there rather than expecting an intent label on the default conversation surface.
+  await frame.getByRole("button", { name: "View details for Demo Customer", exact: true }).click();
+  await expect(frame.getByText("Current intent", { exact: true }).first()).toBeVisible();
   await expect(frame.getByText("Site measurement requested", { exact: true }).first()).toBeVisible();
+  await frame.getByRole("button", { name: "Close details", exact: true }).click();
 
   await openDashboardPage(frame, "Pipeline", "Lead Pipeline");
   await expect(frame.getByText("Cheras / Kajang / Puchong", { exact: true }).first()).toBeVisible();
