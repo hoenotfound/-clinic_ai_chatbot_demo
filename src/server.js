@@ -378,11 +378,17 @@ async function handleSessionAction(req, res, session, action) {
         const isFirstMessage = session.customerMessageCount === 1;
         let reply;
         let degraded = false;
+        let replySource = "deterministic";
         try {
-          reply = await ai.getReply(history, isFirstMessage);
+          const result = await ai.getReplyResult(history, isFirstMessage);
+          reply = result.text;
+          degraded = Boolean(result.degraded);
+          replySource = result.source || (degraded ? "deterministic" : "ai");
         } catch (aiError) {
           console.error("AI service escaped its fallback boundary; using deterministic demo fallback:", aiError);
           reply = ai.getFallbackReply(history);
+          degraded = true;
+          replySource = "deterministic";
         }
 
         if (session.mode === "human") {
@@ -402,6 +408,7 @@ async function handleSessionAction(req, res, session, action) {
           session: state.publicSession(session),
           aiReplied: !degraded,
           degraded,
+          replySource,
           promotion: showPromotion ? (business.promotion || null) : null,
         });
       } finally {
