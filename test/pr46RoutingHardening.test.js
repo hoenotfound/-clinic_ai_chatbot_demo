@@ -17,6 +17,7 @@ const {
   buildRenovationIntakePlan,
   OPENING_MESSAGE,
 } = require("../src/renovationIntakeFlow");
+const { updateRenovationLead } = require("../src/renovationLeadState");
 const { _test: aiHelpers } = require("../src/aiService");
 
 const COMPLETE_KITCHEN_CONSTRAINTS = "The wall is clear, no window, no door, 2 plug points, sink in the middle, no hob or hood, fridge on the right, no beam or column.";
@@ -100,6 +101,36 @@ test("price amounts are not treated as budget without budget context", () => {
     { role: "assistant", content: "What budget range are you aiming for?" },
     { role: "user", content: "4500" },
   ]), "RM4,500");
+});
+
+test("lead metadata uses the same human, technical and contextual-budget intent rules", () => {
+  const benign = { messages: [
+    { role: "user", content: "Kitchen cabinet 12ft in Puchong. Is the RM6,800 price inclusive? There are 2 electrical outlets and a plumbing point under the sink. My project manager already gave me the plan." },
+  ], lead: {} };
+  let lead = updateRenovationLead(benign);
+  assert.equal(lead.budget, null);
+  assert.equal(lead.technicalHandoff, false);
+  assert.equal(lead.humanRequest, false);
+
+  const budget = { messages: [
+    { role: "user", content: "Kitchen cabinet 12ft in Puchong." },
+    { role: "assistant", content: "What budget range are you aiming for?" },
+    { role: "user", content: "4500" },
+  ], lead: {} };
+  lead = updateRenovationLead(budget);
+  assert.equal(lead.budget, "RM4,500");
+
+  const technical = { messages: [
+    { role: "user", content: "Kitchen cabinet. Can you relocate the plumbing point?" },
+  ], lead: {} };
+  lead = updateRenovationLead(technical);
+  assert.equal(lead.technicalHandoff, true);
+
+  const human = { messages: [
+    { role: "user", content: "Kitchen cabinet. I need a designer." },
+  ], lead: {} };
+  lead = updateRenovationLead(human);
+  assert.equal(lead.humanRequest, true);
 });
 
 test("a price-first enquiry still asks for budget later when no real budget was supplied", () => {
