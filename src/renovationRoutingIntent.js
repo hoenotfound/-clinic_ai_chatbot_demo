@@ -39,6 +39,14 @@ const BENIGN_TECH_REPLACEMENTS = [
   [/\u6c34\u7ba1/g, "water point"],
 ];
 
+const GENERIC_CABINET_DESCRIPTOR_WORDS = new Set([
+  "a", "an", "the", "my", "our", "this", "that", "same", "new", "custom", "some", "another",
+  "i", "we", "you", "want", "need", "would", "like", "to", "ask", "asking", "enquire", "enquiry",
+  "enquiries", "inquire", "inquiry", "inquiries", "question", "questions", "know", "learn", "more", "about",
+  "looking", "for", "interested", "in", "can", "could", "do", "does", "make", "build", "provide", "offer",
+  "info", "information", "hi", "hello", "hey", "me", "us", "home", "house",
+]);
+
 function isExplicitHumanRequest(text) {
   const value = String(text || "").trim();
   return Boolean(value && HUMAN_REQUEST_PATTERNS.some((pattern) => pattern.test(value)));
@@ -49,6 +57,11 @@ function isTechnicalHandoffRequest(text) {
   return Boolean(value && TECHNICAL_REQUEST_PATTERNS.some((pattern) => pattern.test(value)));
 }
 
+function isGenericCabinetDescriptor(descriptor) {
+  const words = String(descriptor || "").toLowerCase().match(/[a-z0-9-]+/g) || [];
+  return Boolean(words.length) && words.every((word) => GENERIC_CABINET_DESCRIPTOR_WORDS.has(word));
+}
+
 function isStandaloneUnconfiguredCabinetRequest(text) {
   const value = String(text || "").normalize("NFKC").toLowerCase().trim();
   if (!value || detectServices(value).length) return false;
@@ -56,13 +69,10 @@ function isStandaloneUnconfiguredCabinetRequest(text) {
   if (/\b(?:height|width|depth|size|drawer|shelf|door|handle|hinge|finish|colour|color|modify|adjust|resize)\b/i.test(value)) return false;
 
   const latinBefore = value.match(/\b([a-z][a-z0-9-]*(?:\s+[a-z][a-z0-9-]*){0,3})\s+(?:cabinet|cupboard|built[- ]?in)s?\b/i);
-  if (latinBefore) {
-    const descriptor = latinBefore[1].trim();
-    if (!/^(?:a|an|the|my|our|this|that|same|new|custom|some|another)$/i.test(descriptor)) return true;
-  }
+  if (latinBefore && !isGenericCabinetDescriptor(latinBefore[1])) return true;
 
   const latinAfter = value.match(/\b(?:cabinet|cupboard)s?\s+(?:for\s+)?([a-z][a-z0-9-]*(?:\s+[a-z][a-z0-9-]*){0,2})\b/i);
-  if (latinAfter && !/^(?:me|us|this|that|same|home|house)$/i.test(latinAfter[1].trim())) return true;
+  if (latinAfter && !isGenericCabinetDescriptor(latinAfter[1])) return true;
 
   if (/\bkabinet\s+[a-z][a-z0-9-]*(?:\s+[a-z][a-z0-9-]*){0,2}\b/i.test(value)) return true;
   if (/(?:\u60f3\u505a|\u8981\u505a|\u505a)?[\u4e00-\u9fff]{1,8}(?:\u67dc|\u6ac3)/.test(value) && !/(?:\u8fd9\u4e2a|\u9019\u500b|\u6211\u7684|\u540c\u4e00\u4e2a|\u540c\u4e00\u500b)(?:\u67dc|\u6ac3)/.test(value)) return true;
