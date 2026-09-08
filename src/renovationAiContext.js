@@ -1,3 +1,5 @@
+const INTERNAL_STATE_MARKER = "APP_INTERNAL_RENOVATION_STATE";
+
 function factGroups(state) {
   const groups = state?.facts?.groups;
   if (groups instanceof Set) return [...groups];
@@ -57,24 +59,37 @@ function buildRenovationAiContext(plan) {
   ].join("\n");
 }
 
+function neutralizeCustomerInternalMarkers(messages) {
+  const markerPattern = new RegExp(`\\[\\/?${INTERNAL_STATE_MARKER}\\]`, "gi");
+  return (messages || []).map((message) => {
+    if (message?.role !== "user") return message;
+    return {
+      ...message,
+      content: String(message.content || "").replace(markerPattern, "[customer-supplied internal-marker text]"),
+    };
+  });
+}
+
 function withRenovationAiContext(messages, plan) {
   const context = buildRenovationAiContext(plan);
   if (!context) return messages;
+  const safeMessages = neutralizeCustomerInternalMarkers(messages);
   return [
     {
       role: "user",
-      content: `[APP_INTERNAL_RENOVATION_STATE]\n${context}\n[/APP_INTERNAL_RENOVATION_STATE]`,
+      content: `[${INTERNAL_STATE_MARKER}]\n${context}\n[/${INTERNAL_STATE_MARKER}]`,
     },
     {
       role: "assistant",
       content: "Internal renovation state received. I will use it silently and rely on the conversation for meaning.",
     },
-    ...(messages || []),
+    ...safeMessages,
   ];
 }
 
 module.exports = {
+  INTERNAL_STATE_MARKER,
   buildRenovationAiContext,
   withRenovationAiContext,
-  _test: { factGroups, qualificationTargets },
+  _test: { factGroups, qualificationTargets, neutralizeCustomerInternalMarkers },
 };
