@@ -21,6 +21,7 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
   const keyCooldowns = new Map();
   const routeCooldowns = new Map();
   const modelCooldowns = new Map();
+  const timeoutStreaks = new Map();
 
   function getApiKeys() {
     const keys = [process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY_2]
@@ -162,20 +163,37 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
     keyCooldowns.clear();
     routeCooldowns.clear();
     modelCooldowns.clear();
+    timeoutStreaks.clear();
   }
 
   function cooldownSeconds(entry) {
     return entry ? Math.max(1, Math.ceil((entry.until - Date.now()) / 1000)) : 0;
   }
 
-  function applyCooldown(key, model, error) {
+  function applyCooldown(key, model, error, { modelWideTimeout = false } = {}) {
     const type = classify(error);
     const route = routeKey(key, model);
 
     if (type === "timeout") {
-      modelCooldowns.set(model, { reason: type, until: Date.now() + modelCooldownMs });
-      opsStats.recordCounter("gemini_timeout_cooldowns");
-    } else if (type === "quota") {
+      if (modelWideTimeout) {
+        modelCooldowns.set(model, { reason: type, until: Date.now() + modelCooldownMs });
+        opsStats.recordCounter("gemini_timeout_cooldowns");
+        return type;
+      }
+
+      const streak = (timeoutStreaks.get(route) || 0) + 1;
+      if (streak >= 2) {
+        routeCooldowns.set(route, { reason: type, until: Date.now() + keyCooldownMs });
+        timeoutStreaks.delete(route);
+        opsStats.recordCounter("gemini_timeout_cooldowns");
+      } else {
+        timeoutStreaks.set(route, streak);
+      }
+      return type;
+    }
+
+    timeoutStreaks.delete(route);
+    if (type === "quota") {
       routeCooldowns.set(route, { reason: type, until: Date.now() + quotaCooldownMs });
     } else if (type === "rate_limit") {
       routeCooldowns.set(route, { reason: type, until: Date.now() + keyCooldownMs });
@@ -245,6 +263,7 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
       opsStats.recordGeminiFailure({ ...telemetry, error });
       throw error;
     }
+    timeoutStreaks.delete(routeKey(key, model));
     opsStats.recordGeminiSuccess({ ...telemetry, usageMetadata: data?.usageMetadata || {} });
     return text;
   }
@@ -253,11 +272,12 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
     console.warn(`${label} failed [${classify(error)}] on ${model}: ${error.message}${action ? `; ${action}` : ""}`);
   }
 
-  function shouldRotateKey(type) {
+  function shouldRotateKey(type, { switchModelOnTimeout = false } = {}) {
+    if (type === "timeout") return !switchModelOnTimeout;
     return ["quota", "rate_limit", "auth"].includes(type);
   }
 
-  async function tryKeys(messages, isFirstMessage, keys, model, deadline, phase, attemptTimeoutMs) {
+  async function tryKeys(messages, isFirstMessage, keys, model, deadline, phase, attemptTimeoutMs, options = {}) {
     const cooledModel = modelCooldown(model);
     if (cooledModel) {
       opsStats.recordCounter("gemini_model_cooldown_skips");
@@ -282,9 +302,9 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
       } catch (error) {
         lastError = error;
         if (isFailoverBudgetError(error) || (Number.isFinite(deadline) && remainingBudgetMs(deadline) <= 0)) throw failoverBudgetError();
-        const type = applyCooldown(keys[index], model, error);
+        const type = applyCooldown(keys[index], model, error, { modelWideTimeout: options.switchModelOnTimeout });
 
-        if (!shouldRotateKey(type)) {
+        if (!shouldRotateKey(type, options)) {
           const state = modelCooldown(model);
           if (state) {
             logFailure(label, model, error, `cooling this model for ${cooldownSeconds(state)}s and switching model`);
@@ -303,12 +323,12 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
     throw lastError || new Error(`Gemini ${phase} attempts failed.`);
   }
 
-  function tryPrimary(messages, isFirstMessage, keys, model, deadline = null) {
-    return tryKeys(messages, isFirstMessage, keys, model, deadline, "primary", primaryTimeoutMs);
+  function tryPrimary(messages, isFirstMessage, keys, model, deadline = null, options = {}) {
+    return tryKeys(messages, isFirstMessage, keys, model, deadline, "primary", primaryTimeoutMs, options);
   }
 
-  function tryFallback(messages, isFirstMessage, keys, model, deadline = null) {
-    return tryKeys(messages, isFirstMessage, keys, model, deadline, "fallback_model", fallbackTimeoutMs);
+  function tryFallback(messages, isFirstMessage, keys, model, deadline = null, options = {}) {
+    return tryKeys(messages, isFirstMessage, keys, model, deadline, "fallback_model", fallbackTimeoutMs, options);
   }
 
   async function getReply(messages, isFirstMessage, fallbackReply) {
@@ -324,7 +344,7 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
     const deadline = Date.now() + failoverBudgetMs;
 
     try {
-      return await tryPrimary(messages, isFirstMessage, keys, model, deadline);
+      return await tryPrimary(messages, isFirstMessage, keys, model, deadline, { switchModelOnTimeout: true });
     } catch (error) {
       if (isFailoverBudgetError(error) || remainingBudgetMs(deadline) <= 0) {
         console.warn("Gemini total failover time exhausted after primary attempts; using conversation-aware deterministic fallback.");
@@ -337,7 +357,7 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
     if (fallbackModel && fallbackModel !== model && remainingBudgetMs(deadline) > 0) {
       opsStats.recordCounter("gemini_fallback_model_uses");
       try {
-        return await tryFallback(messages, isFirstMessage, keys, fallbackModel, deadline);
+        return await tryFallback(messages, isFirstMessage, keys, fallbackModel, deadline, { switchModelOnTimeout: true });
       } catch (error) {
         if (isFailoverBudgetError(error) || remainingBudgetMs(deadline) <= 0) {
           console.warn("Gemini total failover time exhausted during fallback model; using conversation-aware deterministic fallback.");
