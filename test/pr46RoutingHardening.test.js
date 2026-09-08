@@ -7,6 +7,8 @@ const {
   isExplicitHumanRequest,
   isTechnicalHandoffRequest,
   isStandaloneUnconfiguredCabinetRequest,
+  isGenericCabinetEnquiry,
+  normalizeSupportedCabinetVariants,
   sanitizeLegacyRoutingMessages,
 } = require("../src/renovationRoutingIntent");
 const {
@@ -82,6 +84,24 @@ test("generic cabinet enquiry wording starts intake instead of being treated as 
   assert.equal(routingReply, null);
 });
 
+test("exact English, BM and Chinese public starter messages all enter the site-first intake", () => {
+  const starters = [
+    "Hi, I want to ask about cabinets.",
+    "Hi, saya nak tanya pasal cabinet.",
+    "你好，我想问一下做柜子。",
+  ];
+
+  for (const text of starters) {
+    assert.equal(isGenericCabinetEnquiry(text), true, text);
+    assert.equal(isStandaloneUnconfiguredCabinetRequest(text), false, text);
+    assert.equal(aiHelpers.renovationRoutingPrecheckReply([{ role: "user", content: text }]), null, text);
+
+    const plan = buildRenovationIntakePlan([{ role: "user", content: text }], { isFirstMessage: true });
+    assert.equal(plan.bypass, false, text);
+    assert.equal(plan.reply, OPENING_MESSAGE, text);
+  }
+});
+
 test("unlisted standalone cabinet types hand off instead of repeating the cabinet question", () => {
   for (const text of ["Pantry cabinet", "Kitchen island cabinet", "I want a pantry cabinet"]) {
     assert.equal(isStandaloneUnconfiguredCabinetRequest(text), true, text);
@@ -94,6 +114,31 @@ test("unlisted standalone cabinet types hand off instead of repeating the cabine
 
   assert.equal(isStandaloneUnconfiguredCabinetRequest("Kitchen cabinet"), false);
   assert.equal(isStandaloneUnconfiguredCabinetRequest("Wardrobe"), false);
+});
+
+test("natural study/storage variants map into the configured service instead of unsupported-scope handoff", () => {
+  const variants = [
+    ["Study room cabinet", "study cabinet"],
+    ["Cabinet for the study room", "study cabinet"],
+    ["kabinet bilik study", "study cabinet"],
+    ["书房柜", "书柜"],
+  ];
+
+  for (const [text, normalized] of variants) {
+    assert.equal(normalizeSupportedCabinetVariants(text), normalized, text);
+    assert.equal(isStandaloneUnconfiguredCabinetRequest(text), false, text);
+    assert.equal(aiHelpers.renovationRoutingPrecheckReply([{ role: "user", content: text }]), null, text);
+  }
+
+  const plan = buildRenovationIntakePlan([
+    { role: "user", content: "Study room cabinet, around 8ft, Location Puchong." },
+  ], { isFirstMessage: true });
+  assert.equal(plan.bypass, false);
+  assert.deepEqual(plan.state.serviceNames, ["Study, Display & Storage Cabinets"]);
+  assert.equal(plan.state.sizeKnown, true);
+  assert.equal(plan.state.hasLocation, true);
+  assert.ok(plan.reply);
+  assert.doesNotMatch(plan.reply, /not configured|HANDOFF/i);
 });
 
 test("human handoff requires actual request intent and accepts natural short requests", () => {
@@ -166,6 +211,54 @@ test("a price-first enquiry still asks for budget later when no real budget was 
   assert.equal(plan.state.budgetKnown, false);
   assert.ok(plan.adviceReply);
   assert.match(plan.adviceReply, /What budget range are you aiming for/i);
+});
+
+test("renovation Gemini path keeps adaptive intake orchestration around a mocked provider reply", () => {
+  const repoRoot = path.resolve(__dirname, "..");
+  const script = `
+    process.env.DEMO_INDUSTRY = "renovation";
+    process.env.AI_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY_1 = "routing-test-key";
+    delete process.env.GEMINI_API_KEY_2;
+    delete process.env.GEMINI_API_KEY;
+    process.env.GEMINI_MODEL = "gemini-2.5-flash";
+    process.env.GEMINI_FALLBACK_MODEL = "gemini-2.5-flash-lite";
+    process.env.GEMINI_RETRY_DELAY_MS = "0";
+    process.env.GEMINI_ATTEMPT_TIMEOUT_MS = "200";
+    process.env.GEMINI_FALLBACK_ATTEMPT_TIMEOUT_MS = "200";
+    process.env.GEMINI_FAILOVER_BUDGET_MS = "800";
+
+    let calls = 0;
+    global.fetch = async () => {
+      calls += 1;
+      return {
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        json: async () => ({ candidates: [{ content: { parts: [{ text: "Kitchen cabinets start from RM 6,800. Final quotation depends on actual site details." }] } }] }),
+      };
+    };
+
+    const aiService = require("./src/aiService");
+    aiService.getReply([{ role: "user", content: "How much for 12ft kitchen cabinet in Puchong?" }], true)
+      .then((reply) => {
+        if (calls !== 1) throw new Error("Expected one mocked Gemini call, got " + calls);
+        if (!/RM\\s*6,800/i.test(reply)) throw new Error("Gemini answer was not preserved: " + reply);
+        if (!/switches or plug points/i.test(reply)) throw new Error("Adaptive site question was not appended: " + reply);
+        if (!/sink\\/water points/i.test(reply)) throw new Error("Kitchen site constraints were not appended: " + reply);
+        if (/Site photo:/i.test(reply)) throw new Error("Known size/location should not reset to opening template: " + reply);
+      })
+      .catch((error) => {
+        console.error(error.stack || error);
+        process.exitCode = 1;
+      });
+  `;
+
+  execFileSync(process.execPath, ["-e", script], {
+    cwd: repoRoot,
+    env: { ...process.env, DEMO_INDUSTRY: "renovation", AI_PROVIDER: "gemini" },
+    stdio: "pipe",
+  });
 });
 
 test("clinic startup does not eagerly load renovation-only conversation modules", () => {
