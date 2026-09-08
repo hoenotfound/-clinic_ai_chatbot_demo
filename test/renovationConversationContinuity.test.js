@@ -45,7 +45,9 @@ test("renovation prompt keeps important config-driven FAQ, sales and guardrail k
   assert.match(prompt, /Never claim to have viewed a customer's photo, drawing or floor plan/i);
   assert.match(prompt, /Customer asks for an unconfigured service/i);
   assert.match(prompt, /Do not dismiss a lower budget/i);
-  assert.match(prompt, /Customer: "4500"[\s\S]{0,160}什么时候完成/);
+  assert.match(prompt, /Site photo:[\s\S]{0,120}Rough size:[\s\S]{0,120}Location:/i);
+  assert.match(prompt, /upper \+ lower kitchen cabinets[\s\S]{0,160}wardrobe cabinet[\s\S]{0,160}TV cabinet[\s\S]{0,160}shoe cabinet/i);
+  assert.match(prompt, /Budget comes after those basics/i);
 });
 
 test("bare numbers are only treated as budget when the conversation context asks for budget", () => {
