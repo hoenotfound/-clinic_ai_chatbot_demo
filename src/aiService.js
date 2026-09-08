@@ -10,34 +10,62 @@ const {
 } = industry;
 const opsStats = require("./opsStats");
 const { createGeminiFailover } = require("./geminiFailover");
-const { establishedConversationLanguage } = require("./conversationLanguage");
-const { sanitizeRenovationCustomerReply } = require("./renovationCustomerLanguage");
-const {
-  buildRenovationIntakeReply,
-  buildRenovationIntakePlan,
-  ensureAdviceMarker,
-} = require("./renovationIntakeFlow");
 
 const provider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
 const SUPPORTED_PROVIDERS = new Set(["mock", "claude", "gemini"]);
-const RENOVATION_TECHNICAL_PRECHECK = /load[- ]?bearing|structural|hack(?:ing)?\s+(?:(?:this|the|a|my|our)\s+)?(?:wall|beam|column)|electrical|rewir(?:e|ing)|plumb(?:ing)?|waterproof(?:ing)?|gas\s+(?:pipe|line)|permit|authority|approval|承重墙|承重牆|敲(?:这个|這個|这面|這面)?墙|敲(?:這個|这个)?柱|电线|電線|防水|kelulusan|struktur|pendawaian/i;
 if (!SUPPORTED_PROVIDERS.has(provider)) {
   throw new Error(`Unknown AI_PROVIDER: ${provider}`);
 }
 
+let renovationDependencies = null;
+function loadRenovationDependencies() {
+  if (!renovationDependencies) {
+    const { establishedConversationLanguage } = require("./conversationLanguage");
+    const { sanitizeRenovationCustomerReply } = require("./renovationCustomerLanguage");
+    const {
+      buildRenovationIntakeReply,
+      buildRenovationIntakePlan,
+      ensureAdviceMarker,
+    } = require("./renovationIntakeFlow");
+    const {
+      renovationRoutingReason,
+      isTechnicalHandoffRequest,
+      sanitizeLegacyRoutingMessages,
+    } = require("./renovationRoutingIntent");
+    renovationDependencies = {
+      establishedConversationLanguage,
+      sanitizeRenovationCustomerReply,
+      buildRenovationIntakeReply,
+      buildRenovationIntakePlan,
+      ensureAdviceMarker,
+      renovationRoutingReason,
+      isTechnicalHandoffRequest,
+      sanitizeLegacyRoutingMessages,
+    };
+  }
+  return renovationDependencies;
+}
+
+function activeRenovationDependencies() {
+  return industry.key === "renovation" ? loadRenovationDependencies() : null;
+}
+
 function customerReply(reply) {
-  return industry.key === "renovation" ? sanitizeRenovationCustomerReply(reply) : reply;
+  const deps = activeRenovationDependencies();
+  return deps ? deps.sanitizeRenovationCustomerReply(reply) : reply;
 }
 
 function renovationIntakeReply(messages, { isFirstMessage = false } = {}) {
-  if (industry.key !== "renovation") return null;
-  const reply = buildRenovationIntakeReply(messages, { isFirstMessage });
+  const deps = activeRenovationDependencies();
+  if (!deps) return null;
+  const reply = deps.buildRenovationIntakeReply(messages, { isFirstMessage });
   return reply ? customerReply(reply) : null;
 }
 
 function renovationIntakePlan(messages, { isFirstMessage = false } = {}) {
-  if (industry.key !== "renovation") return null;
-  return buildRenovationIntakePlan(messages, { isFirstMessage });
+  const deps = activeRenovationDependencies();
+  if (!deps) return null;
+  return deps.buildRenovationIntakePlan(messages, { isFirstMessage });
 }
 
 function latestUserText(messages) {
@@ -47,9 +75,17 @@ function latestUserText(messages) {
   return "";
 }
 
-function renovationTechnicalPrecheckReply(messages) {
-  if (!RENOVATION_TECHNICAL_PRECHECK.test(latestUserText(messages))) return null;
-  const language = establishedConversationLanguage(messages, "en");
+function routingHandoffReply(reason, language) {
+  if (reason === "human") {
+    if (language === "zh") return "可以，我帮您转给团队继续跟进。 [[HANDOFF]]";
+    if (language === "ms") return "Boleh, saya pass kepada team untuk sambung dengan anda. [[HANDOFF]]";
+    return "Sure, I’ll pass this to the team so a person can continue with you. [[HANDOFF]]";
+  }
+  if (reason === "scope") {
+    if (language === "zh") return "这个柜子类型不在目前 demo 已配置的项目里，我不想乱答。我帮您转给团队确认能不能做。 [[HANDOFF]]";
+    if (language === "ms") return "Jenis cabinet ini belum dikonfigurasi dalam demo, jadi saya tak nak teka. Saya pass kepada team untuk confirm sama ada mereka cover scope ini. [[HANDOFF]]";
+    return "That cabinet type is not configured in this demo, so I don’t want to guess. I’ll pass it to the team to confirm whether they cover that scope. [[HANDOFF]]";
+  }
   if (language === "zh") {
     return "这个需要先看实际现场情况才能给准确意见，我不应该在聊天里直接判断。让我转给团队确认安全性和实际可行性。 [[HANDOFF]]";
   }
@@ -57,6 +93,21 @@ function renovationTechnicalPrecheckReply(messages) {
     return "Yang ini perlu semak keadaan site sebenar dulu sebelum bagi jawapan yang pasti. Saya tak patut agak dari chat, jadi saya pass kepada team untuk confirm keselamatan dan feasibility. [[HANDOFF]]";
   }
   return "That needs a site-specific technical check before we advise anything definite. I’ll flag this for the team to review the actual wall/site condition and confirm what is safe and feasible. [[HANDOFF]]";
+}
+
+function renovationRoutingPrecheckReply(messages) {
+  const deps = loadRenovationDependencies();
+  const reason = deps.renovationRoutingReason(latestUserText(messages));
+  if (!reason) return null;
+  const language = deps.establishedConversationLanguage(messages, "en");
+  return routingHandoffReply(reason, language);
+}
+
+function renovationTechnicalPrecheckReply(messages) {
+  const deps = loadRenovationDependencies();
+  if (!deps.isTechnicalHandoffRequest(latestUserText(messages))) return null;
+  const language = deps.establishedConversationLanguage(messages, "en");
+  return routingHandoffReply("technical", language);
 }
 
 function enhancedSystemPrompt(isFirstMessage) {
@@ -68,13 +119,15 @@ function enhancedSystemPrompt(isFirstMessage) {
 }
 
 function getFallbackReply(messages) {
-  const safetyReply = enforceSafetyRules(messages);
+  const deps = activeRenovationDependencies();
+  const routedMessages = deps ? deps.sanitizeLegacyRoutingMessages(messages) : messages;
+  const safetyReply = enforceSafetyRules(routedMessages);
   if (safetyReply) return customerReply(safetyReply);
-  const ruleReply = enforceBookingRules(messages);
+  const ruleReply = enforceBookingRules(routedMessages);
   if (ruleReply) return customerReply(ruleReply);
-  const concernReply = buildConcernFallback(messages);
+  const concernReply = buildConcernFallback(routedMessages);
   if (concernReply) return customerReply(concernReply);
-  return customerReply(buildFallbackReply(messages));
+  return customerReply(buildFallbackReply(routedMessages));
 }
 
 function plannedFallbackReply(messages, plan) {
@@ -93,7 +146,8 @@ function finalizePlannedReply(reply, plan) {
   let text = customerReply(reply);
   if (!plan) return text;
   if (plan.adviceReply) {
-    text = ensureAdviceMarker(text, plan.state?.language || "en");
+    const deps = loadRenovationDependencies();
+    text = deps.ensureAdviceMarker(text, plan.state?.language || "en");
     text = customerReply(text);
   }
   if (plan.appendAfterAnswer) {
@@ -189,8 +243,8 @@ async function getReply(messages, isFirstMessage = false) {
     if (ruleReply) return customerReply(ruleReply);
 
     if (industry.key === "renovation") {
-      const technicalReply = renovationTechnicalPrecheckReply(messages);
-      if (technicalReply) return customerReply(technicalReply);
+      const routingReply = renovationRoutingPrecheckReply(messages);
+      if (routingReply) return customerReply(routingReply);
     }
 
     const intakePlan = renovationIntakePlan(messages, { isFirstMessage });
@@ -225,9 +279,11 @@ module.exports = {
     customerReply,
     renovationIntakeReply,
     renovationIntakePlan,
+    renovationRoutingPrecheckReply,
     renovationTechnicalPrecheckReply,
     plannedFallbackReply,
     finalizePlannedReply,
+    loadRenovationDependencies,
     geminiThinkingConfig: gemini.thinkingConfig,
     buildGeminiRequest: gemini.buildRequest,
     getGeminiApiKeys: gemini.getApiKeys,
