@@ -374,7 +374,11 @@ async function handleSessionAction(req, res, session, action) {
         if (session.mode === "human") {
           return sendJson(res, 200, { session: state.publicSession(session), aiReplied: false });
         }
-        const history = session.messages.map((message) => ({ role: message.role, content: message.content }));
+        const history = session.messages.map((message) => ({
+          role: message.role,
+          content: message.content,
+          ...(message.measurementOffered ? { measurementOffered: true } : {}),
+        }));
         const isFirstMessage = session.customerMessageCount === 1;
         let reply;
         let degraded = false;
@@ -438,6 +442,7 @@ async function handleApi(req, res, url) {
       visitorId: body.visitorId,
       event,
       surface: body.surface,
+      industry: body.industry,
     });
     return sendJson(res, accepted ? 202 : 400, accepted ? { ok: true } : { error: "Invalid visitor id." });
   }
