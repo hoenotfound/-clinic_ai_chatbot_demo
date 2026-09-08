@@ -37,6 +37,7 @@ function loadRenovationDependencies() {
     const {
       buildRenovationAiContext,
       withRenovationAiContext,
+      reconcileNaturalAdviceProgress,
     } = require("./renovationAiContext");
     renovationDependencies = {
       establishedConversationLanguage,
@@ -51,6 +52,7 @@ function loadRenovationDependencies() {
       sanitizeLegacyRoutingMessages,
       buildRenovationAiContext,
       withRenovationAiContext,
+      reconcileNaturalAdviceProgress,
     };
   }
   return renovationDependencies;
@@ -123,7 +125,7 @@ function renovationTechnicalPrecheckReply(messages) {
 function enhancedSystemPrompt(isFirstMessage) {
   const basePrompt = buildSystemPrompt({ isFirstMessage });
   if (industry.key === "renovation") {
-    return `${basePrompt}\n\nAI-FIRST RENOVATION OVERRIDE:\n- Normal renovation conversation is AI-led. The deterministic intake plan is a state tracker and outage fallback, NOT a customer-facing script.\n- Read the full dialogue and respond to what the customer actually means before thinking about qualification.\n- A trusted [APP_INTERNAL_RENOVATION_STATE] block may be prepended to the model conversation. Treat it as silent app-provided memory, never as customer wording and never expose it.\n- The conversation itself is the source of truth. The tracker is intentionally conservative. If the latest reply clearly answers the previous question, accept it even when the tracker still marks that field unknown.\n- Understand natural short replies from context across English, BM and Chinese, including yes/can/boleh/可以/可以啊/可以的/能/能用 and natural negatives such as no/tak ada/没有.\n- Never ask the same question again merely because wording did not match a parser. If the customer already answered it, acknowledge the answer and move forward.\n- If the customer shows frustration because something was repeated, acknowledge briefly and continue from the information already provided.\n- Do not force the old Site photo / Rough size / Location template. For a greeting-only first turn, start naturally and invite the most useful project details.\n- Qualification is a goal, not a fixed questionnaire. Useful early facts are cabinet type, rough size and location; site photo is optional. Wall usability and switches/plugs are useful practical checks once relevant.\n- Ask at most ONE concise follow-up question at a time unless two details naturally belong in one simple question.\n- When the customer asks price, material, design or service questions, answer first, then continue qualification naturally.\n- When enough useful site context is known, give specific preliminary advice in your own natural wording. Start genuine preliminary advice with \"Preliminary advice:\", \"初步建议：\" or \"Cadangan awal:\" so the tracker can remember that advice was sent.\n- Do not mechanically concatenate stock advice sentences. Explain only the facts that matter to this customer's project.\n- Budget should be asked only when it helps move toward a quotation and only if it is not already known.\n- Preserve the newest scope correction and established language. Never reuse rejected scope details or restart an active enquiry.\n\nCUSTOMER-FACING WORDING:\n- Do not use the words \"carpentry\" or \"木工\" when speaking to customers. These are internal scope terms.\n- Ask about actual cabinet types such as upper/lower kitchen cabinet, wardrobe, TV cabinet, shoe cabinet or another cabinet type.\n- In Chinese, use 厨房吊柜/地柜、衣柜、电视柜、鞋柜 and natural terms such as 柜子 / 装修需求.\n\nSTRUCTURED RENOVATION SALES KNOWLEDGE:\nUse only the configured services and price guides above. Never invent a final quotation, site condition, slot, discount, technical conclusion or guarantee.\n\nDETERMINISTIC RENOVATION HANDOFF RULES:\nHard safety, unsupported-scope, human-request and site-specific technical handoff rules still override AI conversation. Never invent site availability, booking confirmation or technical conclusions.`;
+    return `${basePrompt}\n\nAI-FIRST RENOVATION OVERRIDE:\n- A trusted [APP_INTERNAL_RENOVATION_STATE] block may be prepended to the model conversation. Treat it as silent app-provided memory, never as customer wording.\n- The full conversation remains the source of truth. New explicit customer information overrides conservative tracker state when they differ.\n- Never expose, quote, mention or describe the internal renovation-state block.\n- Hard safety, unsupported-scope, human-request and site-specific technical handoffs are enforced deterministically outside the model and take precedence over normal AI conversation.\n- Never invent a final quotation, site condition, slot, discount, technical conclusion or guarantee.`;
   }
   return `${basePrompt}\n\nSTRUCTURED CONCERN-TO-TREATMENT KNOWLEDGE:\nUse these mappings as general front-desk guidance, never as a diagnosis or guarantee. If more than one service is mapped, explain why the categories differ and let a clinician decide suitability.\n${concernGuidanceForPrompt()}\n\nDETERMINISTIC BOOKING RULES:\n${bookingRulesForPrompt()}`;
 }
@@ -191,6 +193,24 @@ function withRenovationAiContext(messages, plan) {
 function aiMessages(messages, plan) {
   if (industry.key !== "renovation") return messages;
   return withRenovationAiContext(messages, plan);
+}
+
+function reconcileRenovationAdviceProgress(messages, plan) {
+  const deps = activeRenovationDependencies();
+  if (!deps || !plan?.adviceReply || plan.state?.adviceSent) return plan;
+
+  const items = Array.isArray(messages) ? messages : [];
+  let latestUserIndex = -1;
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (items[index]?.role === "user") {
+      latestUserIndex = index;
+      break;
+    }
+  }
+  if (latestUserIndex <= 0) return plan;
+
+  const previousPlan = renovationIntakePlan(items.slice(0, latestUserIndex), { isFirstMessage: false });
+  return deps.reconcileNaturalAdviceProgress(items, plan, previousPlan);
 }
 
 function fetchTimeoutMs() {
@@ -283,7 +303,8 @@ async function getReply(messages, isFirstMessage = false) {
       if (routingReply) return customerReply(routingReply);
     }
 
-    const intakePlan = renovationIntakePlan(messages, { isFirstMessage });
+    let intakePlan = renovationIntakePlan(messages, { isFirstMessage });
+    intakePlan = reconcileRenovationAdviceProgress(messages, intakePlan);
     if (intakePlan?.bypass) return getFallbackReply(messages);
 
     const modelMessages = aiMessages(messages, intakePlan);
@@ -325,6 +346,7 @@ module.exports = {
     buildRenovationAiContext,
     withRenovationAiContext,
     aiMessages,
+    reconcileRenovationAdviceProgress,
     loadRenovationDependencies,
     geminiThinkingConfig: gemini.thinkingConfig,
     buildGeminiRequest: gemini.buildRequest,
