@@ -32,12 +32,53 @@ const NEGATIVE_PATTERNS = {
 
 const SHORT_CONTEXT_ANSWER = /^(?:yes|yeah|yep|yup|can|can\s+use|usable|okay|ok|fine|all\s+good|no|none|nope|cannot|can['’]?t|not\s+usable|have|got|got\s+one|one|two|three|\d+|boleh|boleh\s+guna|ada|ada\s+satu|tak\s+ada|tiada|tak\s+boleh|ya|\u53ef\u4ee5(?:\u7684)?(?:\u554a|\u5440)?|\u53ef\u4ee5\u7528(?:\u554a|\u5440)?|\u80fd(?:\u7528)?(?:\u554a|\u5440)?|\u884c(?:\u7684)?(?:\u554a|\u5440)?|\u6709|\u6709\u7684|\u6ca1\u6709|\u6c92\u6709|\u4e0d\u53ef\u4ee5|\u4e0d\u80fd|\u6ca1\u95ee\u9898(?:\u554a|\u5440)?|\u6c92\u554f\u984c(?:\u554a|\u5440)?)[.!\uff01\u3002]?$/i;
 const POSITIVE_WALL_CONTEXT = /^(?:yes|yeah|yep|yup|can|can\s+use|usable|okay|ok|fine|all\s+good|boleh|boleh\s+guna|ya|\u53ef\u4ee5(?:\u7684)?(?:\u554a|\u5440)?|\u53ef\u4ee5\u7528(?:\u554a|\u5440)?|\u80fd(?:\u7528)?(?:\u554a|\u5440)?|\u884c(?:\u7684)?(?:\u554a|\u5440)?|\u6ca1\u95ee\u9898(?:\u554a|\u5440)?|\u6c92\u554f\u984c(?:\u554a|\u5440)?)[.!\uff01\u3002]?$/i;
+const MEASUREMENT_OFFER_PATTERN = /(?:would\s+you\s+like|want\s+me|shall\s+i|can\s+i|do\s+you\s+want).{0,100}(?:site\s*(?:measurement|visit)|measure)|(?:site\s*(?:measurement|visit)|measure).{0,100}(?:would\s+you\s+like|want\s+me|shall\s+i|can\s+i|do\s+you\s+want|arrange\s+it)|(?:要不要|需要我|要我|我可以|我帮你|我幫你).{0,36}(?:安排|转给|轉給|让团队|讓團隊).{0,24}(?:上门量尺|上門量尺|量尺|现场测量|現場測量)|(?:上门量尺|上門量尺|量尺|现场测量|現場測量).{0,36}(?:要不要|需要我|可以帮你|可以幫你|安排)|(?:nak\s+saya|mahu\s+saya|boleh\s+saya).{0,60}(?:arrange|atur|pass).{0,50}(?:site\s*measurement|site\s*visit|ukur)/i;
+const MEASUREMENT_ACCEPT_PATTERN = /^(?:yes(?:\s+please)?|yeah|yep|yup|sure|okay|ok|can|please\s+do|go\s+ahead|let['’]?s\s+do\s+it|arrange\s+it|boleh|ya|boleh\s+atur|teruskan|可以(?:啊|呀|的)?|好(?:的|啊|呀)?|要|行|没问题|沒問題|安排吧)[.!！。]?$/i;
 
 function lastUserText(messages) {
   for (let index = (messages || []).length - 1; index >= 0; index -= 1) {
     if (messages[index]?.role === "user") return String(messages[index].content || "");
   }
   return "";
+}
+
+function previousAssistantBeforeLatestUser(messages) {
+  const items = messages || [];
+  let latestUserIndex = -1;
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (items[index]?.role === "user") {
+      latestUserIndex = index;
+      break;
+    }
+  }
+  if (latestUserIndex < 0) return "";
+  for (let index = latestUserIndex - 1; index >= 0; index -= 1) {
+    if (items[index]?.role === "assistant") return String(items[index].content || "");
+    if (items[index]?.role === "user") break;
+  }
+  return "";
+}
+
+function measurementOfferSent(messages) {
+  return (messages || []).some((message) => message?.role === "assistant" && MEASUREMENT_OFFER_PATTERN.test(String(message.content || "")));
+}
+
+function measurementOfferAccepted(messages) {
+  const latest = lastUserText(messages).trim();
+  if (!latest || !MEASUREMENT_ACCEPT_PATTERN.test(latest)) return false;
+  return MEASUREMENT_OFFER_PATTERN.test(previousAssistantBeforeLatestUser(messages));
+}
+
+function measurementCloseQuestion(language) {
+  if (language === "zh") return "根据你目前给的资料，下一步比较实际的是安排上门量尺，这样团队可以确认实际 layout 和正式 quotation。要不要我帮你转给团队安排？";
+  if (language === "ms") return "Berdasarkan detail yang anda dah bagi, next step paling useful ialah site measurement supaya team boleh confirm layout dan quotation sebenar. Nak saya pass kepada team untuk arrange?";
+  return "Based on what you've shared, the next useful step is a site measurement so the team can confirm the actual layout and quotation. Want me to get the team to arrange it?";
+}
+
+function measurementHandoffReply(language) {
+  if (language === "zh") return "可以 👍 我已经记下目前的项目资料，会交给团队继续跟进并确认上门量尺的实际时间。 [[HANDOFF]]";
+  if (language === "ms") return "Boleh 👍 Saya dah catat detail projek yang ada dan akan pass kepada team untuk confirm masa site measurement dengan anda. [[HANDOFF]]";
+  return "Sure 👍 I've noted the project details so far. I'll pass them to the team so they can confirm the actual site-measurement timing with you. [[HANDOFF]]";
 }
 
 function scopedUserText(state) {
@@ -189,7 +230,18 @@ function enhancePlan(plan) {
   const state = { ...plan.state, facts: refinedFacts(plan.state) };
   state.missingConstraints = state.serviceNames?.length ? missingConstraintGroups(state.serviceNames, state.facts) : [];
   state.budgetKnown = budgetKnown(state);
+  state.measurementReady = Boolean(state.serviceNames?.length && state.sizeKnown && state.hasLocation && !state.missingConstraints.length);
+  state.measurementOfferSent = measurementOfferSent(state.scopedMessages);
+  state.measurementOfferAccepted = measurementOfferAccepted(state.scopedMessages);
   const next = { ...plan, state };
+
+  if (state.measurementOfferAccepted) {
+    next.adviceReply = null;
+    next.appendAfterAnswer = null;
+    next.reply = measurementHandoffReply(state.language);
+    return next;
+  }
+
   const readyForConstraints = state.sizeKnown && state.hasLocation && state.serviceNames?.length;
   if (readyForConstraints && state.missingConstraints.length) {
     const hasAnyConstraintInfo = state.facts.groups.size > 0 || state.facts.allClear;
@@ -204,6 +256,12 @@ function enhancePlan(plan) {
     if (state.budgetKnown) advice = removeRepeatedBudgetQuestion(advice, state.language);
     next.reply = null;
     next.adviceReply = advice;
+    return next;
+  }
+  if (state.measurementReady && state.adviceSent && state.budgetKnown && !state.measurementOfferSent) {
+    next.adviceReply = null;
+    next.appendAfterAnswer = null;
+    next.reply = measurementCloseQuestion(state.language);
     return next;
   }
   if (next.adviceReply && state.budgetKnown) next.adviceReply = removeRepeatedBudgetQuestion(next.adviceReply, state.language);
@@ -240,5 +298,9 @@ module.exports = {
     contextualConstraintFacts,
     budgetKnown,
     removeRepeatedBudgetQuestion,
+    measurementOfferSent,
+    measurementOfferAccepted,
+    measurementCloseQuestion,
+    measurementHandoffReply,
   },
 };
