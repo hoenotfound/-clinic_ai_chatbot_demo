@@ -112,3 +112,20 @@ test("site photo is helpful but does not block the text-only demo from moving fo
   const reply = buildRenovationIntakeReply(messages);
   assert.match(reply, /upper \+ lower kitchen cabinets/i);
 });
+
+test("direct site-measurement and human requests bypass intake for existing handoff rules", () => {
+  assert.equal(
+    buildRenovationIntakeReply(
+      [{ role: "user", content: "Can your team come for site measurement Saturday?" }],
+      { isFirstMessage: true }
+    ),
+    null
+  );
+  assert.equal(
+    buildRenovationIntakeReply(
+      [{ role: "user", content: "Can I speak to a human designer?" }],
+      { isFirstMessage: true }
+    ),
+    null
+  );
+});
