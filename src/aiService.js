@@ -88,6 +88,11 @@ function latestUserText(messages) {
 }
 
 function routingHandoffReply(reason, language) {
+  if (reason === "reference_images") {
+    if (language === "zh") return "好的 👍 我帮你安排一下，团队会发一些参考图给你。 [[HANDOFF]]";
+    if (language === "ms") return "Boleh 👍 Saya dah maklumkan team untuk hantar beberapa gambar rujukan kepada anda. [[HANDOFF]]";
+    return "Sure 👍 I’ll get the team to send you a few reference images. [[HANDOFF]]";
+  }
   if (reason === "human") {
     if (language === "zh") return "可以，我帮您转给团队继续跟进。 [[HANDOFF]]";
     if (language === "ms") return "Boleh, saya pass kepada team untuk sambung dengan anda. [[HANDOFF]]";
