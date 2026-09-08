@@ -9,7 +9,9 @@ const KNOWN_LOCATION_PATTERN = /puchong|cheras|kajang|petaling\s+jaya|\bpj\b|sub
 const LOCATION_LABEL_PATTERN = /(?:location|lokasi|area|地点|地點|地区|地區|位置)\s*[:：-]?\s*\S+/i;
 const PHOTO_PATTERN = /site\s*photo|photo|picture|image|pic\b|attached|sent\s+(?:it|photo)|照片|相片|图片|圖片|gambar|foto/i;
 const OBSTRUCTION_PATTERN = /obstruction|clear\s*wall|empty\s*wall|wall\s*(?:space|length|height)|window|door|switch(?:es)?|socket(?:s)?|plug(?:s)?|power\s*point|sink|water\s*point|pipe|hob|hood|stove|beam|column|db\s*box|distribution\s*board|air\s*con|aircon|skirting|nothing\s+there|no\s+(?:obstruction|window|door|switch|plug|socket|pipe|beam|column)|墙|牆|窗|门|門|开关|開關|插座|水管|水槽|抽油烟机|抽油煙機|梁|柱|电箱|電箱|没有阻碍|沒有阻礙|dinding|tingkap|pintu|suis|plug|soket|paip|sink|tiada\s+halangan/i;
-const ADVICE_MARKER_PATTERN = /preliminary\s+(?:layout|direction|advice)|初步建议|初步建議|cadangan\s+awal/i;
+// Match only the actual advice response. The preceding obstruction question mentions
+// "preliminary layout direction", which must not make the flow think advice was sent.
+const ADVICE_MARKER_PATTERN = /preliminary\s+advice|初步建议|初步建議|cadangan\s+awal/i;
 const DIRECT_HANDOFF_PATTERN = /site\s*(?:visit|measurement)|come\s+measure|exact\s+(?:quote|quotation|price)|proper\s+(?:quote|quotation)|human|designer|salesperson|project\s+manager|上门量尺|上門量尺|正式报价|正式報價|真人|人工|量尺|quotation\s+appointment/i;
 
 function userTexts(messages) {
@@ -92,7 +94,7 @@ function materialDirection(serviceNames, language) {
   }
   if (language === "ms") {
     return kitchen
-      ? "Untuk material, kita boleh compare melamine/MFC, plywood, dan untuk area yang lebih lembap boleh pertimbangkan aluminium juga. Pilihan kena ikut bajet, finish dan keadaan sebenar, bukan satu material yang mesti terbaik untuk semua." 
+      ? "Untuk material, kita boleh compare melamine/MFC, plywood, dan untuk area yang lebih lembap boleh pertimbangkan aluminium juga. Pilihan kena ikut bajet, finish dan keadaan sebenar, bukan satu material yang mesti terbaik untuk semua."
       : "Untuk material, biasanya kita boleh compare melamine/MFC atau plywood ikut bajet, finish dan kegunaan sebenar sebelum confirm spec.";
   }
   return kitchen
