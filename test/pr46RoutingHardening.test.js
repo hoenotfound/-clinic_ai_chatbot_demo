@@ -59,6 +59,29 @@ test("benign site-condition wording continues through the intake and remains usa
   assert.doesNotMatch(plan.reply, /sink\/water points/i);
 });
 
+test("generic cabinet enquiry wording starts intake instead of being treated as an unconfigured scope", () => {
+  for (const text of [
+    "Hi, I want to ask about cabinets.",
+    "I want cabinets",
+    "Can you do cabinets?",
+    "I have a question about cabinets",
+    "Custom cabinets",
+  ]) {
+    assert.equal(isStandaloneUnconfiguredCabinetRequest(text), false, text);
+  }
+
+  const plan = buildRenovationIntakePlan([
+    { role: "user", content: "Hi, I want to ask about cabinets." },
+  ], { isFirstMessage: true });
+  assert.equal(plan.bypass, false);
+  assert.equal(plan.reply, OPENING_MESSAGE);
+
+  const routingReply = aiHelpers.renovationRoutingPrecheckReply([
+    { role: "user", content: "Hi, I want to ask about cabinets." },
+  ]);
+  assert.equal(routingReply, null);
+});
+
 test("unlisted standalone cabinet types hand off instead of repeating the cabinet question", () => {
   for (const text of ["Pantry cabinet", "Kitchen island cabinet", "I want a pantry cabinet"]) {
     assert.equal(isStandaloneUnconfiguredCabinetRequest(text), true, text);
