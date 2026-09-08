@@ -8,6 +8,9 @@ const QUOTE_INTENT_PATTERN = /exact\s+(?:price|quote|quotation)|proper\s+(?:quot
 const HUMAN_REQUEST_PATTERN = /(?:speak|talk|chat|connect)\s+(?:me\s+)?(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:can|could)\s+i\s+(?:speak|talk)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:need|want)\s+(?:a\s+)?(?:human|designer|salesperson|project manager)|human\s+(?:please|pls)|真人|人工|转人工|轉人工|找设计师|找設計師|联系顾问|聯繫顧問|nak\s+cakap\s+dengan\s+(?:staff|designer|sales)|mahu\s+cakap\s+dengan\s+(?:staff|designer|sales)/i;
 const TECHNICAL_PATTERN = /load[- ]?bearing|structural|hack(?:ing)?\s+(?:wall|beam|column)|electrical|rewir(?:e|ing)|plumb(?:ing)?|waterproof(?:ing)?|gas\s+(?:pipe|line)|permit|authority|approval|承重墙|承重牆|敲墙|敲牆|电线|電線|水管|防水|kelulusan|struktur|pendawaian|paip/i;
 const MEASUREMENT_PATTERN = /\b\d+(?:\.\d+)?\s*(?:ft|feet|foot|mm|cm|m|meter|metre)s?\b|floor\s*plan|layout\s*plan|尺寸|尺|平面图|平面圖|ukuran|pelan/i;
+const FLOOR_PLAN_PATTERN = /floor\s*plan|layout\s*plan|平面图|平面圖|pelan/i;
+const MEASUREMENT_GROUP_PATTERN = /\b(?:both|all|each)\b|两个|兩個|全部|都|semua|kedua-dua/i;
+const MEASUREMENT_CLAUSE_SPLIT_PATTERN = /\s*(?:[,;]|\+|&)\s*|\s+(?:and|dan)\s+|(?:以及|还有|還有|和)/i;
 const TIMELINE_PATTERN = /move\s*in|moving|collect(?:ed|ing)?\s+keys?|get(?:ting)?\s+keys?|handover|complete\s+by|finish\s+by|next\s+(?:week|month)|this\s+(?:week|month)|within\s+\d+\s+(?:week|weeks|month|months)|baru\s+dapat\s+kunci|dapat\s+kunci|nak\s+siap|pindah|拿钥匙|拿鑰匙|交房|入住|搬家|完工/i;
 
 function customerMessages(session) {
@@ -163,6 +166,51 @@ function currentScopeMeasurementText(messages) {
   }).join(" \n");
 }
 
+function measurementStateForServices(messages, services, { initialState = {} } = {}) {
+  const serviceNames = [...new Set((services || []).filter(Boolean))];
+  const state = Object.fromEntries(serviceNames.map((name) => [name, Boolean(initialState?.[name])]));
+  if (!serviceNames.length) return state;
+
+  const userMessages = (messages || []).filter((message) => !message?.role || message.role === "user");
+  const correctionIndex = latestServiceCorrectionIndex(userMessages);
+  const scopedMessages = correctionIndex >= 0 ? userMessages.slice(correctionIndex) : userMessages;
+
+  if (correctionIndex >= 0) {
+    for (const name of serviceNames) state[name] = false;
+  }
+
+  for (let messageIndex = 0; messageIndex < scopedMessages.length; messageIndex += 1) {
+    const raw = scopedMessages[messageIndex]?.content || "";
+    const text = correctionIndex >= 0 && messageIndex === 0 ? correctionTargetText(raw) : raw;
+
+    if (FLOOR_PLAN_PATTERN.test(text)) {
+      for (const name of serviceNames) state[name] = true;
+      continue;
+    }
+
+    let lastMentioned = [];
+    const clauses = String(text).split(MEASUREMENT_CLAUSE_SPLIT_PATTERN).filter(Boolean);
+    for (const clause of clauses) {
+      const mentioned = detectServices(clause, { allowBareScope: true })
+        .filter((name) => serviceNames.includes(name));
+      if (mentioned.length) lastMentioned = mentioned;
+      if (!MEASUREMENT_PATTERN.test(clause)) continue;
+
+      if (mentioned.length) {
+        for (const name of mentioned) state[name] = true;
+      } else if (serviceNames.length === 1) {
+        state[serviceNames[0]] = true;
+      } else if (MEASUREMENT_GROUP_PATTERN.test(clause)) {
+        for (const name of serviceNames) state[name] = true;
+      } else if (lastMentioned.length === 1) {
+        state[lastMentioned[0]] = true;
+      }
+    }
+  }
+
+  return state;
+}
+
 function buildSummary({ services, siteMeasurementIntent, quotationIntent, humanRequest, area, propertyType, propertyStatus, budget, measurementsKnown, timing, negative }) {
   if (negative) return "The customer has paused or declined the renovation enquiry for now.";
   const parts = [];
@@ -196,6 +244,7 @@ function updateRenovationLead(session) {
     : null;
   const renewedAfterNegative = lastNegativeIndex >= 0 && hasRenewedInterest(messages, lastNegativeIndex);
   const negative = lastNegativeIndex >= 0 && !sameMessageReplacement && !renewedAfterNegative;
+  const freshAfterRenewal = lastNegativeIndex >= 0 && !sameMessageReplacement && renewedAfterNegative;
 
   let activeMessages;
   if (negative) activeMessages = [];
@@ -209,8 +258,12 @@ function updateRenovationLead(session) {
     activeMessages = messages.slice(lastNegativeIndex + 1);
   }
 
+  const carryPreviousProject = !freshAfterRenewal;
   const activeText = activeMessages.map((message) => message.content || "").join(" \n");
-  const services = resolveServices(activeMessages, session.lead?.interests || []);
+  const services = resolveServices(
+    activeMessages,
+    carryPreviousProject ? (session.lead?.interests || []) : []
+  );
 
   const siteMeasurementIntent = !negative && SITE_PATTERN.test(activeText);
   const quotationIntent = !negative && QUOTE_INTENT_PATTERN.test(activeText);
@@ -219,26 +272,43 @@ function updateRenovationLead(session) {
   const bookingIntent = siteMeasurementIntent || quotationIntent;
   const askedPrice = !negative && PRICE_PATTERN.test(activeText);
   const budget = !negative
-    ? latestBudget(activeMessages, session) || session.lead?.budget || null
+    ? latestBudget(activeMessages, session) || (carryPreviousProject ? session.lead?.budget : null) || null
     : session.lead?.budget || null;
   const propertyType = !negative
-    ? latestDetected(activeMessages, detectPropertyType) || session.lead?.propertyType || null
+    ? latestDetected(activeMessages, detectPropertyType) || (carryPreviousProject ? session.lead?.propertyType : null) || null
     : session.lead?.propertyType || null;
   const propertyStatus = !negative
-    ? latestDetected(activeMessages, detectPropertyStatus) || session.lead?.propertyStatus || null
+    ? latestDetected(activeMessages, detectPropertyStatus) || (carryPreviousProject ? session.lead?.propertyStatus : null) || null
     : session.lead?.propertyStatus || null;
   const area = !negative
-    ? latestDetected(activeMessages, detectArea) || session.lead?.preferredBranch || null
+    ? latestDetected(activeMessages, detectArea) || (carryPreviousProject ? session.lead?.preferredBranch : null) || null
     : session.lead?.preferredBranch || null;
 
-  const serviceCorrectionIndex = latestServiceCorrectionIndex(activeMessages);
-  const measurementsKnown = !negative && (
-    MEASUREMENT_PATTERN.test(currentScopeMeasurementText(activeMessages)) ||
-    (serviceCorrectionIndex < 0 && Boolean(session.lead?.measurementsKnown))
-  );
-  const timelineMentioned = !negative && (TIMELINE_PATTERN.test(activeText) || Boolean(session.lead?.timelineMentioned));
+  const previousMeasurementState = carryPreviousProject
+    ? { ...(session.lead?.measurementsByService || {}) }
+    : {};
+  if (
+    carryPreviousProject &&
+    !Object.keys(previousMeasurementState).length &&
+    session.lead?.measurementsKnown
+  ) {
+    for (const name of session.lead?.interests || []) previousMeasurementState[name] = true;
+  }
 
-  let timing = session.lead?.preferredTiming || null;
+  const measurementsByService = negative
+    ? { ...(session.lead?.measurementsByService || {}) }
+    : measurementStateForServices(activeMessages, services, { initialState: previousMeasurementState });
+  const measurementsKnown = !negative && (
+    services.length
+      ? services.every((name) => Boolean(measurementsByService[name]))
+      : MEASUREMENT_PATTERN.test(currentScopeMeasurementText(activeMessages))
+  );
+  const timelineMentioned = !negative && (
+    TIMELINE_PATTERN.test(activeText) ||
+    (carryPreviousProject && Boolean(session.lead?.timelineMentioned))
+  );
+
+  let timing = carryPreviousProject ? (session.lead?.preferredTiming || null) : null;
   for (const message of activeMessages) timing = detectTiming(message.content, timing);
 
   let score = 0;
@@ -270,6 +340,7 @@ function updateRenovationLead(session) {
     propertyStatus,
     budget,
     measurementsKnown,
+    measurementsByService,
     timelineMentioned,
     siteMeasurementIntent,
     quotationIntent,
@@ -287,4 +358,6 @@ module.exports = {
   detectPropertyType,
   detectPropertyStatus,
   detectBudget,
+  resolveServices,
+  measurementStateForServices,
 };
