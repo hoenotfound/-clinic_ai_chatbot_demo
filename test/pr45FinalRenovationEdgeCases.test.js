@@ -207,3 +207,72 @@ test("multi-scope measurement tracking asks for the still-unmeasured service", (
   assert.equal(session.lead.measurementsByService["Shoe Cabinet & Entrance Storage"], true);
   assert.equal(session.lead.measurementsKnown, true);
 });
+
+test("whole-enquiry decline wording wins even when the customer mentions a detail reason", () => {
+  assert.equal(isGenuineRejection("I'm not interested anymore, the material is too expensive"), true);
+  assert.equal(isGenuineRejection("I don't want to proceed anymore, the glossy finish is too expensive"), true);
+  assert.equal(isGenuineRejection("I'm not interested in the material, show me another option"), false);
+
+  const session = {
+    messages: [
+      { role: "user", content: "Kitchen cabinet in Puchong, budget RM12k" },
+      { role: "assistant", content: "Do you have rough measurements?" },
+      { role: "user", content: "I'm not interested anymore, the material is too expensive" },
+    ],
+    lead: { interests: [] },
+  };
+  updateRenovationLead(session);
+  assert.equal(session.lead.reducedInterest, true);
+  assert.equal(session.lead.score, 0);
+});
+
+test("changed-mind proceed wording renews a previously declined lead without repeating the service", () => {
+  const session = {
+    messages: [
+      { role: "user", content: "Kitchen cabinet in Puchong condo, 12ft, budget RM15k" },
+      { role: "assistant", content: "Noted." },
+      { role: "user", content: "Not interested anymore" },
+      { role: "assistant", content: "No problem, message us again if you need anything." },
+      { role: "user", content: "Actually I changed my mind, let's proceed" },
+    ],
+    lead: {
+      interests: ["Kitchen Cabinets"],
+      preferredBranch: "Cheras / Kajang / Puchong",
+      propertyType: "Condo / apartment",
+      budget: "RM15,000",
+      measurementsKnown: true,
+      measurementsByService: { "Kitchen Cabinets": true },
+    },
+  };
+
+  updateRenovationLead(session);
+  assert.equal(session.lead.reducedInterest, false);
+  assert.deepEqual(session.lead.interests, []);
+  assert.equal(session.lead.preferredBranch, null);
+  assert.equal(session.lead.propertyType, null);
+  assert.equal(session.lead.budget, null);
+  assert.equal(session.lead.measurementsKnown, false);
+  assert.doesNotMatch(buildFallbackReply(session.messages), /leave the renovation enquiry here/i);
+});
+
+test("grouped measurements apply to every active service instead of only the nearest service", () => {
+  for (const message of [
+    "I want wardrobe and shoe cabinet, both 4ft",
+    "Both wardrobe and shoe cabinet are 4ft",
+  ]) {
+    const session = {
+      messages: [{ role: "user", content: message }],
+      lead: { interests: [] },
+    };
+
+    updateRenovationLead(session);
+    assert.deepEqual(
+      session.lead.interests.sort(),
+      ["Built-in Wardrobes", "Shoe Cabinet & Entrance Storage"].sort(),
+      message
+    );
+    assert.equal(session.lead.measurementsByService["Built-in Wardrobes"], true, message);
+    assert.equal(session.lead.measurementsByService["Shoe Cabinet & Entrance Storage"], true, message);
+    assert.equal(session.lead.measurementsKnown, true, message);
+  }
+});
