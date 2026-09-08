@@ -1,4 +1,5 @@
 const { detectServices, detectCorrectedService } = require("./renovationServiceDetection");
+const { correctionTargetText, isGenuineRejection } = require("./renovationConversationIntent");
 
 const PRICE_PATTERN = /price|how much|cost|quotation|quote|budget|harga|berapa|kos|sebut harga|多少钱|多少錢|价格|價格|价钱|價錢|报价|報價|预算|預算/i;
 const BUDGET_QUESTION_PATTERN = /(?:do you (?:already )?have|what(?:'s| is)|how much).{0,30}\bbudget\b|\bbudget\b.{0,30}(?:range|in mind|roughly|approximately|around how much)|\bbudget\s*\?|\bbajet\b.{0,24}(?:berapa|range|anggaran)|(?:berapa|anggaran).{0,24}\bbajet\b|\bbajet\s*\?|(?:预算|預算).{0,12}(?:多少|几|幾|范围|範圍)|(?:多少|几|幾).{0,12}(?:预算|預算)|(?:预算|預算)\s*[?？]/i;
@@ -6,7 +7,6 @@ const SITE_PATTERN = /site\s*(?:visit|measurement|measure)|come\s+(?:and\s+)?mea
 const QUOTE_INTENT_PATTERN = /exact\s+(?:price|quote|quotation)|proper\s+(?:quote|quotation)|send\s+(?:me\s+)?(?:a\s+)?quote|prepare\s+(?:a\s+)?quotation|can\s+(?:you\s+)?quote|nak\s+quotation|mahu\s+quotation|buat\s+quotation|正式报价|正式報價|给我报价|給我報價|出报价|出報價/i;
 const HUMAN_REQUEST_PATTERN = /(?:speak|talk|chat|connect)\s+(?:me\s+)?(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:can|could)\s+i\s+(?:speak|talk)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:need|want)\s+(?:a\s+)?(?:human|designer|salesperson|project manager)|human\s+(?:please|pls)|真人|人工|转人工|轉人工|找设计师|找設計師|联系顾问|聯繫顧問|nak\s+cakap\s+dengan\s+(?:staff|designer|sales)|mahu\s+cakap\s+dengan\s+(?:staff|designer|sales)/i;
 const TECHNICAL_PATTERN = /load[- ]?bearing|structural|hack(?:ing)?\s+(?:wall|beam|column)|electrical|rewir(?:e|ing)|plumb(?:ing)?|waterproof(?:ing)?|gas\s+(?:pipe|line)|permit|authority|approval|承重墙|承重牆|敲墙|敲牆|电线|電線|水管|防水|kelulusan|struktur|pendawaian|paip/i;
-const NEGATIVE_PATTERN = /not interested|no longer interested|never ?mind|don['’]?t want|do not want|cancel|no thanks|tak berminat|tidak berminat|tak nak|tidak mahu|tak jadi|tidak jadi|batal|不要了|不想做|没兴趣|沒興趣|算了|取消/i;
 const MEASUREMENT_PATTERN = /\b\d+(?:\.\d+)?\s*(?:ft|feet|foot|mm|cm|m|meter|metre)s?\b|floor\s*plan|layout\s*plan|尺寸|尺|平面图|平面圖|ukuran|pelan/i;
 const TIMELINE_PATTERN = /move\s*in|moving|collect(?:ed|ing)?\s+keys?|get(?:ting)?\s+keys?|handover|complete\s+by|finish\s+by|next\s+(?:week|month)|this\s+(?:week|month)|within\s+\d+\s+(?:week|weeks|month|months)|baru\s+dapat\s+kunci|dapat\s+kunci|nak\s+siap|pindah|拿钥匙|拿鑰匙|交房|入住|搬家|完工/i;
 
@@ -134,7 +134,8 @@ function resolveServices(messages, initialServices = []) {
     const text = message?.content || "";
     const corrected = detectCorrectedService(text);
     if (corrected) {
-      services = new Set([corrected.name]);
+      const correctedServices = detectServices(correctionTargetText(text));
+      services = new Set(correctedServices.length ? correctedServices : [corrected.name]);
       continue;
     }
     for (const service of detectServices(text)) services.add(service);
@@ -151,8 +152,15 @@ function latestServiceCorrectionIndex(messages) {
 
 function currentScopeMeasurementText(messages) {
   const correctionIndex = latestServiceCorrectionIndex(messages);
-  const scopedMessages = correctionIndex >= 0 ? messages.slice(correctionIndex) : messages;
-  return scopedMessages.map((message) => message?.content || "").join(" \n");
+  if (correctionIndex < 0) {
+    return (messages || []).map((message) => message?.content || "").join(" \n");
+  }
+
+  const scopedMessages = messages.slice(correctionIndex);
+  return scopedMessages.map((message, index) => {
+    const text = message?.content || "";
+    return index === 0 ? correctionTargetText(text) : text;
+  }).join(" \n");
 }
 
 function buildSummary({ services, siteMeasurementIntent, quotationIntent, humanRequest, area, propertyType, propertyStatus, budget, measurementsKnown, timing, negative }) {
@@ -177,7 +185,7 @@ function updateRenovationLead(session) {
 
   let lastNegativeIndex = -1;
   for (let index = messages.length - 1; index >= 0; index -= 1) {
-    if (NEGATIVE_PATTERN.test(messages[index].content || "")) {
+    if (isGenuineRejection(messages[index].content || "")) {
       lastNegativeIndex = index;
       break;
     }
