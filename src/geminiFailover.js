@@ -9,8 +9,8 @@ function nonNegativeIntEnv(name, fallback) {
 }
 
 function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
-  const requestTimeoutMs = positiveIntEnv("AI_REQUEST_TIMEOUT_MS", 6000);
-  const primaryTimeoutMs = positiveIntEnv("GEMINI_ATTEMPT_TIMEOUT_MS", Math.min(requestTimeoutMs, 6000));
+  const requestTimeoutMs = positiveIntEnv("AI_REQUEST_TIMEOUT_MS", 4500);
+  const primaryTimeoutMs = positiveIntEnv("GEMINI_ATTEMPT_TIMEOUT_MS", 6000);
   const fallbackTimeoutMs = positiveIntEnv("GEMINI_FALLBACK_ATTEMPT_TIMEOUT_MS", 4500);
   const failoverBudgetMs = positiveIntEnv("GEMINI_FAILOVER_BUDGET_MS", 16000);
   const compatibilityRetryDelayMs = nonNegativeIntEnv("GEMINI_RETRY_DELAY_MS", 0);
@@ -170,17 +170,11 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
     return entry ? Math.max(1, Math.ceil((entry.until - Date.now()) / 1000)) : 0;
   }
 
-  function applyCooldown(key, model, error, { modelWideTimeout = false } = {}) {
+  function applyCooldown(key, model, error) {
     const type = classify(error);
     const route = routeKey(key, model);
 
     if (type === "timeout") {
-      if (modelWideTimeout) {
-        modelCooldowns.set(model, { reason: type, until: Date.now() + modelCooldownMs });
-        opsStats.recordCounter("gemini_timeout_cooldowns");
-        return type;
-      }
-
       const streak = (timeoutStreaks.get(route) || 0) + 1;
       if (streak >= 2) {
         routeCooldowns.set(route, { reason: type, until: Date.now() + keyCooldownMs });
@@ -302,7 +296,7 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
       } catch (error) {
         lastError = error;
         if (isFailoverBudgetError(error) || (Number.isFinite(deadline) && remainingBudgetMs(deadline) <= 0)) throw failoverBudgetError();
-        const type = applyCooldown(keys[index], model, error, { modelWideTimeout: options.switchModelOnTimeout });
+        const type = applyCooldown(keys[index], model, error);
 
         if (!shouldRotateKey(type, options)) {
           const state = modelCooldown(model);
