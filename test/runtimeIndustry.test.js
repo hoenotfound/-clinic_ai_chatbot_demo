@@ -35,12 +35,13 @@ test("runtime industry contexts stay isolated across concurrent async work", asy
   assert.match(clinic.business, /Nova Demo Aesthetic Clinic/i);
   assert.match(clinic.reply, /HIFU|RM888/i);
   assert.match(clinic.prompt, /CONCERN-TO-TREATMENT/i);
-  assert.doesNotMatch(clinic.prompt, /STRUCTURED RENOVATION SALES KNOWLEDGE/i);
+  assert.doesNotMatch(clinic.prompt, /AI-FIRST RENOVATION OVERRIDE/i);
 
   assert.equal(renovation.key, "renovation");
   assert.match(renovation.business, /Oakline Demo Renovation/i);
   assert.match(renovation.reply, /RM 6,800/i);
-  assert.match(renovation.prompt, /STRUCTURED RENOVATION SALES KNOWLEDGE/i);
+  assert.match(renovation.prompt, /SERVICES AND SAMPLE PRICE GUIDES/i);
+  assert.match(renovation.prompt, /AI-FIRST RENOVATION OVERRIDE/i);
   assert.doesNotMatch(renovation.prompt, /CONCERN-TO-TREATMENT/i);
 });
 
