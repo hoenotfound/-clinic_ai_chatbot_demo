@@ -30,6 +30,7 @@ jobs:
           node --check src/server.js
           node --check src/demoState.js
           node --check src/aiService.js
+          node --check src/geminiFailover.js
           node --check src/industryProfile.js
           node --check src/publicExperienceProfiles.js
           node --check src/sharedState.js
@@ -41,6 +42,8 @@ jobs:
           node --check src/renovationConfig.js
           node --check src/renovationFallback.js
           node --check src/renovationLeadState.js
+          node --check src/renovationServiceDetection.js
+          node --check src/renovationConversationIntent.js
           node --check src/renovationSystemPrompt.js
           node --check public/app.js
           node --check public/channel-experience.js
@@ -84,7 +87,7 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Run renovation regression tests
-        run: node --test test/renovationDemo.test.js
+        run: node --test test/renovationDemo.test.js test/renovationConversationContinuity.test.js test/pr45EdgeCases.test.js test/pr45FinalRenovationEdgeCases.test.js
       - name: Check renovation-specific JavaScript syntax
         run: |
           node --check src/server.js
@@ -94,8 +97,11 @@ jobs:
           node --check src/renovationConfig.js
           node --check src/renovationFallback.js
           node --check src/renovationLeadState.js
+          node --check src/renovationServiceDetection.js
+          node --check src/renovationConversationIntent.js
           node --check src/renovationSystemPrompt.js
           node --check src/aiService.js
+          node --check src/geminiFailover.js
           node --check public/app.js
           node --check public/channel-experience.js
           node --check public/industry-experience.js
