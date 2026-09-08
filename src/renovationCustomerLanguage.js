@@ -1,7 +1,10 @@
+const renovation = require("./renovationConfig");
 const {
   hasCapabilityDisclosure,
   stripCapabilityDisclosure,
 } = require("./renovationCapabilityShield");
+
+const BUSINESS_NAME_TOKEN = "__CONFIGURED_RENOVATION_BUSINESS_NAME__";
 
 function capabilityFollowup(text) {
   const value = String(text || "");
@@ -36,6 +39,11 @@ function sanitizeRenovationCustomerReply(reply) {
     const followup = capabilityFollowup(text);
     text = `${safeText ? `${safeText} ` : ""}${followup} [[HANDOFF]]`;
   }
+
+  // Protect configured canonical branding before customer-wording cleanup. The company
+  // name is allowed to contain trade terminology even though normal chat copy avoids it.
+  const businessName = String(renovation.businessName || "").trim();
+  if (businessName) text = text.replaceAll(businessName, BUSINESS_NAME_TOKEN);
 
   // Keep the first discovery question natural for Malaysian customers. The internal
   // product can still model these as carpentry scopes, but customers should see the
@@ -87,6 +95,7 @@ function sanitizeRenovationCustomerReply(reply) {
   for (const [pattern, replacement] of replacements) {
     text = text.replace(pattern, replacement);
   }
+  if (businessName) text = text.replaceAll(BUSINESS_NAME_TOKEN, businessName);
   return text;
 }
 
