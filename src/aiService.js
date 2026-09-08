@@ -44,11 +44,6 @@ function getFallbackReply(messages) {
   if (ruleReply) return customerReply(ruleReply);
   const concernReply = buildConcernFallback(messages);
   if (concernReply) return customerReply(concernReply);
-  const intakeReply = renovationIntakeReply(messages, {
-    isFirstMessage: (messages || []).filter((message) => message?.role === "user").length === 1 &&
-      !(messages || []).some((message) => message?.role === "assistant"),
-  });
-  if (intakeReply) return intakeReply;
   return customerReply(buildFallbackReply(messages));
 }
 
@@ -137,6 +132,9 @@ async function getReply(messages, isFirstMessage = false) {
     const ruleReply = enforceBookingRules(messages);
     if (ruleReply) return customerReply(ruleReply);
 
+    // The live renovation journey is intentionally site-first. Keep this orchestration
+    // outside getFallbackReply() so existing direct fallback contracts still handle
+    // price, safety, technical and handoff questions deterministically when called alone.
     const intakeReply = renovationIntakeReply(messages, { isFirstMessage });
     if (intakeReply) return intakeReply;
 
