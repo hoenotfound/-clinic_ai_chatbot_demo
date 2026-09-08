@@ -102,7 +102,6 @@ test("industry selector is usable on a narrow mobile viewport", async ({ page })
       switcherRight: switcher?.right || 0,
     };
   });
-  expect(toolbarLayout.bodyWidth).toBeLessThanOrEqual(layout.viewportWidth + 1);
   expect(toolbarLayout.bodyWidth).toBeLessThanOrEqual(toolbarLayout.viewportWidth + 1);
   expect(toolbarLayout.switcherRight).toBeLessThanOrEqual(toolbarLayout.viewportWidth + 1);
   expect(toolbarLayout.toolbarHeight).toBeLessThanOrEqual(78);
