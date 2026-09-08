@@ -83,11 +83,20 @@ test("renovation profile stays industry-specific across customer view and the co
   await expect(page.locator("#messages")).toContainText("shoe cabinet");
 
   await sendCustomerMessage(page, "Upper and lower kitchen cabinet");
+  await expect(page.locator("#messages")).toContainText("wall space usable");
   await expect(page.locator("#messages")).toContainText("switches or plug points");
-  await expect(page.locator("#messages")).toContainText("sink/water points");
-  await expect(page.locator("#messages")).toContainText("beams/columns");
+  await expect(page.locator("#messages")).not.toContainText("sink/water points");
+  await expect(page.locator("#messages")).not.toContainText("beams/columns");
 
-  await sendCustomerMessage(page, "The wall is clear, no window, no door, 2 plug points, sink in the middle, no hob or hood, fridge on the right, no beam or column.");
+  // Natural partial answers should be understood from meaning and conversation context.
+  await sendCustomerMessage(page, "one waterpoint and one plug");
+  await expect(page.locator("#messages")).toContainText("Is the wall space usable for the cabinet?");
+  const messagesAfterPartial = page.locator("#messages");
+  await expect(messagesAfterPartial).not.toContainText("fridge position");
+  await expect(messagesAfterPartial).not.toContainText("hob/hood");
+
+  // A short answer belongs to the wall-space question just asked.
+  await sendCustomerMessage(page, "yes");
   await expect(page.locator("#messages")).toContainText("Preliminary advice");
   await expect(page.locator("#messages")).toContainText("melamine/MFC");
   await expect(page.locator("#messages")).toContainText("plywood");
