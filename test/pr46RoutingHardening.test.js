@@ -244,8 +244,9 @@ test("renovation Gemini path keeps adaptive intake orchestration around a mocked
       .then((reply) => {
         if (calls !== 1) throw new Error("Expected one mocked Gemini call, got " + calls);
         if (!/RM\\s*6,800/i.test(reply)) throw new Error("Gemini answer was not preserved: " + reply);
-        if (!/switches or plug points/i.test(reply)) throw new Error("Adaptive site question was not appended: " + reply);
-        if (!/sink\\/water points/i.test(reply)) throw new Error("Kitchen site constraints were not appended: " + reply);
+        if (!/wall space usable/i.test(reply)) throw new Error("Usable-wall site question was not appended: " + reply);
+        if (!/switches or plug points/i.test(reply)) throw new Error("Power-point site question was not appended: " + reply);
+        if (/sink\\/water points|hob\\/hood|fridge|beams\\/columns/i.test(reply)) throw new Error("Old long site checklist leaked into the reply: " + reply);
         if (/Site photo:/i.test(reply)) throw new Error("Known size/location should not reset to opening template: " + reply);
       })
       .catch((error) => {
