@@ -41,8 +41,9 @@ test("renovation prompt focuses on carpentry qualification instead of medical be
 
 test("Gemini and Claude provider prompt stays renovation-specific", () => {
   const prompt = ai._test.enhancedSystemPrompt(true);
-  assert.match(prompt, /STRUCTURED RENOVATION SALES KNOWLEDGE/i);
-  assert.match(prompt, /DETERMINISTIC RENOVATION HANDOFF RULES/i);
+  assert.match(prompt, /SERVICES AND SAMPLE PRICE GUIDES/i);
+  assert.match(prompt, /AI-FIRST RENOVATION OVERRIDE/i);
+  assert.match(prompt, /Hard safety, unsupported-scope, human-request and site-specific technical handoffs are enforced deterministically/i);
   assert.doesNotMatch(prompt, /CONCERN-TO-TREATMENT/i);
   assert.doesNotMatch(prompt, /diagnosis/i);
   assert.doesNotMatch(prompt, /clinician/i);
@@ -53,7 +54,8 @@ test("Gemini and Claude provider prompt stays renovation-specific", () => {
     "gemini-2.5-flash"
   );
   const geminiPrompt = geminiBody.systemInstruction.parts.map((part) => part.text).join("\n");
-  assert.match(geminiPrompt, /RENOVATION SALES KNOWLEDGE/i);
+  assert.match(geminiPrompt, /SERVICES AND SAMPLE PRICE GUIDES/i);
+  assert.match(geminiPrompt, /AI-FIRST RENOVATION OVERRIDE/i);
   assert.doesNotMatch(geminiPrompt, /clinician|diagnosis|CONCERN-TO-TREATMENT/i);
 });
 

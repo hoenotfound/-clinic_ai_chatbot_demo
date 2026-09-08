@@ -2,6 +2,14 @@ function sanitizeRenovationCustomerReply(reply) {
   let text = String(reply || "");
   if (!text) return text;
 
+  // The AI-first renovation path prepends a private state block to the model context.
+  // The model is instructed never to expose it, and this is a final defensive strip
+  // in case a provider ever echoes the tagged block back into customer-facing text.
+  text = text.replace(
+    /\[APP_INTERNAL_RENOVATION_STATE\][\s\S]*?\[\/APP_INTERNAL_RENOVATION_STATE\]/gi,
+    ""
+  ).trim();
+
   // Keep the first discovery question natural for Malaysian customers. The internal
   // product can still model these as carpentry scopes, but customers should see the
   // cabinet types they actually ask for rather than trade terminology.

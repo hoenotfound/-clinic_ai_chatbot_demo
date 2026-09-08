@@ -30,8 +30,8 @@ const NEGATIVE_PATTERNS = {
   db: /no\s+(?:db\s*box|distribution\s*board)|without\s+(?:a\s+)?(?:db\s*box|distribution\s*board)|tiada\s+db\s*box|tak\s+ada\s+db\s*box|\u6ca1\u6709\u7535\u7bb1|\u6c92\u6709\u96fb\u7bb1/i,
 };
 
-const SHORT_CONTEXT_ANSWER = /^(?:yes|yeah|yep|yup|can|can\s+use|usable|okay|ok|fine|all\s+good|no|none|nope|cannot|can['’]?t|not\s+usable|have|got|got\s+one|one|two|three|\d+|boleh|boleh\s+guna|ada|ada\s+satu|tak\s+ada|tiada|tak\s+boleh|ya|\u53ef\u4ee5|\u53ef\u4ee5\u7528|\u6709|\u6709\u7684|\u6ca1\u6709|\u6c92\u6709|\u4e0d\u53ef\u4ee5|\u4e0d\u80fd|\u6ca1\u95ee\u9898|\u6c92\u554f\u984c)[.!\uff01\u3002]?$/i;
-const POSITIVE_WALL_CONTEXT = /^(?:yes|yeah|yep|yup|can|can\s+use|usable|okay|ok|fine|all\s+good|boleh|boleh\s+guna|ya|\u53ef\u4ee5|\u53ef\u4ee5\u7528|\u6ca1\u95ee\u9898|\u6c92\u554f\u984c)[.!\uff01\u3002]?$/i;
+const SHORT_CONTEXT_ANSWER = /^(?:yes|yeah|yep|yup|can|can\s+use|usable|okay|ok|fine|all\s+good|no|none|nope|cannot|can['’]?t|not\s+usable|have|got|got\s+one|one|two|three|\d+|boleh|boleh\s+guna|ada|ada\s+satu|tak\s+ada|tiada|tak\s+boleh|ya|\u53ef\u4ee5(?:\u7684)?(?:\u554a|\u5440)?|\u53ef\u4ee5\u7528(?:\u554a|\u5440)?|\u80fd(?:\u7528)?(?:\u554a|\u5440)?|\u884c(?:\u7684)?(?:\u554a|\u5440)?|\u6709|\u6709\u7684|\u6ca1\u6709|\u6c92\u6709|\u4e0d\u53ef\u4ee5|\u4e0d\u80fd|\u6ca1\u95ee\u9898(?:\u554a|\u5440)?|\u6c92\u554f\u984c(?:\u554a|\u5440)?)[.!\uff01\u3002]?$/i;
+const POSITIVE_WALL_CONTEXT = /^(?:yes|yeah|yep|yup|can|can\s+use|usable|okay|ok|fine|all\s+good|boleh|boleh\s+guna|ya|\u53ef\u4ee5(?:\u7684)?(?:\u554a|\u5440)?|\u53ef\u4ee5\u7528(?:\u554a|\u5440)?|\u80fd(?:\u7528)?(?:\u554a|\u5440)?|\u884c(?:\u7684)?(?:\u554a|\u5440)?|\u6ca1\u95ee\u9898(?:\u554a|\u5440)?|\u6c92\u554f\u984c(?:\u554a|\u5440)?)[.!\uff01\u3002]?$/i;
 
 function lastUserText(messages) {
   for (let index = (messages || []).length - 1; index >= 0; index -= 1) {
@@ -67,7 +67,7 @@ function previousAssistantText(messages, index) {
 function questionTargets(text) {
   const value = String(text || "");
   const targets = new Set();
-  if (/usable\s+wall|wall\s+space|wall\s+(?:is\s+)?usable|ruang\s+dinding|dinding.*boleh\s+guna|\u5899\u9762.*(?:\u80fd\u7528|\u53ef\u4ee5\u7528|\u591f\u4e0d\u591f)|\u5899\u9762\u7a7a\u95f4|\u7246\u9762/i.test(value)) targets.add("wall");
+  if (/usable\s+wall|wall\s+space|wall\s+(?:is\s+)?usable|ruang\s+dinding|dinding.*boleh\s+guna|\u5899\u9762.*(?:\u80fd\u7528|\u53ef\u4ee5\u7528|\u591f\u4e0d\u591f)|\u5899\u9762\u7a7a\u95f4|\u7246\u9762|(?:\u8fd9|\u9019)?\u9762?(?:\u5899|\u7246)(?:\u7684)?\u7a7a\u95f4.*(?:\u80fd\u4e0d\u80fd|\u53ef\u4e0d\u53ef\u4ee5|\u80fd|\u53ef\u4ee5).*\u67dc\u5b50|(?:\u5899|\u7246)(?:\u7684)?\u7a7a\u95f4/i.test(value)) targets.add("wall");
   if (/switch|plug|socket|outlet|power\s*point|suis|soket|\u63d2\u5ea7|\u5f00\u5173|\u958b\u95dc|\u7535\u6e90|\u96fb\u6e90|\u7535\u4f4d|\u96fb\u4f4d/i.test(value)) targets.add("power");
   return targets;
 }
