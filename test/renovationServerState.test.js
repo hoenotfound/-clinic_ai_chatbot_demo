@@ -25,3 +25,10 @@ test("server preserves hidden measurement-offer state for the next AI turn witho
   assert.equal("measurementOffered" in publicCopy.messages.at(-1), false);
   assert.doesNotMatch(publicCopy.messages.at(-1).content, /MEASUREMENT_OFFERED/);
 });
+
+test("server reports aiReplied only for provider-generated replies", () => {
+  const serverSource = fs.readFileSync(path.join(__dirname, "../src/server.js"), "utf8");
+
+  assert.match(serverSource, /aiReplied:\s*replySource\s*===\s*["']ai["']/);
+  assert.doesNotMatch(serverSource, /aiReplied:\s*!degraded/);
+});
