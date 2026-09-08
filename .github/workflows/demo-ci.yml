@@ -86,7 +86,7 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Run renovation regression tests
-        run: node --test test/renovationDemo.test.js test/renovationConversationContinuity.test.js
+        run: node --test test/renovationDemo.test.js test/renovationConversationContinuity.test.js test/pr45EdgeCases.test.js
       - name: Check renovation-specific JavaScript syntax
         run: |
           node --check src/server.js
