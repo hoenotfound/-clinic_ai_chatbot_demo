@@ -1,3 +1,5 @@
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { createGeminiFailover } = require("../src/geminiFailover");
@@ -85,4 +87,22 @@ test("quota failures still rotate API keys", async () => {
   assert.equal(reply, "healthy reply");
   assert.deepEqual(calls, ["key-one", "key-two"]);
   assert.equal(gemini.keyCooldown("key-one", "gemini-3.6-flash")?.reason, "quota");
+});
+
+test("Gemini deployment defaults stay aligned", () => {
+  const envExample = fs.readFileSync(path.join(__dirname, "..", ".env.example"), "utf8");
+  const renderYaml = fs.readFileSync(path.join(__dirname, "..", "render.yaml"), "utf8");
+
+  for (const source of [envExample, renderYaml]) {
+    assert.match(source, /gemini-3\.6-flash/);
+    assert.match(source, /gemini-3\.5-flash-lite/);
+    assert.doesNotMatch(source, /gemini-2\.5-flash-lite/);
+  }
+
+  assert.match(envExample, /GEMINI_ATTEMPT_TIMEOUT_MS=6000/);
+  assert.match(envExample, /GEMINI_FALLBACK_ATTEMPT_TIMEOUT_MS=4500/);
+  assert.match(envExample, /GEMINI_FAILOVER_BUDGET_MS=16000/);
+  assert.match(renderYaml, /key: GEMINI_ATTEMPT_TIMEOUT_MS\s+value: 6000/);
+  assert.match(renderYaml, /key: GEMINI_FALLBACK_ATTEMPT_TIMEOUT_MS\s+value: 4500/);
+  assert.match(renderYaml, /key: GEMINI_FAILOVER_BUDGET_MS\s+value: 16000/);
 });
