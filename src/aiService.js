@@ -10,7 +10,6 @@ const {
 } = industry;
 const opsStats = require("./opsStats");
 const { createGeminiFailover } = require("./geminiFailover");
-const { buildRenovationAiContext, withRenovationAiContext } = require("./renovationAiContext");
 
 const provider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
 const SUPPORTED_PROVIDERS = new Set(["mock", "claude", "gemini"]);
@@ -35,6 +34,10 @@ function loadRenovationDependencies() {
       isTechnicalHandoffRequest,
       sanitizeLegacyRoutingMessages,
     } = require("./renovationRoutingIntent");
+    const {
+      buildRenovationAiContext,
+      withRenovationAiContext,
+    } = require("./renovationAiContext");
     renovationDependencies = {
       establishedConversationLanguage,
       sanitizeRenovationCustomerReply,
@@ -46,6 +49,8 @@ function loadRenovationDependencies() {
       renovationRoutingReason,
       isTechnicalHandoffRequest,
       sanitizeLegacyRoutingMessages,
+      buildRenovationAiContext,
+      withRenovationAiContext,
     };
   }
   return renovationDependencies;
@@ -169,7 +174,18 @@ function finalizePlannedReply(reply, plan) {
 }
 
 function deterministicPlannedFallback(messages, plan) {
+  if (plan?.reply) return customerReply(plan.reply);
   return finalizePlannedReply(plannedFallbackReply(messages, plan), plan);
+}
+
+function buildRenovationAiContext(plan) {
+  const deps = activeRenovationDependencies();
+  return deps ? deps.buildRenovationAiContext(plan) : "";
+}
+
+function withRenovationAiContext(messages, plan) {
+  const deps = activeRenovationDependencies();
+  return deps ? deps.withRenovationAiContext(messages, plan) : messages;
 }
 
 function aiMessages(messages, plan) {
