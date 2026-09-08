@@ -21,6 +21,19 @@ const TECHNICAL_REQUEST_PATTERNS = [
   /(?:buat|kerja)\s+(?:elektrik|pendawaian|plumbing)|(?:ubah|alih|pindah|tambah)\s+(?:pendawaian|suis|soket|plug|paip|water\s*point)|waterproof|kelulusan\s+(?:majlis|pihak\s+berkuasa)|struktur\s+(?:dinding|beam|column)/i,
 ];
 
+const CUSTOMER_SENDING_IMAGE_PATTERN = /\b(?:can|could|may)\s+i\s+(?:send|share|upload)\b[^.!?]{0,80}\b(?:photo|photos|image|images|picture|pictures)\b|(?:我|我这边|我這邊)(?:可以|能)?(?:发|發|传|傳|上传|上傳).{0,20}(?:照片|图片|圖片|图|圖).{0,10}(?:给你|給你)|\b(?:boleh|dapat)\s+saya\s+(?:hantar|share|upload)\b[^.!?]{0,60}\b(?:gambar|foto)\b/i;
+const REFERENCE_IMAGE_REQUEST_PATTERNS = [
+  /\b(?:can|could|would|will)\s+you\s+(?:send|share|show)\s+(?:me\s+)?[^.!?]{0,80}\b(?:photo|photos|image|images|picture|pictures|reference|references|sample|samples|design|designs)\b/i,
+  /\b(?:send|share|show)\s+me\s+[^.!?]{0,80}\b(?:photo|photos|image|images|picture|pictures|reference|references|sample|samples|design|designs)\b/i,
+  /\bcan\s+i\s+see\s+[^.!?]{0,80}\b(?:photo|photos|image|images|picture|pictures|reference|references|sample|samples|design|designs)\b/i,
+  /\bdo\s+you\s+have\s+(?:any\s+)?[^.!?]{0,60}\b(?:photo|photos|image|images|picture|pictures|reference|references|sample|samples)\b/i,
+  /(?:你|你们|你們)?(?:可以|能不能|能否|可不可以)?(?:发|發|send).{0,12}(?:我|给我|給我|看看).{0,12}(?:参考图|參考圖|图片|圖片|照片|图|圖|款式|样板|樣板)/i,
+  /(?:有|有没有|有沒有).{0,10}(?:参考图|參考圖|图片|圖片|照片|样板|樣板).{0,4}(?:吗|嗎)?/i,
+  /(?:给|給)我看.{0,12}(?:参考图|參考圖|图片|圖片|照片|图|圖|款式|样板|樣板)/i,
+  /\b(?:boleh|dapat)\s+(?:hantar|share|bagi|tunjuk)\s+(?:saya\s+)?[^.!?]{0,60}\b(?:gambar|foto|design|contoh)\b/i,
+  /\bada\s+(?:gambar|foto|contoh)\b/i,
+];
+
 const PASSIVE_ROLE_REPLACEMENTS = [
   [/\bproject\s+manager\b/gi, "project lead"],
   [/\bsalesperson\b/gi, "sales rep"],
@@ -69,6 +82,12 @@ function isExplicitHumanRequest(text) {
 function isTechnicalHandoffRequest(text) {
   const value = String(text || "").trim();
   return Boolean(value && TECHNICAL_REQUEST_PATTERNS.some((pattern) => pattern.test(value)));
+}
+
+function isReferenceImageRequest(text) {
+  const value = String(text || "").trim();
+  if (!value || CUSTOMER_SENDING_IMAGE_PATTERN.test(value)) return false;
+  return REFERENCE_IMAGE_REQUEST_PATTERNS.some((pattern) => pattern.test(value));
 }
 
 function normalizeSupportedCabinetVariants(text) {
@@ -132,6 +151,7 @@ function sanitizeLegacyRoutingMessages(messages) {
 function renovationRoutingReason(text) {
   if (isExplicitHumanRequest(text)) return "human";
   if (isTechnicalHandoffRequest(text)) return "technical";
+  if (isReferenceImageRequest(text)) return "reference_images";
   if (isStandaloneUnconfiguredCabinetRequest(text)) return "scope";
   return null;
 }
@@ -139,6 +159,7 @@ function renovationRoutingReason(text) {
 module.exports = {
   isExplicitHumanRequest,
   isTechnicalHandoffRequest,
+  isReferenceImageRequest,
   isStandaloneUnconfiguredCabinetRequest,
   isGenericCabinetEnquiry,
   normalizeSupportedCabinetVariants,
