@@ -1,114 +1,191 @@
-const renovation = require("./renovationConfig");
-const {
-  detectCorrectedService,
-  isUnconfiguredServiceRequest,
-} = require("./renovationServiceDetection");
-const { resolveServices } = require("./renovationLeadState");
-const { establishedConversationLanguage } = require("./conversationLanguage");
-const { correctionTargetText, isGenuineRejection } = require("./renovationConversationIntent");
+const base = require("./renovationIntakeFlowBase");
+const { detectCorrectedService } = require("./renovationServiceDetection");
+const { correctionTargetText } = require("./renovationConversationIntent");
 
-const OPENING_MESSAGE = "â˜€ï¸Pls let us know :\n\nSite photo: \n\nRough size: \n\nLocation: \n\nThanks ðŸ‘";
-const SIZE_VALUE_PATTERN = /\b\d+(?:\.\d+)?\s*(?:ft|feet|foot|mm|cm|m|meter|metre)s?\b|floor\s*plan|layout\s*plan|å¹³é¢å›¾|å¹³é¢åœ–|\d+(?:\.\d+)?\s*å°º|pelan/i;
-const KNOWN_LOCATION_PATTERN = /puchong|cheras|kajang|petaling\s+jaya|\bpj\b|subang|shah\s+alam|kuala\s+lumpur|\bkl\b|mont\s+kiara|bukit\s+bintang|bukit\s+jalil|setapak|old\s+klang\s+road|ara\s+damansara|ampang|kepong|selayang|seri\s+kembangan|cyberjaya|putrajaya|è’²ç§|è’²ç¨®|è•‰èµ–|è•‰è³´|åŠ å½±|å…«æ‰“çµå†ä¹Ÿ|å…«æ‰“éˆå†ä¹Ÿ|æ¢³é‚¦|èŽŽé˜¿å—|å‰éš†å¡/i;
-const LOCATION_VALUE_PATTERN = /(?:location|lokasi|area|åœ°ç‚¹|åœ°é»ž|åœ°åŒº|åœ°å€|ä½ç½®)\s*[:ï¼š-]?\s*([^\n,;.!?ï¼Ÿã€‚]{2,60})/gi;
-const PROJECT_LOCATION_PATTERN = /(?:project|site|unit|rumah|é¡¹ç›®|é …ç›¦)\s*(?:is|åœ¨|kat|dekat)?\s*(?:in|at|åœ¨|kat|dekat)\s+([a-z\u4e00-\u9fff][a-z\u4e00-\u9fff .'-]{1,45})/i;
-const VAGUE_VALUE_PATTERN = /^(?:not\s*sure|unsure|unknown|don['â€™]?t\s*know|dunno|no\s*idea|n\/a|na|later|tak\s*tahu|tidak\s+tahu|belum\s+tahu|ä¸çŸ¥é“|ä¸ç¡®å®š|ä¸ç¢ºå®š|è¿˜ä¸çŸ¥é“|é‚„ä¸çŸ¥é“)$/i;
-const PHOTO_NEGATIVE_PATTERN = /(?:no|don['â€™]?t\s+have|do\s+not\s+have|without)\s+(?:a\s+)?(?:site\s*)?(?:photo|picture|image|pic)|(?:site\s*)?(?:photo|picture|image|pic)\s*(?:not\s+available|later)|tak\s+ada\s+(?:gambar|foto)|tiada\s+(?:gambar|foto)|æ²¡æœ‰(?:çŽ°åœº)?ç…§ç‰‡|æ²’æœ‰(?:ç¾å ´)?ç…§ç‰‡|æ²¡ç…§ç‰‡|æ²’ç…§ç‰‡/i;
-const PHOTO_PATTERN = /site\s*photo|photo|picture|image|pic\b|attached|sent\s+(?:it|photo)|ç…§ç‰‡|ç›¸ç‰‡|å›¾ç‰‡|åœ–ç‰‡|gambar|foto/i;
-const ADVICE_MARKER_PATTERN = /preliminary\s+advice|åˆæ­¥å»ºè®®|åˆæ­¥å»ºè­°|cadangan\s+awal/i;
-const GENERIC_GREETING_PATTERN = /^(?:hi|hello|hey|halo|hai|ä½ å¥½|å—¨|æ—©å®‰|good\s+(?:morning|afternoon|evening))[!ï¼,.ï¼Œã€‚\s]*(?:(?:i|we)\s+(?:want|would\s+like)\s+to\s+(?:ask|enquire|inquire)\s+(?:about\s+)?(?:cabinet(?:s)?|renovation)[.!ï¼ã€‚]?)?$/i;
-const ANSWER_FIRST_PATTERN = /[?ï¼Ÿ]|\b(?:how\s+much|price|cost|harga|berapa|do\s+you|can\s+you|could\s+you|what\s+material|which\s+material|warranty)\b|å¤šå°‘é’±|å¤šå°‘éŒ¢|ä»·æ ¼|åƒ¹æ ¼|ä»·é’±|åƒ¹éŒ¢|æœ‰åšå—|æœ‰åšå—Ž|å¯ä»¥å—|å¯ä»¥å—Ž/i;
-const MATERIAL_QUESTION_PATTERN = /plywood|melamine|\bmfc\b|aluminium|aluminum|material|laminate|finish|æè´¨|æè³ª|ææ–™|æ¿æ|é“|é‹/i;
-const COMPLAINT_PATTERN = /complaint|refund|defect|damage|poor workmanship|wrong colour|wrong color|not happy|very disappointed|æŠ•è¯‰|æŠ•è¨´|é€€æ¬¾|ç‘•ç–µ|åšå|åšå£ž|rosak|aduan/i;
-const TECHNICAL_PATTERN = /load[- ]?bearing|structural|hack(?:ing)?\s+(?:(?:this|the|a|my|our)\s+)?(?:wall|beam|column)|electrical|rewir(?:e|ing)|plumb(?:ing)?|waterproof(?:ing)?|gas\s+(?:pipe|line)|permit|authority|approval|æ‰¿é‡å¢™|æ‰¿é‡ç‰†|æ•²(?:è¿™ä¸ª|é€™å€‹|è¿™é¢|é€™é¢)?å¢™|æ•²(?:é€™å€‹|è¿™ä¸ª)?æŸ±|ç”µçº¿|é›»ç·š|é˜²æ°´|kelulusan|struktur|pendawaian/i;
-const SITE_OR_QUOTE_HANDOFF_PATTERN = /site\s*(?:visit|measurement|measure)|come\s+(?:and\s+)?measure|exact\s+(?:quote|quotation|price)|proper\s+(?:quote|quotation)|ä¸Šé—¨é‡å°º|ä¸Šé–€é‡å°º|æ­£å¼æŠ¥ä»·|æ­£å¼å ±åƒ¹|é‡å°º|quotation\s+appointment/i;
-const HUMAN_REQUEST_PATTERN = /(?:speak|talk|chat|connect)\s+(?:me\s+)?(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project\s+manager)|(?:can|could|may)\s+i\s+(?:speak|talk|chat)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project\s+manager)|(?:want|need)\s+to\s+(?:speak|talk|chat|connect)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project\s+manager)|(?:want|need)\s+(?:a\s+)?(?:human|designer|salesperson|project\s+manager)\s+(?:to\s+)?(?:contact|call|reply|help)|human\s+(?:please|pls)|çœŸäºº|äººå·¥|è½¬äººå·¥|è½‰äººå·¥|æ‰¾è®¾è®¡å¸ˆ|æ‰¾è¨­è¨ˆå¸«|è”ç³»é¡¾é—®|è¯ç¹«é¡§å•|nak\s+cakap\s+dengan\s+(?:staff|designer|sales)|mahu\s+cakap\s+dengan\s+(?:staff|designer|sales)/i;
-const OUT_OF_SCOPE_PATTERN = /\b(?:tiles?|tiling|floor(?:ing)?|paint(?:ing)?|ceiling|plaster(?:ing)?|wallpaper|masonry|wet\s*works?|bathroom\s+renovation|toilet\s+renovation|kitchen\s+renovation|jubin|lantai|siling|renovasi\s+(?:dapur|bilik\s+air))\b|ç“·ç –|ç“·ç£š|åœ°ç –|åœ°ç£š|åœ°æ¿|æ²¹æ¼†|å¤©èŠ±|å¢™çº¸|ç‰†ç´™|æ³¥æ°´|åŽ¨æˆ¿(?:è£…ä¿®|è£ä¿®|ç¿»æ–°)|å»šæˆ¿(?:è£ä¿®|ç¿»æ–°)|åŽ•æ‰€(?:è£…ä¿®|è£ä¿®)|å»æ‰€è£ä¿®|æµ´å®¤(?:è£…ä¿®|è£ä¿®)/i;
-const SERVICE_FINISH_PATTERN = /\b(?:paint(?:ed)?|spray[- ]paint(?:ed)?|lacquer(?:ed)?)\s+(?:finish(?:es)?|colour|color|cabinet|door)|\b(?:finish|colour|color)\s+(?:with\s+)?(?:paint|spray[- ]paint|lacquer)|çƒ¤æ¼†|å–·æ¼†|å™´æ¼†|æ²¹æ¼†(?:é¢|æŸœé—¨|æ«ƒé–€|finish|é¢œè‰²|é¡è‰²)/i;
-const BUDGET_PATTERN = /\b(?:budget|bajet)\b.{0,30}(?:rm\s*)?\d+(?:[,.]\d+)?\s*k?\b|\b(?:rm\s*)\d+(?:[,.]\d+)?\s*k?\b|\b\d+(?:\.\d+)?\s*k\s*(?:budget|bajet)\b|(?:é¢„ç®—|é ç®—).{0,16}(?:rm\s*)?\d+(?:[,.]\d+)?\s*k?/i;
+const EXPLICIT_HUMAN_REQUEST_PATTERN = /(?:speak|talk|chat|connect)\s+(?:me\s+)?(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project\s+manager)|(?:can|could|may)\s+i\s+(?:speak|talk|chat)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project\s+manager)|(?:want|need)\s+to\s+(?:speak|talk|chat|connect)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project\s+manager)|(?:want|need)\s+(?:a\s+)?(?:human|designer|salesperson|project\s+manager)\s+(?:to\s+)?(?:contact|call|reply|help)|human\s+(?:please|pls)|\u771f\u4eba|\u4eba\u5de5|\u8f6c\u4eba\u5de5|\u8f49\u4eba\u5de5|\u627e\u8bbe\u8ba1\u5e08|\u627e\u8a2d\u8a08\u5e2b|\u8054\u7cfb\u987e\u95ee|\u806f\u7e6b\u9867\u554f|nak\s+cakap\s+dengan\s+(?:staff|designer|sales)|mahu\s+cakap\s+dengan\s+(?:staff|designer|sales)/i;
+const BUDGET_PATTERN = /\b(?:budget|bajet)\b.{0,30}(?:rm\s*)?\d+(?:[,.]\d+)?\s*k?\b|\b(?:rm\s*)\d+(?:[,.]\d+)?\s*k?\b|\b\d+(?:\.\d+)?\s*k\s*(?:budget|bajet)\b|(?:\u9884\u7b97|\u9810\u7b97).{0,16}(?:rm\s*)?\d+(?:[,.]\d+)?\s*k?/i;
+const ALL_CLEAR_PATTERN = /no\s+(?:other\s+)?obstruction|nothing\s+(?:else|there)|all\s+clear|tiada\s+halangan|tak\s+ada\s+halangan|\u6ca1\u6709(?:\u5176\u4ed6)?\u963b\u788d|\u6c92\u6709(?:\u5176\u4ed6)?\u963b\u7919/i;
 
-const CONSTRAINT_PATTERNS = {
-  wall: /clear\s*wall|empty\s*wall|usable\s*wall|wall\s+(?:is\s+)?clear|wall\s*(?:space|length|height|width)|enough\s+wall|dinding|å¢™é¢|ç‰†é¢|å¢™é•¿|ç‰†é•·|å¢™é«˜|ç‰†é«˜/i,
-  window: /window|tingkap|çª—/i,
-  door: /door|sliding\s*door|pintu|é—¨|é–€/i,
-  power: /switch(?:es)?|socket(?:s)?|plug(?:s)?|power\s*point|data\s*point|suis|soket|æ’åº§|å¼€å…³|é–‹é—œ|ç”µæº|é›»æº/i,
-  plumbing: /sink|water\s*point|pipe|plumb(?:ing)?|paip|æ°´ç®¡|æ°´ä½|æ°´æ§½/i,
-  cooking: /hob|hood|stove|cooker|æŠ½æ²¹çƒŸæœº|æŠ½æ²¹ç…™æ©Ÿ|ç‚‰|çˆ/i,
-  structure: /beam|column|æ¢|æŸ±/i,
-  aircon: /air\s*con|aircon|air-conditioner|ç©ºè°ƒ|å†·æ°”|å†·æ°£/i,
-  fridge: /fridge|refrigerator|å†°ç®±/i,
-  db: /db\s*box|distribution\s*board|ç”µç®±|é›»ç®±/i,
-  tv: /\btv\b|television|ç”µè§†|é›»è¦–/i,
+const GROUP_PATTERNS = {
+  wall: /clear\s*wall|empty\s*wall|usable\s*wall|wall\s+(?:is\s+)?clear|wall\s*(?:space|length|height|width)|enough\s+wall|dinding|\u5899\u9762|\u7246\u9762|\u5899\u957f|\u7246\u9577|\u5899\u9ad8|\u7246\u9ad8/i,
+  window: /window|tingkap|\u7a97/i,
+  door: /door|sliding\s*door|pintu|\u95e8|\u9580/i,
+  power: /switch(?:es)?|socket(?:s)?|plug(?:s)?|power\s*point|data\s*point|suis|soket|\u63d2\u5ea7|\u5f00\u5173|\u958b\u95dc|\u7535\u6e90|\u96fb\u6e90/i,
+  plumbing: /sink|water\s*point|pipe|plumb(?:ing)?|paip|\u6c34\u7ba1|\u6c34\u4f4d|\u6c34\u69fd/i,
+  cooking: /hob|hood|stove|cooker|\u62bd\u6cb9\u70df\u673a|\u62bd\u6cb9\u7159\u6a5f|\u7089|\u7210/i,
+  fridge: /fridge|refrigerator|\u51b0\u7bb1/i,
+  structure: /beam|column|\u6881|\u67f1/i,
+  aircon: /air\s*con|aircon|air-conditioner|\u7a7a\u8c03|\u51b7\u6c14|\u51b7\u6c23/i,
+  db: /db\s*box|distribution\s*board|\u7535\u7bb1|\u96fb\u7bb1/i,
+  tv: /(?:tv\s*(?:size|around|about)?\s*[:=-]?\s*\d+\s*(?:inch(?:es)?|in\b|[\"â€])|\d+\s*(?:inch(?:es)?|in\b|[\"â€])\s*tv|tv\s+size\s*[:=-]?\s*(?!not\s*sure|unknown)\S+)/i,
 };
-const ALL_CLEAR_PATTERN = /no\s+(?:other\s+)?obstruction|nothing\s+(?:else|there)|all\s+clear|tiada\s+halangan|tak\s+ada\s+halangan|æ²¡æœ‰(?:å…¶ä»–)?é˜»ç¢|æ²’æœ‰(?:å…¶ä»–)?é˜»ç¤™|æ²¡æœ‰å…¶ä»–ä¸œè¥¿|æ²’æœ‰å…žä»–æ±è¥¿/i;
 
-function userTexts(messages) {
-  return (messages || []).filter((message) => message?.role === "user").map((message) => String(message.content || "").trim()).filter(Boolean);
-}
+const NEGATIVE_PATTERNS = {
+  window: /no\s+(?:window|windows)|without\s+(?:a\s+)?window|tiada\s+tingkap|tak\s+ada\s+tingkap|\u6ca1\u6709\u7a97|\u6c92\u6709\u7a97|\u65e0\u7a97|\u7121\u7a97/i,
+  structure: /no\s+(?:beam|column|beam\s*(?:or|and|\/)\s*column)|without\s+(?:a\s+)?(?:beam|column)|tiada\s+(?:beam|column)|tak\s+ada\s+(?:beam|column)|\u6ca1\u6709(?:\u6881|\u67f1)|\u6c92\u6709(?:\u6881|\u67f1)/i,
+  aircon: /no\s+(?:air\s*con|aircon|air-conditioner)|without\s+(?:an?\s+)?(?:air\s*con|aircon|air-conditioner)|tiada\s+aircon|tak\s+ada\s+aircon|\u6ca1\u6709(?:\u7a7a\u8c03|\u51b7\u6c14)|\u6c92\u6709(?:\u7a7a\u8abf|\u51b7\u6c23)/i,
+  db: /no\s+(?:db\s*box|distribution\s*board)|without\s+(?:a\s+)?(?:db\s*box|distribution\s*board)|tiada\s+db\s*box|tak\s+ada\s+db\s*box|\u6ca1\u6709\u7535\u7bb1|\u6c92\u6709\u96fb\u7bb1/i,
+};
 
-function assistantTexts(messages) {
-  return (messages || []).filter((message) => message?.role === "assistant").map((message) => String(message.content || "").trim()).filter(Boolean);
-}
-
-function hasOpeningMessage(messages) {
-  return assistantTexts(messages).some((text) => /Site photo\s*:/i.test(text) && /Rough size\s*:/i.test(text) && /Location\s*:/i.test(text));
-}
-
-function locationKnown(text) {
-  const value = String(text || "");
-  if (KNOWN_LOCATION_PATTERN.test(value)) return true;
-  for (const match of value.matchAll(LOCATION_VALUE_PATTERN)) {
-    const candidate = String(match[1] || "").trim();
-    if (candidate && !VAGUE_VALUE_PATTERN.test(candidate)) return true;
+function lastUserText(messages) {
+  for (let index = (messages || []).length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === "user") return String(messages[index].content || "");
   }
-  const projectMatch = value.match(PROJECT_LOCATION_PATTERN);
-  if (!projectMatch) return false;
-  const candidate = String(projectMatch[1] || "").trim().replace(/[.!ï¼ã€‚?ï¼Ÿ]+$/, "");
-  return Boolean(candidate && !VAGUE_VALUE_PATTERN.test(candidate));
+  return "";
 }
 
-function photoStatus(text) {
-  const value = String(text || "");
-  if (PHOTO_NEGATIVE_PATTERN.test(value)) return "unavailable";
-  if (PHOTO_PATTERN.test(value)) return "available";
-  return "unknown";
+function sanitizeNonRequestDesignerMention(messages) {
+  const latest = lastUserText(messages);
+  if (!/\bdesigner\b/i.test(latest) || EXPLICIT_HUMAN_REQUEST_PATTERN.test(latest)) return messages;
+  let replaced = false;
+  return (messages || []).map((message, index, items) => {
+    if (replaced || message?.role !== "user") return message;
+    const isLatestUser = !items.slice(index + 1).some((item) => item?.role === "user");
+    if (!isLatestUser) return message;
+    replaced = true;
+    return { ...message, content: String(message.content || "").replace(/\bdesigner\b/ig, "design consultant") };
+  });
 }
 
-function budgetKnown(text) {
-  return BUDGET_PATTERN.test(String(text || ""));
+function scopedUserText(state) {
+  let firstUser = true;
+  return (state.scopedMessages || [])
+    .filter((message) => message?.role === "user")
+    .map((message) => {
+      const text = String(message.content || "");
+      if (firstUser && detectCorrectedService(text)) {
+        firstUser = false;
+        return correctionTargetText(text);
+      }
+      firstUser = false;
+      return text;
+    })
+    .join(" \n");
 }
 
-function serviceQuestion(language) {
-  if (language === "zh") return "è°¢è°¢ ðŸ‘ æ‚¨ä¸»è¦æƒ³åšå“ªä¸€ç§/ï¼šåŽ¨æˆ¿åŠæ›š + åœ°æ›šã€è¡£æš¨ã€ç”µè§†æš¨ã€éž‹æš¨ï¼Œè¿˜æ˜¯å…¶ä»–æš¨å­ï¼Ÿ";
-  if (language === "ms") return "Terima kasih ðŸ‘ Anda nak buat apa: kitchen cabinet atas + bawah, wardrobe, TV cabinet, shoe cabinet, atau cabinet lain?";
-  return "Thanks ðŸ‘ What are you looking to do upper + lower kitchen cabinets, wardrobe cabinet, TV cabinet, shoe cabinet, or something else?";
+function refinedFacts(state) {
+  const text = scopedUserText(state);
+  const groups = new Set();
+  for (const [name, pattern] of Object.entries(GROUP_PATTERNS)) {
+    if (pattern.test(text)) groups.add(name);
+  }
+  const allClear = ALL_CLEAR_PATTERN.test(text);
+  const noWindow = NEGATIVE_PATTERNS.window.test(text);
+  const noStructure = NEGATIVE_PATTERNS.structure.test(text);
+  const noAircon = NEGATIVE_PATTERNS.aircon.test(text);
+  const noDb = NEGATIVE_PATTERNS.db.test(text);
+  return {
+    ...state.facts,
+    groups,
+    allClear,
+    noWindow,
+    hasWindow: groups.has("window") && !noWindow,
+    hasBeamOrColumn: groups.has("structure") && !noStructure,
+    hasAircon: groups.has("aircon") && !noAircon,
+    hasDbBox: groups.has("db") && !noDb,
+  };
 }
 
-function missingIntakeQuestion(language, state) {
-  const missing = [];
-  if (!state.sizeKnown) missing.push("size");
-  if (!state.hasLocation) missing.push("location");
-  if (!missing.length) return null;
+function requiredConstraintGroups(serviceNames) {
+  const required = new Set();
+  for (const name of serviceNames || []) {
+    let groups;
+    if (name === "Kitchen Cabinets") groups = ["wall", "window", "door", "power", "plumbing", "cooking", "fridge", "structure"];
+    else if (name === "Built-in Wardrobes") groups = ["wall", "window", "door", "power", "structure", "aircon"];
+    else if (name === "TV Console & Living Room Carpentry") groups = ["wall", "tv", "power", "window", "door", "aircon"];
+    else if (name === "Shoe Cabinet & Entrance Storage") groups = ["wall", "door", "power", "db"];
+    else groups = ["wall", "window", "door", "power"];
+    for (const group of groups) required.add(group);
+  }
+  return [...required];
+}
 
-  const photoAvailable = state.photoStatus === "available";
-  const photoUnavailable = state.photoStatus === "unavailable";
+function missingConstraintGroups(serviceNames, facts) {
+  if (facts.allClear) return [];
+  return requiredConstraintGroups(serviceNames).filter((group) => !facts.groups.has(group));
+}
+
+function missingConstraintQuestion(language, missing) {
+  const labels = {
+    en: { wall: "usable wall space", window: "windows", door: "doors / door swing", power: "switches or plug points", plumbing: "sink/water points", cooking: "hob/hood", fridge: "fridge position", structure: "beams/columns", aircon: "aircon position", db: "DB box", tv: "TV size" },
+    ms: { wall: "ruang dinding yang boleh guna", window: "tingkap", door: "pintu / arah pintu buka", power: "switch atau plug", plumbing: "sink/water point", cooking: "hob/hood", fridge: "posisi fridge", structure: "beam/column", aircon: "posisi aircon", db: "DB box", tv: "saiz TV" },
+  };
+  const zh = { wall: "\u5899\u9762\u662f\u4e0d\u662f\u90fd\u80fd\u7528", window: "\u7a97\u4f4d", door: "\u95e8\u4f4d / \u5f00\u95e8\u65b9\u5411", power: "switch / plug", plumbing: "\u6c34\u69fd / \u6c34\u4f4d", cooking: "hob / hood", fridge: "\u51b0\u7bb1\u4f4d\u7f6e", structure: "\u6881\u67f1", aircon: "\u51b7\u6c14\u4f4d\u7f6e", db: "DB box", tv: "TV \u5c3a\u5bf8" };
+  const table = language === "zh" ? zh : (labels[language] || labels.en);
+  const items = missing.map((key) => table[key] || labels.en[key] || key);
+  if (language === "zh") return `\u6536\u5230\u3002\u518d\u786e\u8ba4${items.join("\u3001")}\u8fd9${items.length > 1 ? "\u51e0\u9879" : "\u4e00\u9879"}\u5c31\u53ef\u4ee5\uff0c\u7136\u540e\u6211\u53ef\u4ee5\u6309\u4f60\u7ed9\u7684\u73b0\u573a\u8d44\u6599\u5148\u7ed9\u5e03\u5c40\u548c\u6750\u6599\u65b9\u5411\u3002`;
+  if (language === "ms") return `Faham. Tinggal confirm ${items.join(", ")} saja, lepas itu saya boleh bagi preliminary layout dan material direction berdasarkan detail site anda.`;
+  return `Got it. I just need ${items.join(", ")} as well, then I can give preliminary layout and material direction based on the site details you've provided.`;
+}
+
+function budgetKnown(state) {
+  const text = (state.projectMessages || []).filter((message) => message?.role === "user").map((message) => String(message.content || "")).join(" \n");
+  return BUDGET_PATTERN.test(text);
+}
+
+function removeRepeatedBudgetQuestion(reply, language) {
+  let text = String(reply || "").trim();
+  if (!text) return text;
   if (language === "zh") {
-    if (missing.length === 2) return `å…ˆè¡¥å……ä¸€å¤§æ¦‚å°ºå¯¸å’Œ Location å°±å¯ä»¥ã€‚${photoAvailable ? "Site photo æˆ‘ä¹Ÿè®°ä¸‹äº†ã€‚" : photoUnavailable ? "æ²¡æœ‰ site photo ä¹Ÿæ¶¡æ¯ã€‚" : "æœ‰àsite photo çš„è¯ä¹Ÿå¯ä»¥ä¸€èµ·å‘ã€"}`;
-    if (missing[0] === "size") return `è¿˜å·®ä¸€ä¸ª Rough sizeï¼Œå¤§æ¦‚å‡  ft / å¤§æ¦‚å¤šé•¿å°±æ˜¿å¹¶ä»¥ã€‚${photoUnavailable ? "æ²¡æœ‰ site photo ä¹Ÿæ²¡å…³ç³»ã€‚" : ""}`;
-    return `è¿˜å·® Locationï¼Œå‘Šè¯‰æˆ‘é¡¹ç›®åœ¨å“ªä¸ªåœ°åŒºå°±å¯ä»¥ã€‚${photoUnavailable ? "æ²¡æœ‰ site photo ä¹Ÿæ¶¡æ¯ã€‚" : ""}`;
+    text = text.replace(/\s*\u60a8\u7684\s*Budget\s*\u5927\u6982\u60f3\u63a7\u5236\u5728\u591a\u5c11[\uff1f?]?\s*$/i, "");
+    return `${text} \u63a5\u4e0b\u6765\u6211\u4f1a\u6309\u60a8\u5df2\u7ecf\u7ed9\u7684 Budget \u7ee7\u7eed\u770b quotation / design \u65b9\u5411\u3002`.trim();
   }
   if (language === "ms") {
-    if (missing.length === 2) return `Tinggal rough size dan location saja. ${photoAvailable ? "Site photo pun saya dah catat." : photoUnavailable ? "Tak ada site photo pun tak apa." : "Kalau ada site photo, boleh bagi sekali."}`;
-    if (missing[0] === "size") return `Tinggal rough size saja, anggaran berapa ft pun okay. ${photoUnavailable ? "Tak ada site photo pun tak apa." : ""}`;
-    return `Tinggal location saja, beritahu project area mana. ${photoUnavailable ? "Tak ada site photo pun tak apa." : ""}`;
+    text = text.replace(/\s*Bajet anda lebih kurang berapa\?\s*$/i, "");
+    return `${text} Saya akan guna bajet yang anda dah bagi untuk langkah quotation/design seterusnya.`.trim();
   }
-  if (missing.length === 2) return `I just need the rough size and location first. ${photoAvailable ? "I've noted the site photo too." : photoUnavailable ? "No site photo is okay." : "If you have a site photo, you can send that as well."}`;
-  if (missing[0] === "size") return `I just need the rough size next, even an approximate length in ft is fine. ${photoUnavailable ? "No site photo is okay." : ""}`;
-  return `I just need the location next. Which area is the project in? ${photoUnavailable ? "No site photo is okay." : ""}`;
+  text = text.replace(/\s*What budget range are you aiming for\?\s*$/i, "");
+  return `${text} I'll keep the budget you already shared in mind for the next quotation/design step.`.trim();
 }
 
-function serviceLabels(serviceNames, language) {
-  const labels = {
-    "Kitchen Cabinets": { en: "kitchen cabinets", ms: "kitchen cabinet", zh: "åŽ¨æˆ¿æ³•å®Ÿ" },
-    "Built-in Wardrobes": { en: "wardrobe", ms: "wardrobe", zh: "è¡£æš¨" },
-    "TV|½¹Í½±”€˜1¥Ù¥¹œI½½´…ÉÁ•¹ÑÉäˆèì•¸è€‰QX…‰¥¹•Ðˆ°µÌè€‰QX…‰¥¹•Ðˆ°é è€‹žR×¢žšj ˆô°(€€€€‰M¡½”…‰¥¹•Ð€˜¹ÑÉ…¹”MÑ½É…”ˆèì•¸è€‰Í¡½”…‰¥¹•Ðˆ°µÌè€‰Í¡½”…‰¥¹•Ðˆ°é è€‹¦zšj”ˆô°(€€€€‰MÑÕ‘ä°¥ÍÁ±…ä€˜MÑ½É…”…‰¥¹•ÑÌˆèì•¸è€‰ÍÑÕ‘ä€¼ÍÑ½É…”…‰¥¹•Ðˆ°µÌè€‰ÍÑÕ‘ä€¼ÍÑ½É…”…‰¥¹•Ðˆ°é è€‹’æ›š"ü€¼ƒšRÛžêÏš~0ˆô°(€€€€‰Õ±°µ!½µ”ÕÍÑ½´…ÉÁ•¹ÑÉäˆèì•¸è€‰µÕ±Ñ¥Á±”…‰¥¹•Ð…É•…Ìˆ°µÌè€‰‰•‰•É…Á„©•¹¥Ì…‰¥¹•Ðˆ°é è€‹–’k’â«šj£–¶C–2ë–~|ˆô°(€ôì(€É•ÑÕÉ¸Í•ÉÙ¥•9…µ•Ì¹µ…À ¡¹…µ”¤€ôø±…‰•±Ím¹…µ•tü¹m±…¹Õ…•tñð±…‰•±Ím}9…µ•tü¹•¸ñð¹…µ”¤¹©½¥¸¡±…¹Õ…”€ôôô€‰é ˆ€ü€‹Žˆ€è€ˆ°€ˆ¤ì)ô()™Õ¹Ñ¥½¸½‰ÍÑÉÕÑ¥½¹EÕ•ÍÑ¥½¸¡±…¹Õ…”°Í•ÉÙ¥•9…µ•Ì€ômt¤ì(€½¹ÍÐ½¹±ä€ôÍ•ÉÙ¥•9…µ•Ì¹±•¹Ñ €ôôô€Ä€üÍ•ÉÙ¥•9…µ•ÍlÁt€è¹Õ±°ì(€¥˜€¡±…¹Õ…”€ôôô€‰é ˆ¤ì(€€€¥˜€¡½¹±ä€ôôô€‰-¥Ñ¡•¸…‰¥¹•ÑÌˆ¤É•ÑÕÉ¸€‹––÷žjŽ+¢þg’â«–:£š"ÿ’ö7žö»š"G–7ž†»¢º“’â’â/¾òk–Šg¦v‹šb¿’â7šb¿¦÷¢÷žR£¾òšr'šÊ‡šr'žª_Ž¦^£ŽÍÝ¥Ñ ƒš"X€Á±ÕŸŽšÂÓšžô¿šÂÓ’ö7Ž¡¡½ˆ½¡½½“Ž–ÏžºÃŽšŠh‰nX[nK¹n™‹®z(ûÉò#°¢–b†öæÇ’ÓÓÒ$'V–ÇBÖ–âv&G&ö&W2"’&WGW&â.Z[Þy¨N8.Š>iªŽ‹ùžKŠ®KØÞ{Úîh‰XhÞzîŠêNKˆKˆ¾ûÉ®Z)ž™Ú.ZëÞ[ªbþš¹Ž[ªnZIþKˆÞZIþûÉþ™˜n‹ùiÈžk*8[ÈX[>h‰bÇV~8j(iû8Xk~k	Nh‰nX[nK¹nKÉ®hÊX‹iªŽ™zŽy¨NKØÞ{ÚîûÉò#°¢–b†öæÇ’ÓÓÒ%Eb6öç6öÆRbÆ—f–ær&ööÒ6'VçG'’"’&WGW&â.Z[Þy¨N8.yK^ŠxniªŽ‹ùžKŠ®KØÞ{Úîh‰XhÞzîŠêNKˆKˆ¾ûÉ®Z)ž™Ú.[®ZûŽZIþKˆÞZIþûÉõEbZJ~jh.ZI®ZJ~ûÈÎ™˜N‹ùiÈžk*iÈ’ÇVröFFö–çN8k*8[ÈX[>8Xk~k	Nh‰nX[nK¹n™‹®z(ûÉò#°¢–b†öæÇ’ÓÓÒ%6†öR6&–æWBbVçG&æ6R7F÷&vR"’&WGW&â.Z[Þy¨N8 ¥è.™øî{û
+function enhancePlan(plan) {
+  if (!plan?.state) return plan;
+  const state = { ...plan.state, facts: refinedFacts(plan.state) };
+  state.missingConstraints = state.serviceNames?.length ? missingConstraintGroups(state.serviceNames, state.facts) : [];
+  state.budgetKnown = budgetKnown(state);
+  const next = { ...plan, state };
+  const readyForConstraints = state.sizeKnown && state.hasLocation && state.serviceNames?.length;
+  if (readyForConstraints && state.missingConstraints.length) {
+    const hasAnyConstraintInfo = state.facts.groups.size > 0 || state.facts.allClear;
+    const question = hasAnyConstraintInfo ? missingConstraintQuestion(state.language, state.missingConstraints) : base._test.obstructionQuestion(state.language, state.serviceNames);
+    next.adviceReply = null;
+    if (next.answerFirst) next.appendAfterAnswer = question;
+    else next.reply = question;
+    return next;
+  }
+  if (readyForConstraints && !state.missingConstraints.length && !state.adviceSent) {
+    let advice = base._test.preliminaryAdvice(state.serviceNames, state.language, state.facts);
+    if (state.budgetKnown) advice = removeRepeatedBudgetQuestion(advice, state.language);
+    next.reply = null;
+    next.adviceReply = advice;
+    return next;
+  }
+  if (next.adviceReply && state.budgetKnown) next.adviceReply = removeRepeatedBudgetQuestion(next.adviceReply, state.language);
+  return next;
+}
+
+function buildRenovationIntakePlan(messages, options = {}) {
+  const latest = lastUserText(messages);
+  if (EXPLICIT_HUMAN_REQUEST_PATTERN.test(latest)) return base.buildRenovationIntakePlan(messages, options);
+  const sourceMessages = sanitizeNonRequestDesignerMention(messages);
+  return enhancePlan(base.buildRenovationIntakePlan(sourceMessages, options));
+}
+
+function buildRenovationIntakeReply(messages, options = {}) {
+  return buildRenovationIntakePlan(messages, options).reply;
+}
+
+module.exports = {
+  ...base,
+  buildRenovationIntakeReply,
+  buildRenovationIntakePlan,
+  _test: {
+    ...base._test,
+    requiredConstraintGroups,
+    missingConstraintGroups,
+    missingConstraintQuestion,
+    refinedFacts,
+    budgetKnown,
+    removeRepeatedBudgetQuestion,
+  },
+};
