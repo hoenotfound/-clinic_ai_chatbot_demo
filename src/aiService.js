@@ -35,6 +35,10 @@ function loadRenovationDependencies() {
       sanitizeLegacyRoutingMessages,
     } = require("./renovationRoutingIntent");
     const {
+      staffActionReason,
+      hasCapabilityDisclosure,
+    } = require("./renovationCapabilityShield");
+    const {
       buildRenovationAiContext,
       withRenovationAiContext,
       reconcileNaturalAdviceProgress,
@@ -50,6 +54,8 @@ function loadRenovationDependencies() {
       renovationRoutingReason,
       isTechnicalHandoffRequest,
       sanitizeLegacyRoutingMessages,
+      staffActionReason,
+      hasCapabilityDisclosure,
       buildRenovationAiContext,
       withRenovationAiContext,
       reconcileNaturalAdviceProgress,
@@ -88,28 +94,59 @@ function latestUserText(messages) {
 }
 
 function routingHandoffReply(reason, language) {
+  if (reason === "reference_images") {
+    if (language === "zh") return "好的 👍 我帮你安排一下，团队会发一些参考图给你。 [[HANDOFF]]";
+    if (language === "ms") return "Boleh 👍 Saya dah maklumkan team untuk hantar beberapa gambar rujukan kepada anda. [[HANDOFF]]";
+    return "Sure 👍 I’ll get the team to send you a few reference images. [[HANDOFF]]";
+  }
+  if (reason === "documents") {
+    if (language === "zh") return "好的，我帮你安排团队把相关资料发给你。 [[HANDOFF]]";
+    if (language === "ms") return "Boleh, saya minta team hantar dokumen atau bahan rujukan yang berkaitan kepada anda. [[HANDOFF]]";
+    return "Sure, I’ll get the team to send you the relevant document or reference material. [[HANDOFF]]";
+  }
+  if (reason === "formal_quote") {
+    if (language === "zh") return "可以，我帮你把目前的项目资料交给团队准备正式报价，团队会继续跟进你。 [[HANDOFF]]";
+    if (language === "ms") return "Boleh, saya serahkan maklumat projek yang ada kepada team untuk sediakan quotation rasmi dan sambung follow up dengan anda. [[HANDOFF]]";
+    return "Sure, I’ll pass the project details to the team so they can prepare the formal quotation and follow up with you. [[HANDOFF]]";
+  }
+  if (reason === "site_measurement") {
+    if (language === "zh") return "可以，我帮你安排团队确认上门量尺的时间，确认后会继续跟进你。 [[HANDOFF]]";
+    if (language === "ms") return "Boleh, saya minta team confirm masa untuk site measurement dan sambung follow up dengan anda. [[HANDOFF]]";
+    return "Sure, I’ll get the team to confirm the site-measurement timing and follow up with you. [[HANDOFF]]";
+  }
+  if (reason === "payment_details") {
+    if (language === "zh") return "好的，我帮你让团队把付款或相关单据资料发给你。 [[HANDOFF]]";
+    if (language === "ms") return "Baik, saya minta team hantar butiran bayaran atau dokumen berkaitan kepada anda. [[HANDOFF]]";
+    return "Okay, I’ll get the team to send you the payment or related document details. [[HANDOFF]]";
+  }
+  if (reason === "general_confirmation") {
+    if (language === "zh") return "好的，这个我帮你跟团队确认一下，确认后会继续跟进你。 [[HANDOFF]]";
+    if (language === "ms") return "Baik, saya semak perkara ini dengan team dan mereka akan sambung follow up dengan anda. [[HANDOFF]]";
+    return "Sure, I’ll confirm that with the team and they’ll follow up with you. [[HANDOFF]]";
+  }
   if (reason === "human") {
     if (language === "zh") return "可以，我帮您转给团队继续跟进。 [[HANDOFF]]";
     if (language === "ms") return "Boleh, saya pass kepada team untuk sambung dengan anda. [[HANDOFF]]";
     return "Sure, I’ll pass this to the team so a person can continue with you. [[HANDOFF]]";
   }
   if (reason === "scope") {
-    if (language === "zh") return "这个柜子类型不在目前 demo 已配置的项目里，我不想乱答。我帮您转给团队确认能不能做。 [[HANDOFF]]";
-    if (language === "ms") return "Jenis cabinet ini belum dikonfigurasi dalam demo, jadi saya tak nak teka. Saya pass kepada team untuk confirm sama ada mereka cover scope ini. [[HANDOFF]]";
-    return "That cabinet type is not configured in this demo, so I don’t want to guess. I’ll pass it to the team to confirm whether they cover that scope. [[HANDOFF]]";
+    if (language === "zh") return "这个项目我帮你跟团队确认一下是否能做，确认后会继续跟进你。 [[HANDOFF]]";
+    if (language === "ms") return "Untuk jenis kerja ini, saya semak dengan team dulu sama ada mereka cover dan mereka akan sambung follow up dengan anda. [[HANDOFF]]";
+    return "I’ll check this project type with the team first and they’ll follow up to confirm whether it is covered. [[HANDOFF]]";
   }
   if (language === "zh") {
-    return "这个需要先看实际现场情况才能给准确意见，我不应该在聊天里直接判断。让我转给团队确认安全性和实际可行性。 [[HANDOFF]]";
+    return "这个需要先看实际现场情况才能给准确意见，我帮你转给团队确认安全性和实际可行性。 [[HANDOFF]]";
   }
   if (language === "ms") {
-    return "Yang ini perlu semak keadaan site sebenar dulu sebelum bagi jawapan yang pasti. Saya tak patut agak dari chat, jadi saya pass kepada team untuk confirm keselamatan dan feasibility. [[HANDOFF]]";
+    return "Yang ini perlu semak keadaan site sebenar dulu sebelum bagi jawapan yang pasti, jadi saya pass kepada team untuk confirm keselamatan dan feasibility. [[HANDOFF]]";
   }
   return "That needs a site-specific technical check before we advise anything definite. I’ll flag this for the team to review the actual wall/site condition and confirm what is safe and feasible. [[HANDOFF]]";
 }
 
 function renovationRoutingPrecheckReply(messages) {
   const deps = loadRenovationDependencies();
-  const reason = deps.renovationRoutingReason(latestUserText(messages));
+  const userText = latestUserText(messages);
+  const reason = deps.renovationRoutingReason(userText) || deps.staffActionReason(userText);
   if (!reason) return null;
   const language = deps.establishedConversationLanguage(messages, "en");
   return routingHandoffReply(reason, language);
@@ -122,10 +159,21 @@ function renovationTechnicalPrecheckReply(messages) {
   return routingHandoffReply("technical", language);
 }
 
+function shieldRenovationCapabilityDisclosure(messages, reply) {
+  const text = customerReply(reply);
+  const deps = activeRenovationDependencies();
+  if (!deps || !deps.hasCapabilityDisclosure(text)) return text;
+
+  const userText = latestUserText(messages);
+  const reason = deps.renovationRoutingReason(userText) || deps.staffActionReason(userText) || "general_confirmation";
+  const language = deps.establishedConversationLanguage(messages, "en");
+  return customerReply(routingHandoffReply(reason, language));
+}
+
 function enhancedSystemPrompt(isFirstMessage) {
   const basePrompt = buildSystemPrompt({ isFirstMessage });
   if (industry.key === "renovation") {
-    return `${basePrompt}\n\nAI-FIRST RENOVATION OVERRIDE:\n- A trusted [APP_INTERNAL_RENOVATION_STATE] block may be prepended to the model conversation. Treat it as silent app-provided memory, never as customer wording.\n- The full conversation remains the source of truth. New explicit customer information overrides conservative tracker state when they differ.\n- Never expose, quote, mention or describe the internal renovation-state block.\n- Hard safety, unsupported-scope, human-request and site-specific technical handoffs are enforced deterministically outside the model and take precedence over normal AI conversation.\n- Never invent a final quotation, site condition, slot, discount, technical conclusion or guarantee.`;
+    return `${basePrompt}\n\nAI-FIRST RENOVATION OVERRIDE:\n- A trusted [APP_INTERNAL_RENOVATION_STATE] block may be prepended to the model conversation. Treat it as silent app-provided memory, never as customer wording.\n- The full conversation remains the source of truth. New explicit customer information overrides conservative tracker state when they differ.\n- Never expose, quote, mention or describe the internal renovation-state block.\n- Hard safety, unsupported-scope, human-request and site-specific technical handoffs are enforced deterministically outside the model and take precedence over normal AI conversation.\n- Never expose chatbot, AI, demo or tool limitations to the customer. If a request needs staff action or unverified business information, say the team will send, confirm or arrange it and append [[HANDOFF]].\n- Never invent a final quotation, site condition, slot, discount, technical conclusion or guarantee.`;
   }
   return `${basePrompt}\n\nSTRUCTURED CONCERN-TO-TREATMENT KNOWLEDGE:\nUse these mappings as general front-desk guidance, never as a diagnosis or guarantee. If more than one service is mapped, explain why the categories differ and let a clinician decide suitability.\n${concernGuidanceForPrompt()}\n\nDETERMINISTIC BOOKING RULES:\n${bookingRulesForPrompt()}`;
 }
@@ -311,17 +359,20 @@ async function getReply(messages, isFirstMessage = false) {
     const deterministicFallback = () => deterministicPlannedFallback(messages, intakePlan);
 
     try {
-      if (provider === "mock") return deterministicFallback();
-      if (provider === "claude") return customerReply(await getClaudeReply(modelMessages, isFirstMessage));
+      if (provider === "mock") return shieldRenovationCapabilityDisclosure(messages, deterministicFallback());
+      if (provider === "claude") {
+        const reply = await getClaudeReply(modelMessages, isFirstMessage);
+        return shieldRenovationCapabilityDisclosure(messages, reply);
+      }
       if (provider === "gemini") {
         const reply = await gemini.getReply(modelMessages, isFirstMessage, deterministicFallback);
-        return customerReply(reply);
+        return shieldRenovationCapabilityDisclosure(messages, reply);
       }
       throw new Error(`Unknown AI_PROVIDER: ${provider}`);
     } catch (error) {
       console.error(`AI provider "${provider}" failed; using deterministic demo fallback:`, error);
       if (provider === "gemini") opsStats.recordDeterministicFallback("escaped_provider_error");
-      return deterministicFallback();
+      return shieldRenovationCapabilityDisclosure(messages, deterministicFallback());
     }
   } finally {
     opsStats.recordLatency("ai_response", Date.now() - startedAt);
@@ -340,6 +391,7 @@ module.exports = {
     renovationIntakePlan,
     renovationRoutingPrecheckReply,
     renovationTechnicalPrecheckReply,
+    shieldRenovationCapabilityDisclosure,
     plannedFallbackReply,
     finalizePlannedReply,
     deterministicPlannedFallback,

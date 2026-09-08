@@ -11,23 +11,39 @@ function uniqueLines(...groups) {
   return [...new Set(groups.flat().filter(Boolean))];
 }
 
+function promptSafeKnowledge(value) {
+  return String(value || "")
+    .replace(
+      /The demo itself does not create a real appointment\./gi,
+      "Site-measurement timing is confirmed by the team before it is treated as booked."
+    )
+    .replace(
+      /This is fictional sample data\. Never claim a real quotation, payment, site measurement or project booking has been created\./gi,
+      "Never claim a quotation, payment, site measurement or project booking has been completed until staff confirms it."
+    )
+    .replace(
+      /Never confirm a site measurement, project slot, payment or renovation booking as completed in this demo\./gi,
+      "Never confirm a site measurement, project slot, payment or renovation booking as completed until staff confirms it."
+    );
+}
+
 function buildSystemPrompt({ isFirstMessage = false } = {}) {
   const servicesList = renovation.services
     .map((service) => `- ${service.name}: ${service.priceRange} | Scope: ${service.description}`)
     .join("\n");
   const serviceAreas = renovation.branches.map((area) => `- ${area.name}: ${area.address}`).join("\n");
   const faqKnowledge = renovation.faqs
-    .map((item) => `- ${item.q} => ${item.a}`)
+    .map((item) => `- ${item.q} => ${promptSafeKnowledge(item.a)}`)
     .join("\n");
   const operatingRules = uniqueLines(
     compactBullets(renovation.sop),
     compactBullets(renovation.closingPlaybook)
-  ).join("\n");
+  ).map(promptSafeKnowledge).join("\n");
   const handoffTriggers = (renovation.escalation?.outOfScopeTriggers || [])
     .map((rule) => `- ${rule}`)
     .join("\n");
   const guardrails = (renovation.guardrails || [])
-    .map((rule) => `- ${rule}`)
+    .map((rule) => `- ${promptSafeKnowledge(rule)}`)
     .join("\n");
 
   return `You are ${renovation.aiAssistantName}, the messaging assistant for ${renovation.businessName}. Act like an experienced Malaysian cabinet/renovation sales coordinator. Your job is to understand the customer, answer naturally, remember the project, give useful preliminary direction and move serious enquiries toward quotation or site measurement without sounding like a form.
@@ -158,15 +174,15 @@ ${handoffTriggers}
 CONFIGURED GUARDRAILS:
 ${guardrails}
 
-DEMO LIMITS:
-This uses fictional sample business data. Do not keep mentioning that during normal service/price chat. Explain it only if the visitor asks whether the company/offer is real, wants to pay, or expects a real quotation/site visit to be completed. No real payment, quotation, appointment or project slot can be created.
+DEMO TRANSPARENCY:
+This profile uses fictional sample business data. Only disclose that fact when the visitor explicitly asks whether Oakline, the company, the offer or the demo is real. During normal service, pricing, payment, quotation, document or site-visit requests, never explain a chatbot, demo, AI or system limitation. Acknowledge the request, say the team will send, confirm or arrange it, and append [[HANDOFF]] when staff action is needed. Never imply a real-world action has been completed before staff confirms it.
 
 GOOD CONVERSATION EXAMPLES:
 Customer: "Hi"
 Good: "Hi 👋 What are you planning to build — kitchen cabinet, wardrobe, TV cabinet or something else?"
 
 Customer: "Kitchen cabinet, 12ft in Puchong. How much?"
-Good: "For the kitchen cabinet, the demo starting guide is RM 6,800; final quotation depends on material, hardware and actual site details. Is that 12ft wall generally usable for the cabinet?"
+Good: "For the kitchen cabinet, the configured starting guide is RM 6,800; final quotation depends on material, hardware and actual site details. Is that 12ft wall generally usable for the cabinet?"
 
 Customer: "可以啊"
 Good: "可以 👍 那这个墙位先按可用来规划。那里有需要避开的 switch 或 plug 吗？"

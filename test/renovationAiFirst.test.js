@@ -21,6 +21,7 @@ process.env.GEMINI_MODEL = "gemini-3.6-flash";
 process.env.GEMINI_FALLBACK_MODEL = "gemini-3.5-flash-lite";
 
 const ai = require("../src/aiService");
+const demoState = require("../src/demoState");
 const { OPENING_MESSAGE } = require("../src/renovationIntakeFlow");
 
 function successResponse(text) {
@@ -171,6 +172,51 @@ test("hard renovation technical handoffs still bypass the AI provider", async ()
   assert.equal(fetchCalls, 0);
   assert.match(reply, /site-specific technical check/i);
   assert.match(reply, /\[\[HANDOFF\]\]/);
+});
+
+test("reference-image requests are acknowledged naturally and flagged for staff fulfilment", async () => {
+  let fetchCalls = 0;
+  global.fetch = async () => {
+    fetchCalls += 1;
+    throw new Error("Gemini should not be called for a staff reference-image fulfilment request");
+  };
+
+  const reply = await ai.getReply([
+    { role: "user", content: "你可以发我一些图片看看吗" },
+  ], true);
+
+  assert.equal(fetchCalls, 0);
+  assert.match(reply, /团队会发一些参考图给你/);
+  assert.doesNotMatch(reply, /无法|不能|cannot|can't|unable/i);
+  assert.match(reply, /\[\[HANDOFF\]\]/);
+
+  const session = demoState.createSession({ ip: "reference-image-fulfilment-test" });
+  const stored = demoState.addAssistantMessage(session, reply);
+  assert.equal(session.needsAttention, true);
+  assert.match(session.attentionReason, /human assistance/i);
+  assert.doesNotMatch(stored.content, /\[\[HANDOFF\]\]/);
+  assert.match(stored.content, /团队会发一些参考图给你/);
+});
+
+test("customer-owned photos are not mistaken for outbound reference-image requests", async () => {
+  for (const content of ["我有照片", "saya ada gambar", "我可以发现场照片给你吗？"]) {
+    const precheck = ai._test.renovationRoutingPrecheckReply([{ role: "user", content }]);
+    assert.equal(precheck, null, `expected normal AI routing for: ${content}`);
+  }
+
+  let fetchCalls = 0;
+  global.fetch = async () => {
+    fetchCalls += 1;
+    return successResponse("可以，发给我就好 👍 我会按你发的现场照片和前面的尺寸继续看。 ");
+  };
+
+  const reply = await ai.getReply([
+    { role: "user", content: "我可以发现场照片给你吗？" },
+  ], true);
+
+  assert.equal(fetchCalls, 1);
+  assert.match(reply, /发给我就好/);
+  assert.doesNotMatch(reply, /\[\[HANDOFF\]\]/);
 });
 
 test("internal renovation state is a memory aid and explicitly yields to conversation meaning", () => {
