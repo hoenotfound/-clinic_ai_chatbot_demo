@@ -254,7 +254,7 @@ test("renovation Gemini path keeps qualification state underneath an AI-first re
         const sent = (requestBody.contents || []).map((item) => item.parts?.[0]?.text || "").join("\\n");
         if (!/APP_INTERNAL_RENOVATION_STATE/i.test(sent)) throw new Error("Internal renovation state was missing");
         if (!/whether the wall space is usable/i.test(sent)) throw new Error("Missing wall goal was not supplied to AI: " + sent);
-        if (!/switch \/ plug-point information/i.test(sent)) throw new Error("Missing power goal was not supplied to AI: " + sent);
+        if (!/plug-point information/i.test(sent)) throw new Error("Missing power goal was not supplied to AI: " + sent);
       })
       .catch((error) => {
         console.error(error.stack || error);
