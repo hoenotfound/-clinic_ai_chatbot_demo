@@ -22,6 +22,8 @@ function baseKitchenConversation() {
   ];
 }
 
+const COMPLETE_KITCHEN_CONSTRAINTS = "The wall is clear, no window, no door, 2 plug points, sink in the middle, no hob or hood, fridge on the right, no beam or column.";
+
 test("renovation intake starts with the requested site-details template for a generic greeting", () => {
   const reply = buildRenovationIntakeReply([{ role: "user", content: "Hi" }], { isFirstMessage: true });
   assert.equal(reply, "☀️Pls let us know :\n\nSite photo: \n\nRough size: \n\nLocation: \n\nThanks 👍");
@@ -57,6 +59,7 @@ test("after cabinet type the bot asks service-specific site constraints before a
   assert.match(reply, /sink\/water points/i);
   assert.match(reply, /hob\/hood/i);
   assert.match(reply, /fridge/i);
+  assert.match(reply, /beams\/columns/i);
   assert.doesNotMatch(reply, /budget range/i);
   assert.doesNotMatch(reply, BANNED_CUSTOMER_TERMS);
 });
@@ -69,12 +72,45 @@ test("one obstruction detail does not count as a complete site-condition answer"
   assert.match(plan.reply, /usable wall space/i);
   assert.match(plan.reply, /switches or plug points/i);
   assert.match(plan.reply, /sink\/water points/i);
+  assert.match(plan.reply, /hob\/hood/i);
+  assert.match(plan.reply, /fridge position/i);
+  assert.match(plan.reply, /beams\/columns/i);
   assert.doesNotMatch(plan.reply, /Preliminary advice/i);
+});
+
+test("kitchen advice waits for every site-condition group the bot asked about", () => {
+  const messages = baseKitchenConversation();
+  messages.push({ role: "user", content: "The wall is clear except 2 plug points and a sink in the middle. No window." });
+  const plan = buildRenovationIntakePlan(messages);
+  assert.equal(plan.adviceReply, null);
+  assert.match(plan.reply, /doors \/ door swing/i);
+  assert.match(plan.reply, /hob\/hood/i);
+  assert.match(plan.reply, /fridge position/i);
+  assert.match(plan.reply, /beams\/columns/i);
+});
+
+test("service-specific required constraints match the questions shown to customers", () => {
+  assert.deepEqual(
+    new Set(intakeHelpers.requiredConstraintGroups(["Kitchen Cabinets"])),
+    new Set(["wall", "window", "door", "power", "plumbing", "cooking", "fridge", "structure"])
+  );
+  assert.deepEqual(
+    new Set(intakeHelpers.requiredConstraintGroups(["Built-in Wardrobes"])),
+    new Set(["wall", "window", "door", "power", "structure", "aircon"])
+  );
+  assert.deepEqual(
+    new Set(intakeHelpers.requiredConstraintGroups(["TV Console & Living Room Carpentry"])),
+    new Set(["wall", "tv", "power", "window", "door", "aircon"])
+  );
+  assert.deepEqual(
+    new Set(intakeHelpers.requiredConstraintGroups(["Shoe Cabinet & Entrance Storage"])),
+    new Set(["wall", "door", "power", "db"])
+  );
 });
 
 test("complete kitchen constraints produce tailored preliminary advice and let the provider answer naturally", () => {
   const messages = baseKitchenConversation();
-  messages.push({ role: "user", content: "The wall is clear except 2 plug points and a sink in the middle. No window." });
+  messages.push({ role: "user", content: COMPLETE_KITCHEN_CONSTRAINTS });
   const plan = buildRenovationIntakePlan(messages);
   assert.equal(plan.reply, null);
   assert.ok(plan.adviceReply);
@@ -86,6 +122,7 @@ test("complete kitchen constraints produce tailored preliminary advice and let t
   assert.match(plan.adviceReply, /plywood/i);
   assert.match(plan.adviceReply, /aluminium/i);
   assert.match(plan.adviceReply, /budget range/i);
+  assert.doesNotMatch(plan.adviceReply, /beam\/column will affect/i);
   assert.doesNotMatch(plan.adviceReply, BANNED_CUSTOMER_TERMS);
   assert.equal(buildRenovationIntakeReply(messages), null);
 });
@@ -147,9 +184,38 @@ test("natural technical wording with a determiner is intercepted before intake a
   assert.doesNotMatch(reply, BANNED_CUSTOMER_TERMS);
 });
 
+test("technical precheck preserves Chinese and BM conversation language", () => {
+  const chinese = aiHelpers.renovationTechnicalPrecheckReply([
+    { role: "user", content: "承重墙可以敲吗？" },
+  ]);
+  assert.match(chinese, /实际现场|团队/);
+  assert.doesNotMatch(chinese, /site-specific technical check/i);
+  assert.match(chinese, /\[\[HANDOFF\]\]/);
+  assert.doesNotMatch(chinese, BANNED_CUSTOMER_TERMS);
+
+  const malay = aiHelpers.renovationTechnicalPrecheckReply([
+    { role: "user", content: "Boleh buat pendawaian sekali?" },
+  ]);
+  assert.match(malay, /site sebenar|Saya pass kepada team/i);
+  assert.match(malay, /\[\[HANDOFF\]\]/);
+});
+
+test("mentioning an existing designer does not trigger a human handoff", () => {
+  const plan = buildRenovationIntakePlan([
+    { role: "user", content: "My designer already gave me the layout, I need kitchen cabinets." },
+  ], { isFirstMessage: true });
+  assert.equal(plan.bypass, false);
+  assert.equal(plan.reply, OPENING_MESSAGE);
+
+  const humanPlan = buildRenovationIntakePlan([
+    { role: "user", content: "Can I speak to a human designer?" },
+  ], { isFirstMessage: true });
+  assert.equal(humanPlan.bypass, true);
+});
+
 test("service correction uses only the replacement scope for size and obstruction collection", () => {
   const messages = baseKitchenConversation();
-  messages.push({ role: "user", content: "The wall is clear except 2 plug points and a sink in the middle. No window." });
+  messages.push({ role: "user", content: COMPLETE_KITCHEN_CONSTRAINTS });
   messages.push({ role: "assistant", content: "Preliminary advice: kitchen direction noted." });
   messages.push({ role: "user", content: "Actually change kitchen cabinet to wardrobe, wardrobe around 8ft." });
   const plan = buildRenovationIntakePlan(messages);
@@ -163,7 +229,7 @@ test("service correction uses only the replacement scope for size and obstructio
 
 test("a renewed project after a genuine decline does not inherit old location or site facts", () => {
   const messages = baseKitchenConversation();
-  messages.push({ role: "user", content: "The wall is clear except 2 plug points and a sink in the middle. No window." });
+  messages.push({ role: "user", content: COMPLETE_KITCHEN_CONSTRAINTS });
   messages.push({ role: "assistant", content: "Preliminary advice: kitchen direction noted." });
   messages.push({ role: "user", content: "Not interested anymore." });
   messages.push({ role: "assistant", content: "No problem, we'll stop here." });
@@ -174,6 +240,23 @@ test("a renewed project after a genuine decline does not inherit old location or
   assert.equal(plan.state.hasLocation, false);
   assert.equal(plan.state.facts.groups.has("plumbing"), false);
   assert.match(plan.reply, /location/i);
+});
+
+test("an early budget is remembered and deterministic advice does not ask for it again", () => {
+  const messages = [
+    { role: "user", content: "Hi" },
+    { role: "assistant", content: OPENING_MESSAGE },
+    { role: "user", content: "Rough size: 12ft. Location: Puchong. Budget RM15k. No site photo." },
+    { role: "assistant", content: "Thanks 👍 What are you looking to do?" },
+    { role: "user", content: "Upper and lower kitchen cabinet" },
+    { role: "assistant", content: intakeHelpers.obstructionQuestion("en", ["Kitchen Cabinets"]) },
+    { role: "user", content: COMPLETE_KITCHEN_CONSTRAINTS },
+  ];
+  const plan = buildRenovationIntakePlan(messages);
+  assert.equal(plan.state.budgetKnown, true);
+  assert.ok(plan.adviceReply);
+  assert.match(plan.adviceReply, /budget you already shared/i);
+  assert.doesNotMatch(plan.adviceReply, /What budget range are you aiming for/i);
 });
 
 test("Chinese customer keeps Chinese while following the same adaptive site-first order", () => {

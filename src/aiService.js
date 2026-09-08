@@ -10,6 +10,7 @@ const {
 } = industry;
 const opsStats = require("./opsStats");
 const { createGeminiFailover } = require("./geminiFailover");
+const { establishedConversationLanguage } = require("./conversationLanguage");
 const { sanitizeRenovationCustomerReply } = require("./renovationCustomerLanguage");
 const {
   buildRenovationIntakeReply,
@@ -48,6 +49,13 @@ function latestUserText(messages) {
 
 function renovationTechnicalPrecheckReply(messages) {
   if (!RENOVATION_TECHNICAL_PRECHECK.test(latestUserText(messages))) return null;
+  const language = establishedConversationLanguage(messages, "en");
+  if (language === "zh") {
+    return "这个需要先看实际现场情况才能给准确意见，我不应该在聊天里直接判断。让我转给团队确认安全性和实际可行性。 [[HANDOFF]]";
+  }
+  if (language === "ms") {
+    return "Yang ini perlu semak keadaan site sebenar dulu sebelum bagi jawapan yang pasti. Saya tak patut agak dari chat, jadi saya pass kepada team untuk confirm keselamatan dan feasibility. [[HANDOFF]]";
+  }
   return "That needs a site-specific technical check before we advise anything definite. I’ll flag this for the team to review the actual wall/site condition and confirm what is safe and feasible. [[HANDOFF]]";
 }
 

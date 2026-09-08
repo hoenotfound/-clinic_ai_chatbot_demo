@@ -87,7 +87,7 @@ test("renovation profile stays industry-specific across customer view and the co
   await expect(page.locator("#messages")).toContainText("sink/water points");
   await expect(page.locator("#messages")).toContainText("beams/columns");
 
-  await sendCustomerMessage(page, "The wall is clear except 2 plug points and a sink in the middle. No window.");
+  await sendCustomerMessage(page, "The wall is clear, no window, no door, 2 plug points, sink in the middle, no hob or hood, fridge on the right, no beam or column.");
   await expect(page.locator("#messages")).toContainText("Preliminary advice");
   await expect(page.locator("#messages")).toContainText("melamine/MFC");
   await expect(page.locator("#messages")).toContainText("plywood");
