@@ -254,6 +254,17 @@ function handoffReply(language, reason = "quote") {
   return "Sure. I'll pass this to the renovation team so they can continue with the actual quotation or site-measurement arrangement. [[HANDOFF]]";
 }
 
+function mixedScopeHandoffReply(service, language) {
+  const label = serviceNameForLanguage(service, language);
+  if (language === "zh") {
+    return `${label}是这个示范已配置的木工项目，但你同时问到另一个没有配置的柜体或装修范围。我不应该自己猜有没有做，我帮你转给团队一起确认。 [[HANDOFF]]`;
+  }
+  if (language === "ms") {
+    return `${label} memang dalam scope yang dikonfigurasi, tapi anda juga tanya satu lagi jenis cabinet atau renovation yang tak dikonfigurasi. Saya tak patut teka, jadi saya pass kepada team untuk sahkan kedua-dua scope. [[HANDOFF]]`;
+  }
+  return `${label} is within the configured carpentry scope, but you also asked about another cabinet or renovation item that isn't configured here. I shouldn't guess whether it's covered, so I'll pass both scopes to the team to confirm. [[HANDOFF]]`;
+}
+
 function servicePriceReply(service, language, messages, contextText) {
   const next = nextQualificationQuestion(language, messages, contextText);
   const label = serviceNameForLanguage(service, language);
@@ -338,12 +349,17 @@ function buildFallbackReply(messages) {
   const allowBareScope = previousQuestionKind(messages) === "service";
   const directService = detectService(text, { allowBareScope });
   const serviceFinishQuestion = Boolean(directService && SERVICE_FINISH_PATTERN.test(text));
+  const unconfiguredScope = isUnconfiguredServiceRequest(text);
 
-  if (OUT_OF_SCOPE_PATTERN.test(text) && !serviceFinishQuestion) return handoffReply(language, "scope");
+  if (OUT_OF_SCOPE_PATTERN.test(text) && !serviceFinishQuestion) {
+    return directService ? mixedScopeHandoffReply(directService, language) : handoffReply(language, "scope");
+  }
   if (SITE_VISIT_PATTERN.test(text)) return handoffReply(language, "quote");
   if (QUOTE_INTENT_PATTERN.test(text)) return handoffReply(language, "quote");
   if (HUMAN_REQUEST_PATTERN.test(text)) return handoffReply(language, "human");
-  if (!directService && isUnconfiguredServiceRequest(text)) return handoffReply(language, "scope");
+  if (unconfiguredScope) {
+    return directService ? mixedScopeHandoffReply(directService, language) : handoffReply(language, "scope");
+  }
 
   const contextualBudget = detectContextualBudget(messages);
   if (contextualBudget) return budgetReply(contextualBudget, language, messages, contextText);
