@@ -78,7 +78,7 @@ test("production timeout switches away from the model without retrying another k
   assert.equal(gemini.keyCooldown("key-one", "gemini-3.6-flash"), null);
 });
 
-test("getReply routes one 3.6 timeout directly to 3.5 Flash-Lite and leaves 3.6 available for the next request", async () => {
+test("getReply routes one 3.6 timeout directly to 3.5 Flash-Lite and retries 3.6 on the next request", async () => {
   const previous = {
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     GEMINI_API_KEY_1: process.env.GEMINI_API_KEY_1,
@@ -94,34 +94,46 @@ test("getReply routes one 3.6 timeout directly to 3.5 Flash-Lite and leaves 3.6 
   process.env.GEMINI_FALLBACK_MODEL = "gemini-3.5-flash-lite";
 
   const calls = [];
+  let primaryAttempts = 0;
   const gemini = makeFailover(async (url, options) => {
     const key = options.headers["x-goog-api-key"];
     const model = url.includes("gemini-3.5-flash-lite") ? "gemini-3.5-flash-lite" : "gemini-3.6-flash";
     calls.push({ model, key });
 
     if (model === "gemini-3.6-flash") {
-      const error = new Error("Gemini key 1 timed out.");
-      error.code = "AI_REQUEST_TIMEOUT";
-      error.statusCode = 408;
-      throw error;
+      primaryAttempts += 1;
+      if (primaryAttempts === 1) {
+        const error = new Error("Gemini key 1 timed out.");
+        error.code = "AI_REQUEST_TIMEOUT";
+        error.statusCode = 408;
+        throw error;
+      }
+      return { candidates: [{ content: { parts: [{ text: "reply from 3.6" }] } }] };
     }
 
     return { candidates: [{ content: { parts: [{ text: "reply from 3.5 lite" }] } }] };
   });
 
   try {
-    const reply = await gemini.getReply(
+    const firstReply = await gemini.getReply(
       [{ role: "user", content: "hello" }],
       false,
       () => "deterministic fallback"
     );
+    assert.equal(firstReply, "reply from 3.5 lite");
+    assert.equal(gemini.modelCooldown("gemini-3.6-flash"), null);
 
-    assert.equal(reply, "reply from 3.5 lite");
+    const secondReply = await gemini.getReply(
+      [{ role: "user", content: "hello again" }],
+      false,
+      () => "deterministic fallback"
+    );
+    assert.equal(secondReply, "reply from 3.6");
     assert.deepEqual(calls, [
       { model: "gemini-3.6-flash", key: "key-one" },
       { model: "gemini-3.5-flash-lite", key: "key-one" },
+      { model: "gemini-3.6-flash", key: "key-one" },
     ]);
-    assert.equal(gemini.modelCooldown("gemini-3.6-flash"), null);
   } finally {
     restoreEnv(previous);
   }
