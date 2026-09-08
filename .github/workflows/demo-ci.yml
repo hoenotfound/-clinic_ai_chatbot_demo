@@ -41,6 +41,7 @@ jobs:
           node --check src/visitorAnalyticsPreload.js
           node --check src/renovationConfig.js
           node --check src/renovationFallback.js
+          node --check src/renovationAiContext.js
           node --check src/renovationIntakeFlow.js
           node --check src/renovationLeadState.js
           node --check src/renovationServiceDetection.js
@@ -64,6 +65,7 @@ jobs:
           node --check e2e/public-visual.spec.js
           node --check e2e/subpath.spec.js
           node --check e2e/renovation.spec.js
+          node --check test/renovationAiFirst.test.js
           node --check test/pr46RoutingHardening.test.js
       - name: Run clinic browser E2E tests
         run: npm run test:e2e
@@ -91,7 +93,7 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Run renovation regression tests
-        run: node --test test/renovationDemo.test.js test/renovationConversationContinuity.test.js test/pr45EdgeCases.test.js test/pr45FinalRenovationEdgeCases.test.js test/renovationCustomerLanguage.test.js test/renovationIntakeFlow.test.js test/pr46RoutingHardening.test.js
+        run: node --test test/renovationDemo.test.js test/renovationConversationContinuity.test.js test/pr45EdgeCases.test.js test/pr45FinalRenovationEdgeCases.test.js test/renovationCustomerLanguage.test.js test/renovationIntakeFlow.test.js test/renovationAiFirst.test.js test/pr46RoutingHardening.test.js
       - name: Check renovation-specific JavaScript syntax
         run: |
           node --check src/server.js
@@ -100,6 +102,7 @@ jobs:
           node --check src/demoState.js
           node --check src/renovationConfig.js
           node --check src/renovationFallback.js
+          node --check src/renovationAiContext.js
           node --check src/renovationIntakeFlow.js
           node --check src/renovationLeadState.js
           node --check src/renovationServiceDetection.js
@@ -113,6 +116,7 @@ jobs:
           node --check public/channel-experience.js
           node --check public/industry-experience.js
           node --check e2e/renovation.spec.js
+          node --check test/renovationAiFirst.test.js
           node --check test/pr46RoutingHardening.test.js
       - name: Run renovation browser E2E test
         run: npx playwright test e2e/renovation.spec.js
