@@ -242,6 +242,15 @@ function enhancePlan(plan) {
     return next;
   }
 
+  // Once the site-measurement close has been offered, qualification is finished.
+  // Let the AI continue naturally without falling back into old intake questions.
+  if (state.measurementReady && state.measurementOfferSent) {
+    next.adviceReply = null;
+    next.appendAfterAnswer = null;
+    next.reply = null;
+    return next;
+  }
+
   const readyForConstraints = state.sizeKnown && state.hasLocation && state.serviceNames?.length;
   if (readyForConstraints && state.missingConstraints.length) {
     const hasAnyConstraintInfo = state.facts.groups.size > 0 || state.facts.allClear;
