@@ -17,15 +17,120 @@ if (!SUPPORTED_PROVIDERS.has(provider)) {
   throw new Error(`Unknown AI_PROVIDER: ${provider}`);
 }
 
+let renovationDependencies = null;
+function loadRenovationDependencies() {
+  if (!renovationDependencies) {
+    const { establishedConversationLanguage } = require("./conversationLanguage");
+    const { sanitizeRenovationCustomerReply } = require("./renovationCustomerLanguage");
+    const {
+      buildRenovationIntakeReply,
+      buildRenovationIntakePlan,
+      ensureAdviceMarker,
+    } = require("./renovationIntakeFlow");
+    const { buildFallbackReply: buildRenovationFallbackReply } = require("./renovationFallback");
+    const { currentConversationContext } = require("./aiMemoryContext");
+    const {
+      renovationRoutingReason,
+      isTechnicalHandoffRequest,
+      sanitizeLegacyRoutingMessages,
+    } = require("./renovationRoutingIntent");
+    renovationDependencies = {
+      establishedConversationLanguage,
+      sanitizeRenovationCustomerReply,
+      buildRenovationIntakeReply,
+      buildRenovationIntakePlan,
+      ensureAdviceMarker,
+      buildRenovationFallbackReply,
+      currentConversationContext,
+      renovationRoutingReason,
+      isTechnicalHandoffRequest,
+      sanitizeLegacyRoutingMessages,
+    };
+  }
+  return renovationDependencies;
+}
+
+function activeRenovationDependencies() {
+  return industry.key === "renovation" ? loadRenovationDependencies() : null;
+}
+
+function customerReply(reply) {
+  const deps = activeRenovationDependencies();
+  return deps ? deps.sanitizeRenovationCustomerReply(reply) : reply;
+}
+
+function renovationIntakeReply(messages, { isFirstMessage = false } = {}) {
+  const deps = activeRenovationDependencies();
+  if (!deps) return null;
+  const reply = deps.buildRenovationIntakeReply(messages, { isFirstMessage });
+  return reply ? customerReply(reply) : null;
+}
+
+function renovationIntakePlan(messages, { isFirstMessage = false } = {}) {
+  const deps = activeRenovationDependencies();
+  if (!deps) return null;
+  return deps.buildRenovationIntakePlan(messages, { isFirstMessage });
+}
+
+function latestUserText(messages) {
+  for (let index = (messages || []).length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === "user") return String(messages[index].content || "").trim();
+  }
+  return "";
+}
+
+function routingHandoffReply(reason, language) {
+  if (reason === "human") {
+    if (language === "zh") return "可以，我帮您转给团队继续跟进。 [[HANDOFF]]";
+    if (language === "ms") return "Boleh, saya pass kepada team untuk sambung dengan anda. [[HANDOFF]]";
+    return "Sure, I’ll pass this to the team so a person can continue with you. [[HANDOFF]]";
+  }
+  if (reason === "scope") {
+    if (language === "zh") return "这个柜子类型不在目前 demo 已配置的项目里，我不想乱答。我帮您转给团队确认能不能做。 [[HANDOFF]]";
+    if (language === "ms") return "Jenis cabinet ini belum dikonfigurasi dalam demo, jadi saya tak nak teka. Saya pass kepada team untuk confirm sama ada mereka cover scope ini. [[HANDOFF]]";
+    return "That cabinet type is not configured in this demo, so I don’t want to guess. I’ll pass it to the team to confirm whether they cover that scope. [[HANDOFF]]";
+  }
+  if (language === "zh") {
+    return "这个需要先看实际现场情况才能给准确意见，我不应该在聊天里直接判断。让我转给团队确认安全性和实际可行性。 [[HANDOFF]]";
+  }
+  if (language === "ms") {
+    return "Yang ini perlu semak keadaan site sebenar dulu sebelum bagi jawapan yang pasti. Saya tak patut agak dari chat, jadi saya pass kepada team untuk confirm keselamatan dan feasibility. [[HANDOFF]]";
+  }
+  return "That needs a site-specific technical check before we advise anything definite. I’ll flag this for the team to review the actual wall/site condition and confirm what is safe and feasible. [[HANDOFF]]";
+}
+
+function renovationRoutingPrecheckReply(messages) {
+  const deps = loadRenovationDependencies();
+  const reason = deps.renovationRoutingReason(latestUserText(messages));
+  if (!reason) return null;
+  const language = deps.establishedConversationLanguage(messages, "en");
+  return routingHandoffReply(reason, language);
+}
+
+function renovationTechnicalPrecheckReply(messages) {
+  const deps = loadRenovationDependencies();
+  if (!deps.isTechnicalHandoffRequest(latestUserText(messages))) return null;
+  const language = deps.establishedConversationLanguage(messages, "en");
+  return routingHandoffReply("technical", language);
+}
+
 function enhancedSystemPrompt(isFirstMessage) {
   const basePrompt = buildSystemPrompt({ isFirstMessage });
   if (industry.key === "renovation") {
-    return `${basePrompt}\n\nSTRUCTURED RENOVATION SALES KNOWLEDGE:\nUse only the configured services and price guides above. Preserve known project context and never invent a final quotation.\n\nDETERMINISTIC RENOVATION HANDOFF RULES:\nFollow the handoff conditions above. Never invent site availability, booking confirmation or technical conclusions.`;
+    return `${basePrompt}\n\nCUSTOMER-FACING WORDING:\n- Do not use the words "carpentry" or "木工" when speaking to customers. These are internal scope terms and sound unnatural in normal Malaysian customer chat.\n- Ask about the actual cabinet type instead: upper/lower kitchen cabinet, wardrobe, TV cabinet, shoe cabinet or another cabinet type.\n- In Chinese, use 厨房吊柜/地柜、衣柜、电视柜、鞋柜 and natural terms such as 柜子 / 装修需求. Do not say 木工装修、木工项目、木工区域 or 全屋木工.\n\nSITE-FIRST SALES FLOW:\n- The deterministic intake layer tracks what information is still missing. Follow its order without turning the conversation into a rigid form.\n- If the customer's first message asks a real question, answer that question first. Do not ignore a price, material or service question just to show an intake template. For that first direct answer, do not add your own qualification question because the deterministic intake layer will append the correct next site question.\n- Site basics are: site photo if available, a usable rough size, and project location. A missing photo must never block the conversation.\n- Then identify what the customer wants to build: upper + lower kitchen cabinets, wardrobe, TV cabinet, shoe cabinet or another cabinet type.\n- Once scope and site basics are known, check practical site constraints relevant to that cabinet type. Do not repeat a full generic checklist if the customer has already answered part of it.\n- When the latest customer message completes the needed site constraints, the next reply MUST give specific preliminary advice using the facts they actually supplied before asking another qualification question. Start that reply with "Preliminary advice:", "初步建议：" or "Cadangan awal:" so the flow can recognise that advice was already given.\n- Use concrete facts naturally: e.g. a sink position should affect base-cabinet planning, plug points must remain accessible, a window affects upper-cabinet width/height, a fridge needs door/ventilation clearance, and a beam/column affects cabinet sectioning. Do not merely repeat the checklist back to them.\n- Never claim to see a photo unless its actual contents were provided to the model.\n- Material guidance is preliminary. Compare practical options according to budget, finish, moisture exposure and use; never claim one material is universally best.\n- Respect the newest scope correction. Do not reuse measurements or obstruction details from a rejected cabinet scope, and do not reuse old project facts after a genuinely ended enquiry is restarted.\n\nSTRUCTURED RENOVATION SALES KNOWLEDGE:\nUse only the configured services and price guides above. Preserve current project context and never invent a final quotation.\n\nDETERMINISTIC RENOVATION HANDOFF RULES:\nFollow the handoff conditions above. Never invent site availability, booking confirmation or technical conclusions.`;
   }
   return `${basePrompt}\n\nSTRUCTURED CONCERN-TO-TREATMENT KNOWLEDGE:\nUse these mappings as general front-desk guidance, never as a diagnosis or guarantee. If more than one service is mapped, explain why the categories differ and let a clinician decide suitability.\n${concernGuidanceForPrompt()}\n\nDETERMINISTIC BOOKING RULES:\n${bookingRulesForPrompt()}`;
 }
 
 function getFallbackReply(messages) {
+  const deps = activeRenovationDependencies();
+  if (deps) {
+    const fullMessages = deps.currentConversationContext()?.fullMessages;
+    const sourceMessages = Array.isArray(fullMessages) && fullMessages.length ? fullMessages : messages;
+    const routedMessages = deps.sanitizeLegacyRoutingMessages(sourceMessages);
+    return customerReply(deps.buildRenovationFallbackReply(routedMessages));
+  }
+
   const safetyReply = enforceSafetyRules(messages);
   if (safetyReply) return safetyReply;
   const ruleReply = enforceBookingRules(messages);
@@ -33,6 +138,33 @@ function getFallbackReply(messages) {
   const concernReply = buildConcernFallback(messages);
   if (concernReply) return concernReply;
   return buildFallbackReply(messages);
+}
+
+function plannedFallbackReply(messages, plan) {
+  if (!plan) return getFallbackReply(messages);
+  if (plan.adviceReply) {
+    if (plan.answerFirst && plan.directFallbackAnswer) {
+      return customerReply(`${plan.directFallbackAnswer}\n\n${plan.adviceReply}`);
+    }
+    return customerReply(plan.adviceReply);
+  }
+  if (plan.answerFirst && plan.directFallbackAnswer) return customerReply(plan.directFallbackAnswer);
+  return getFallbackReply(messages);
+}
+
+function finalizePlannedReply(reply, plan) {
+  let text = customerReply(reply);
+  if (!plan) return text;
+  if (plan.adviceReply) {
+    const deps = loadRenovationDependencies();
+    text = deps.ensureAdviceMarker(text, plan.state?.language || "en");
+    text = customerReply(text);
+  }
+  if (plan.appendAfterAnswer) {
+    const prompt = customerReply(plan.appendAfterAnswer);
+    if (prompt && !text.includes(prompt)) text = `${text}\n\n${prompt}`;
+  }
+  return text;
 }
 
 function fetchTimeoutMs() {
@@ -115,22 +247,32 @@ async function getReply(messages, isFirstMessage = false) {
   const startedAt = Date.now();
   try {
     const safetyReply = enforceSafetyRules(messages);
-    if (safetyReply) return safetyReply;
+    if (safetyReply) return customerReply(safetyReply);
 
     const ruleReply = enforceBookingRules(messages);
-    if (ruleReply) return ruleReply;
+    if (ruleReply) return customerReply(ruleReply);
+
+    if (industry.key === "renovation") {
+      const routingReply = renovationRoutingPrecheckReply(messages);
+      if (routingReply) return customerReply(routingReply);
+    }
+
+    const intakePlan = renovationIntakePlan(messages, { isFirstMessage });
+    if (intakePlan?.reply) return customerReply(intakePlan.reply);
+    if (intakePlan?.bypass) return getFallbackReply(messages);
 
     try {
-      if (provider === "mock") return getFallbackReply(messages);
-      if (provider === "claude") return await getClaudeReply(messages, isFirstMessage);
+      if (provider === "mock") return finalizePlannedReply(plannedFallbackReply(messages, intakePlan), intakePlan);
+      if (provider === "claude") return finalizePlannedReply(await getClaudeReply(messages, isFirstMessage), intakePlan);
       if (provider === "gemini") {
-        return await gemini.getReply(messages, isFirstMessage, () => getFallbackReply(messages));
+        const reply = await gemini.getReply(messages, isFirstMessage, () => plannedFallbackReply(messages, intakePlan));
+        return finalizePlannedReply(reply, intakePlan);
       }
       throw new Error(`Unknown AI_PROVIDER: ${provider}`);
     } catch (error) {
       console.error(`AI provider "${provider}" failed; using deterministic demo fallback:`, error);
       if (provider === "gemini") opsStats.recordDeterministicFallback("escaped_provider_error");
-      return getFallbackReply(messages);
+      return finalizePlannedReply(plannedFallbackReply(messages, intakePlan), intakePlan);
     }
   } finally {
     opsStats.recordLatency("ai_response", Date.now() - startedAt);
@@ -144,6 +286,14 @@ module.exports = {
   configured,
   _test: {
     enhancedSystemPrompt,
+    customerReply,
+    renovationIntakeReply,
+    renovationIntakePlan,
+    renovationRoutingPrecheckReply,
+    renovationTechnicalPrecheckReply,
+    plannedFallbackReply,
+    finalizePlannedReply,
+    loadRenovationDependencies,
     geminiThinkingConfig: gemini.thinkingConfig,
     buildGeminiRequest: gemini.buildRequest,
     getGeminiApiKeys: gemini.getApiKeys,

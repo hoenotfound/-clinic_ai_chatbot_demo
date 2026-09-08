@@ -5,7 +5,10 @@ const renovationConfig = {
   aiAssistantName: "Aiden",
   assistantName: "Aiden",
   location: "Klang Valley, Malaysia",
-  introMessage: "Hi, I'm Aiden from Oakline Demo Renovation & Carpentry! 😊",
+  // The renovation experience starts with the site-first intake template from
+  // renovationIntakeFlow. Keep the generic app intro blank so customers do not see
+  // an extra trade-jargon greeting before that template.
+  introMessage: "",
   consultation: "Complimentary initial project consultation; site measurement is arranged by the team when needed",
 
   hours: {

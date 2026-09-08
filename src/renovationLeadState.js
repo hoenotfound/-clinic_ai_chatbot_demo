@@ -1,12 +1,12 @@
 const { detectServices, detectCorrectedService } = require("./renovationServiceDetection");
 const { correctionTargetText, isGenuineRejection } = require("./renovationConversationIntent");
+const { detectKnownBudget } = require("./renovationBudgetContext");
+const { isExplicitHumanRequest, isTechnicalHandoffRequest } = require("./renovationRoutingIntent");
 
 const PRICE_PATTERN = /price|how much|cost|quotation|quote|budget|harga|berapa|kos|sebut harga|多少钱|多少錢|价格|價格|价钱|價錢|报价|報價|预算|預算/i;
 const BUDGET_QUESTION_PATTERN = /(?:do you (?:already )?have|what(?:'s| is)|how much).{0,30}\bbudget\b|\bbudget\b.{0,30}(?:range|in mind|roughly|approximately|around how much)|\bbudget\s*\?|\bbajet\b.{0,24}(?:berapa|range|anggaran)|(?:berapa|anggaran).{0,24}\bbajet\b|\bbajet\s*\?|(?:预算|預算).{0,12}(?:多少|几|幾|范围|範圍)|(?:多少|几|幾).{0,12}(?:预算|預算)|(?:预算|預算)\s*[?？]/i;
 const SITE_PATTERN = /site\s*(?:visit|measurement|measure)|come\s+(?:and\s+)?measure|come\s+measure|arrange\s+(?:a\s+)?measurement|home\s+visit|datang\s+ukur|ukur\s+rumah|上门量尺|上門量尺|现场测量|現場測量|量尺/i;
 const QUOTE_INTENT_PATTERN = /exact\s+(?:price|quote|quotation)|proper\s+(?:quote|quotation)|send\s+(?:me\s+)?(?:a\s+)?quote|prepare\s+(?:a\s+)?quotation|can\s+(?:you\s+)?quote|nak\s+quotation|mahu\s+quotation|buat\s+quotation|正式报价|正式報價|给我报价|給我報價|出报价|出報價/i;
-const HUMAN_REQUEST_PATTERN = /(?:speak|talk|chat|connect)\s+(?:me\s+)?(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:can|could)\s+i\s+(?:speak|talk)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:need|want)\s+(?:a\s+)?(?:human|designer|salesperson|project manager)|human\s+(?:please|pls)|真人|人工|转人工|轉人工|找设计师|找設計師|联系顾问|聯繫顧問|nak\s+cakap\s+dengan\s+(?:staff|designer|sales)|mahu\s+cakap\s+dengan\s+(?:staff|designer|sales)/i;
-const TECHNICAL_PATTERN = /load[- ]?bearing|structural|hack(?:ing)?\s+(?:wall|beam|column)|electrical|rewir(?:e|ing)|plumb(?:ing)?|waterproof(?:ing)?|gas\s+(?:pipe|line)|permit|authority|approval|承重墙|承重牆|敲墙|敲牆|电线|電線|水管|防水|kelulusan|struktur|pendawaian|paip/i;
 const MEASUREMENT_PATTERN = /\b\d+(?:\.\d+)?\s*(?:ft|feet|foot|mm|cm|m|meter|metre)s?\b|floor\s*plan|layout\s*plan|尺寸|尺|平面图|平面圖|ukuran|pelan/i;
 const FLOOR_PLAN_PATTERN = /floor\s*plan|layout\s*plan|平面图|平面圖|pelan/i;
 const MEASUREMENT_GROUP_PATTERN = /\b(?:both|all|each)\b|两个|兩個|全部|都|semua|kedua-dua/i;
@@ -245,6 +245,12 @@ function buildSummary({ services, siteMeasurementIntent, quotationIntent, humanR
   return `${parts.join("; ")}.`;
 }
 
+function activeConversationForLead(session, activeMessages) {
+  if (!activeMessages.length) return [];
+  const startIndex = (session.messages || []).indexOf(activeMessages[0]);
+  return startIndex >= 0 ? session.messages.slice(startIndex) : activeMessages;
+}
+
 function updateRenovationLead(session) {
   const messages = customerMessages(session);
 
@@ -277,6 +283,7 @@ function updateRenovationLead(session) {
 
   const carryPreviousProject = !freshAfterRenewal;
   const activeText = activeMessages.map((message) => message.content || "").join(" \n");
+  const activeConversation = activeConversationForLead(session, activeMessages);
   const services = resolveServices(
     activeMessages,
     carryPreviousProject ? (session.lead?.interests || []) : []
@@ -284,12 +291,12 @@ function updateRenovationLead(session) {
 
   const siteMeasurementIntent = !negative && SITE_PATTERN.test(activeText);
   const quotationIntent = !negative && QUOTE_INTENT_PATTERN.test(activeText);
-  const humanRequest = !negative && HUMAN_REQUEST_PATTERN.test(activeText);
-  const technicalHandoff = !negative && TECHNICAL_PATTERN.test(activeText);
+  const humanRequest = !negative && activeMessages.some((message) => isExplicitHumanRequest(message.content || ""));
+  const technicalHandoff = !negative && activeMessages.some((message) => isTechnicalHandoffRequest(message.content || ""));
   const bookingIntent = siteMeasurementIntent || quotationIntent;
   const askedPrice = !negative && PRICE_PATTERN.test(activeText);
   const budget = !negative
-    ? latestBudget(activeMessages, session) || (carryPreviousProject ? session.lead?.budget : null) || null
+    ? detectKnownBudget(activeConversation) || (carryPreviousProject ? session.lead?.budget : null) || null
     : session.lead?.budget || null;
   const propertyType = !negative
     ? latestDetected(activeMessages, detectPropertyType) || (carryPreviousProject ? session.lead?.propertyType : null) || null

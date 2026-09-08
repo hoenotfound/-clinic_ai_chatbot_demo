@@ -21,7 +21,7 @@ test("first-time industry chooser switches between isolated renovation and clini
   await picker.locator('[data-industry="renovation"]').click();
   await expect(page).toHaveURL(/industry=renovation/);
   await expect(page.getByRole("button", { name: "Switch demo industry" })).toContainText("Home Renovation & Carpentry");
-  await expect(page.locator(".experience-status strong")).toHaveText("Oakline Demo Renovation & Carpentry");
+  await expect(page.locator(".experience-status strong")).toHaveText("Oakline Demo Renovation");
   await expect(page.locator("#patientTab strong")).toHaveText("Customer View");
   await expect(page.locator("#dashboardTab strong")).toHaveText("Sales Dashboard");
 
