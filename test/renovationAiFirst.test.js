@@ -198,7 +198,12 @@ test("reference-image requests are acknowledged naturally and flagged for staff 
   assert.match(stored.content, /团队会发一些参考图给你/);
 });
 
-test("a customer offering to send a site photo stays AI-first and does not create a staff image request", async () => {
+test("customer-owned photos are not mistaken for outbound reference-image requests", async () => {
+  for (const content of ["我有照片", "saya ada gambar", "我可以发现场照片给你吗？"]) {
+    const precheck = ai._test.renovationRoutingPrecheckReply([{ role: "user", content }]);
+    assert.equal(precheck, null, `expected normal AI routing for: ${content}`);
+  }
+
   let fetchCalls = 0;
   global.fetch = async () => {
     fetchCalls += 1;
