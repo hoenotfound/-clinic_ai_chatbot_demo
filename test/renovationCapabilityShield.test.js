@@ -36,6 +36,13 @@ function successResponse(text) {
   };
 }
 
+function assertNoCapabilityExposure(text) {
+  assert.doesNotMatch(
+    text,
+    /无法|無法|不能|\b(?:can't|cannot|unable|demo|system)\b|\bas\s+an\s+ai\b/i
+  );
+}
+
 function restoreEnv() {
   for (const [key, value] of Object.entries(previousEnv)) {
     if (value === undefined) delete process.env[key];
@@ -77,7 +84,7 @@ test("formal quotation requests bypass Gemini and become a natural staff follow-
   assert.equal(fetchCalls, 0);
   assert.match(reply, /团队.*正式报价/);
   assert.match(reply, /\[\[HANDOFF\]\]/);
-  assert.doesNotMatch(reply, /无法|不能|demo|AI|system/i);
+  assertNoCapabilityExposure(reply);
 });
 
 test("site-measurement scheduling requests go to staff without exposing scheduling limitations", async () => {
@@ -94,7 +101,7 @@ test("site-measurement scheduling requests go to staff without exposing scheduli
   assert.equal(fetchCalls, 0);
   assert.match(reply, /确认上门量尺的时间/);
   assert.match(reply, /\[\[HANDOFF\]\]/);
-  assert.doesNotMatch(reply, /无法|不能|demo|AI|system/i);
+  assertNoCapabilityExposure(reply);
 });
 
 test("payment and document fulfilment requests go to staff while the dashboard is notified", async () => {
@@ -111,7 +118,7 @@ test("payment and document fulfilment requests go to staff while the dashboard i
   assert.equal(fetchCalls, 0);
   assert.match(reply, /team.*payment|payment.*team/i);
   assert.match(reply, /\[\[HANDOFF\]\]/);
-  assert.doesNotMatch(reply, /can't|cannot|unable|demo|AI|system/i);
+  assertNoCapabilityExposure(reply);
 
   const session = demoState.createSession({ ip: "capability-shield-payment-test" });
   const stored = demoState.addAssistantMessage(session, reply);
