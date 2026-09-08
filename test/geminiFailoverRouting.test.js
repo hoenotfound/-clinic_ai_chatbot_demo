@@ -44,7 +44,7 @@ test("model-level 404 stops key rotation immediately", async () => {
   assert.equal(gemini.modelCooldown("gemini-old")?.reason, "model_not_found");
 });
 
-test("timeout switches away from the model without retrying another key", async () => {
+test("production timeout switches away from the model without retrying another key", async () => {
   const calls = [];
   const gemini = makeFailover(async (_url, options) => {
     calls.push(options.headers["x-goog-api-key"]);
@@ -55,7 +55,14 @@ test("timeout switches away from the model without retrying another key", async 
   });
 
   await assert.rejects(
-    gemini.tryPrimary([{ role: "user", content: "hello" }], false, ["key-one", "key-two"], "gemini-3.6-flash"),
+    gemini.tryPrimary(
+      [{ role: "user", content: "hello" }],
+      false,
+      ["key-one", "key-two"],
+      "gemini-3.6-flash",
+      null,
+      { switchModelOnTimeout: true }
+    ),
     /timed out/i
   );
 
