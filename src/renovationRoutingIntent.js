@@ -88,8 +88,11 @@ function isTechnicalHandoffRequest(text) {
 
 function isReferenceImageRequest(text) {
   const value = String(text || "").trim();
-  if (!value || CUSTOMER_SENDING_IMAGE_PATTERN.test(value)) return false;
-  return REFERENCE_IMAGE_REQUEST_PATTERNS.some((pattern) => pattern.test(value));
+  if (!value) return false;
+  const outboundRequest = REFERENCE_IMAGE_REQUEST_PATTERNS.some((pattern) => pattern.test(value));
+  if (outboundRequest) return true;
+  if (CUSTOMER_SENDING_IMAGE_PATTERN.test(value)) return false;
+  return false;
 }
 
 function normalizeSupportedCabinetVariants(text) {
