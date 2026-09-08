@@ -290,8 +290,12 @@ function buildRenovationIntakePlan(messages, options = {}) {
   if (isStandaloneUnconfiguredCabinetRequest(latest)) return bypassPlan();
   const sourceMessages = sanitizeLegacyRoutingMessages(messages);
   const plan = enhancePlan(base.buildRenovationIntakePlan(sourceMessages, options));
+  const language = plan?.state?.language || "en";
   if (plan?.reply === base.OPENING_MESSAGE) {
-    plan.reply = fallbackOpening(plan.state?.language || "en");
+    plan.reply = fallbackOpening(language);
+  }
+  if (plan?.appendAfterAnswer === base.OPENING_MESSAGE) {
+    plan.appendAfterAnswer = fallbackOpening(language);
   }
   return plan;
 }
