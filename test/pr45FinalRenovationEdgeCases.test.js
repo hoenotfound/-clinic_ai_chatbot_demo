@@ -9,6 +9,9 @@ test("design-detail and appointment changes are not treated as full renovation r
   assert.equal(isGenuineRejection("I don't want handles, can do handleless kitchen cabinet?"), false);
   assert.equal(isGenuineRejection("I don't want glossy finish, I prefer matte"), false);
   assert.equal(isGenuineRejection("Cancel Saturday site measurement and reschedule"), false);
+  assert.equal(isGenuineRejection("I'm not interested in glossy finish, I prefer matte"), false);
+  assert.equal(isGenuineRejection("No thanks on handles, make it handleless"), false);
+  assert.equal(isGenuineRejection("Never mind Saturday, Sunday works"), false);
   assert.equal(isGenuineRejection("Not interested anymore, no thanks"), true);
 
   const detailSession = {
@@ -31,7 +34,7 @@ test("design-detail and appointment changes are not treated as full renovation r
     messages: [
       { role: "user", content: "I want kitchen cabinets" },
       { role: "assistant", content: "Do you have rough measurements?" },
-      { role: "user", content: "I don't want glossy finish, I prefer matte" },
+      { role: "user", content: "I'm not interested in glossy finish, I prefer matte" },
     ],
     lead: { interests: [] },
   };
@@ -44,7 +47,7 @@ test("design-detail and appointment changes are not treated as full renovation r
     messages: [
       { role: "user", content: "I want a site measurement for kitchen cabinets" },
       { role: "assistant", content: "The team can follow up on the measurement arrangement." },
-      { role: "user", content: "Cancel Saturday site measurement and reschedule" },
+      { role: "user", content: "Never mind Saturday, Sunday works" },
     ],
     lead: { interests: [] },
   };
@@ -83,6 +86,28 @@ test("one correction message can replace an old scope with multiple new configur
   assert.doesNotMatch(reply, /leave the renovation enquiry here/i);
 });
 
+test("natural change, switch-from and short cancel wording replace the old service", () => {
+  for (const correction of [
+    "change kitchen cabinet to wardrobe",
+    "switch from kitchen cabinet to wardrobe",
+    "cancel kitchen cabinet, want wardrobe",
+  ]) {
+    const session = {
+      messages: [
+        { role: "user", content: "Kitchen cabinet in Puchong condo, budget RM15k" },
+        { role: "assistant", content: "Noted." },
+        { role: "user", content: correction },
+      ],
+      lead: { interests: [] },
+    };
+
+    updateRenovationLead(session);
+    assert.deepEqual(session.lead.interests, ["Built-in Wardrobes"], correction);
+    assert.equal(session.lead.reducedInterest, false, correction);
+    assert.match(buildFallbackReply(session.messages), /wardrobe/i, correction);
+  }
+});
+
 test("measurements in the rejected part of a correction do not leak into the replacement scope", () => {
   const session = {
     messages: [
@@ -114,4 +139,71 @@ test("measurements in the rejected part of a correction do not leak into the rep
   updateRenovationLead(targetMeasurementSession);
   assert.deepEqual(targetMeasurementSession.lead.interests, ["Built-in Wardrobes"]);
   assert.equal(targetMeasurementSession.lead.measurementsKnown, true);
+});
+
+test("a renewed enquiry after a genuine decline starts with fresh project facts", () => {
+  const session = {
+    messages: [
+      { role: "user", content: "Kitchen cabinet in Puchong condo, 12ft, budget RM15k, weekend" },
+      { role: "assistant", content: "Noted." },
+      { role: "user", content: "Not interested anymore" },
+      { role: "assistant", content: "No problem, message us again if you need anything." },
+      { role: "user", content: "I want wardrobe" },
+    ],
+    lead: {
+      interests: ["Kitchen Cabinets"],
+      preferredBranch: "Cheras / Kajang / Puchong",
+      propertyType: "Condo / apartment",
+      budget: "RM15,000",
+      measurementsKnown: true,
+      measurementsByService: { "Kitchen Cabinets": true },
+      preferredTiming: "Weekend",
+      timelineMentioned: true,
+    },
+  };
+
+  updateRenovationLead(session);
+  assert.deepEqual(session.lead.interests, ["Built-in Wardrobes"]);
+  assert.equal(session.lead.reducedInterest, false);
+  assert.equal(session.lead.preferredBranch, null);
+  assert.equal(session.lead.propertyType, null);
+  assert.equal(session.lead.budget, null);
+  assert.equal(session.lead.measurementsKnown, false);
+  assert.equal(session.lead.measurementsByService["Built-in Wardrobes"], false);
+  assert.equal(session.lead.preferredTiming, null);
+  assert.equal(session.lead.timelineMentioned, false);
+
+  const reply = buildFallbackReply(session.messages);
+  assert.match(reply, /condo|landed|commercial/i);
+  assert.doesNotMatch(reply, /Puchong|RM15,000|12ft/i);
+});
+
+test("multi-scope measurement tracking asks for the still-unmeasured service", () => {
+  const session = {
+    messages: [
+      { role: "user", content: "Kitchen cabinet in Puchong condo, budget RM18k" },
+      { role: "assistant", content: "Noted." },
+      { role: "user", content: "I don't want kitchen cabinet. I want a 9ft wardrobe and shoe cabinet." },
+    ],
+    lead: { interests: [] },
+  };
+
+  updateRenovationLead(session);
+  assert.deepEqual(
+    session.lead.interests.sort(),
+    ["Built-in Wardrobes", "Shoe Cabinet & Entrance Storage"].sort()
+  );
+  assert.equal(session.lead.measurementsByService["Built-in Wardrobes"], true);
+  assert.equal(session.lead.measurementsByService["Shoe Cabinet & Entrance Storage"], false);
+  assert.equal(session.lead.measurementsKnown, false);
+
+  const reply = buildFallbackReply(session.messages);
+  assert.match(reply, /rough measurements.*Shoe Cabinet|floor plan.*Shoe Cabinet/i);
+
+  session.messages.push({ role: "assistant", content: reply });
+  session.messages.push({ role: "user", content: "shoe cabinet 4ft" });
+  updateRenovationLead(session);
+  assert.equal(session.lead.measurementsByService["Built-in Wardrobes"], true);
+  assert.equal(session.lead.measurementsByService["Shoe Cabinet & Entrance Storage"], true);
+  assert.equal(session.lead.measurementsKnown, true);
 });
