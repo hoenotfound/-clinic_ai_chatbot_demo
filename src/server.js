@@ -410,7 +410,7 @@ async function handleSessionAction(req, res, session, action) {
         await persistSession(session);
         return sendJson(res, 200, {
           session: state.publicSession(session),
-          aiReplied: !degraded,
+          aiReplied: replySource === "ai",
           degraded,
           replySource,
           promotion: showPromotion ? (business.promotion || null) : null,
