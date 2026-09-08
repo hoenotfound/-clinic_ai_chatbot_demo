@@ -11,6 +11,14 @@ const EXTRA_ALIASES = {
     "廚房櫃",
     "厨柜",
     "廚櫃",
+    "厨房吊柜",
+    "廚房吊櫃",
+    "厨房地柜",
+    "廚房地櫃",
+    "吊柜和地柜",
+    "吊櫃和地櫃",
+    "吊柜 + 地柜",
+    "吊櫃 + 地櫃",
     "aluminium cabinet",
     "aluminum cabinet",
     "aliminium cabinet",
@@ -61,7 +69,7 @@ const EXTRA_ALIASES = {
   ],
 };
 
-// Room-only words are useful short answers after the bot asks which carpentry area
+// Room-only words are useful short answers after the bot asks which cabinet area
 // the customer wants, but they are too broad to classify every mention of that room
 // as cabinetry. For example, "kitchen tiles" must not become a Kitchen Cabinets lead.
 const CONTEXTUAL_SCOPE_ALIASES = {
@@ -100,9 +108,6 @@ function termsFor(service) {
 function containsTerm(text, term) {
   const normalizedTerm = normalizeText(term);
   if (!normalizedTerm) return false;
-
-  // Use loose boundaries for Latin terms so "wardrobe" does not accidentally
-  // match inside another word. CJK phrases still use substring matching.
   if (/^[a-z0-9][a-z0-9 /&+.-]*$/i.test(normalizedTerm)) {
     const pattern = escapeRegex(normalizedTerm).replace(/\\ /g, "\\s+");
     return new RegExp(`(^|[^a-z0-9])${pattern}(?=$|[^a-z0-9])`, "i").test(text);
@@ -138,7 +143,6 @@ function contextualAliasMatches(text, term, allowBareScope) {
 function detectServiceObjects(text, { allowBareScope = false } = {}) {
   const normalized = normalizeText(text);
   if (!normalized) return [];
-
   const matches = [];
   for (const service of renovation.services) {
     const strongMatch = termsFor(service).some((term) => containsTerm(normalized, term));
@@ -164,7 +168,6 @@ function correctionSegments(text) {
   const normalized = normalizeText(text);
   if (!normalized) return null;
 
-  // Wanted service is on the left.
   for (const pattern of [
     /^(.+?)\s+instead\s+of\s+(.+)$/i,
     /^(.+?)\s+rather\s+than\s+(.+)$/i,
@@ -177,11 +180,10 @@ function correctionSegments(text) {
     if (match) return { targetText: normalizeText(match[1]), rejectedText: normalizeText(match[2]) };
   }
 
-  // Wanted service is on the right.
   for (const pattern of [
     /^(?:i|we)\s+(?:don['’]?t|do\s+not)\s+want\s+(.+?)(?:[,;.!?]+\s*|\s+but\s+)(?:but\s+)?(?:i|we)\s+(?:want|need)\s+(.+?)(?:\s+instead)?[.!?]*$/i,
     /^(?:cancel|drop|remove)\s+(.+?)(?:[,;.!?]+\s*|\s+but\s+)(?:but\s+)?(?:(?:i|we)\s+)?(?:want|need)\s+(.+?)(?:\s+instead)?[.!?]*$/i,
-    /^(?:change|switch)\s+(?:from\s+)?(.+?)\s+to\s+(.+?)[.!?]*$/i,
+    /^(?:(?:actually|sorry|wait|instead)[,;:]?\s+)?(?:change|switch)\s+(?:from\s+)?(.+?)\s+to\s+(.+?)[.!?]*$/i,
     /^(?:tak|tidak)\s+(?:nak|mahu)\s+(.+?)(?:[,;.!?]+\s*|\s+(?:tapi|tetapi)\s+)(?:(?:tapi|tetapi)\s+)?(?:saya\s+)?(?:nak|mahu)\s+(.+?)(?:\s+sebaliknya)?[.!?]*$/i,
     /^(?:not|bukan)\s+(.+?)(?:[,;.!?]+\s*|\s+(?:but|actually|instead|tapi|tetapi)\s+)(?:(?:but|actually|instead|tapi|tetapi)\s+)?(.+?)[.!?]*$/i,
     /^(?:不是|不要)\s*(.+?)[,，;。！？]\s*(?:而是|是|要|改做|改成)?\s*(.+)$/i,
@@ -190,7 +192,6 @@ function correctionSegments(text) {
     if (match) return { targetText: normalizeText(match[2]), rejectedText: normalizeText(match[1]) };
   }
 
-  // Direct switch/change wording where the previous service is omitted.
   for (const pattern of [
     /\b(?:switch|change)\s+(?:it\s+)?to\s+([^,.;!?]+)/i,
     /(?:改成|改做|换成|換成|应该是|應該是)\s*([^，。！？,!?]+)/i,
@@ -219,23 +220,13 @@ function correctionTargetText(text) {
 function isUnconfiguredServiceRequest(text) {
   const normalized = normalizeText(text);
   if (!normalized) return false;
-
-  // A specific unlisted cabinet/carpentry noun is already enough to represent a
-  // new scope in chat. This catches shorthand such as "bathroom vanity" or
-  // "office cabinets" and mixed shorthand such as "kitchen cabinets + bathroom vanity".
   if (UNCONFIGURED_SCOPE_PHRASE_PATTERN.test(normalized)) return true;
-
   if (!NEW_SCOPE_REQUEST_PATTERN.test(normalized)) return false;
 
   const configuredMatches = detectServiceObjects(normalized, { allowBareScope: false });
   if (configuredMatches.length) return false;
   if (!CARPENTRY_SCOPE_NOUN_PATTERN.test(normalized)) return false;
-
-  // Modification requests about the already-known cabinet are not new scope.
   if (KNOWN_SCOPE_REFERENCE_PATTERN.test(normalized) || EXISTING_SCOPE_DETAIL_PATTERN.test(normalized)) return false;
-
-  // Generic unlisted scope is only escalated when the customer clearly introduces
-  // an additional item; otherwise the bot can continue clarifying normally.
   return /\balso\b|也|另外|tambahan|juga/i.test(normalized);
 }
 
