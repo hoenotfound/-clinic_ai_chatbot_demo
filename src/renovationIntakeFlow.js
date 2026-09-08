@@ -32,8 +32,13 @@ const NEGATIVE_PATTERNS = {
 
 const SHORT_CONTEXT_ANSWER = /^(?:yes|yeah|yep|yup|can|can\s+use|usable|okay|ok|fine|all\s+good|no|none|nope|cannot|can['’]?t|not\s+usable|have|got|got\s+one|one|two|three|\d+|boleh|boleh\s+guna|ada|ada\s+satu|tak\s+ada|tiada|tak\s+boleh|ya|\u53ef\u4ee5(?:\u7684)?(?:\u554a|\u5440)?|\u53ef\u4ee5\u7528(?:\u554a|\u5440)?|\u80fd(?:\u7528)?(?:\u554a|\u5440)?|\u884c(?:\u7684)?(?:\u554a|\u5440)?|\u6709|\u6709\u7684|\u6ca1\u6709|\u6c92\u6709|\u4e0d\u53ef\u4ee5|\u4e0d\u80fd|\u6ca1\u95ee\u9898(?:\u554a|\u5440)?|\u6c92\u554f\u984c(?:\u554a|\u5440)?)[.!\uff01\u3002]?$/i;
 const POSITIVE_WALL_CONTEXT = /^(?:yes|yeah|yep|yup|can|can\s+use|usable|okay|ok|fine|all\s+good|boleh|boleh\s+guna|ya|\u53ef\u4ee5(?:\u7684)?(?:\u554a|\u5440)?|\u53ef\u4ee5\u7528(?:\u554a|\u5440)?|\u80fd(?:\u7528)?(?:\u554a|\u5440)?|\u884c(?:\u7684)?(?:\u554a|\u5440)?|\u6ca1\u95ee\u9898(?:\u554a|\u5440)?|\u6c92\u554f\u984c(?:\u554a|\u5440)?)[.!\uff01\u3002]?$/i;
-const MEASUREMENT_OFFER_PATTERN = /(?:would\s+you\s+like|want\s+me|shall\s+i|can\s+i|do\s+you\s+want).{0,100}(?:site\s*(?:measurement|visit)|measure)|(?:site\s*(?:measurement|visit)|measure).{0,100}(?:would\s+you\s+like|want\s+me|shall\s+i|can\s+i|do\s+you\s+want|arrange\s+it)|(?:要不要|需要我|要我|我可以|我帮你|我幫你).{0,36}(?:安排|转给|轉給|让团队|讓團隊).{0,24}(?:上门量尺|上門量尺|量尺|现场测量|現場測量)|(?:上门量尺|上門量尺|量尺|现场测量|現場測量).{0,36}(?:要不要|需要我|可以帮你|可以幫你|安排)|(?:nak\s+saya|mahu\s+saya|boleh\s+saya).{0,60}(?:arrange|atur|pass).{0,50}(?:site\s*measurement|site\s*visit|ukur)|(?:site\s*measurement|site\s*visit|ukur).{0,100}(?:nak\s+saya|mahu\s+saya|boleh\s+saya).{0,60}(?:arrange|atur|pass)/i;
-const MEASUREMENT_ACCEPT_PATTERN = /^(?:yes(?:\s+please)?|yeah|yep|yup|sure|okay|ok|can|please\s+do|go\s+ahead|let['’]?s\s+do\s+it|arrange\s+it|boleh|ya|boleh\s+atur|teruskan|可以(?:啊|呀|的)?|好(?:的|啊|呀)?|要|行|没问题|沒問題|安排吧)[.!！。]?$/i;
+const MEASUREMENT_TOPIC_PATTERN = /site\s*(?:measurement|visit)|come\s+(?:and\s+)?measure|measure\s+(?:the\s+)?(?:space|site|unit|place)|measurement|上门量尺|上門量尺|量尺|现场测量|現場測量|site\s*visit|datang\s+ukur|ukur\s+(?:site|rumah)/i;
+const MEASUREMENT_OFFER_ACTION_PATTERN = /(?:arrange|schedule|set\s*up|book|pass|send|get|ask).{0,90}(?:site\s*(?:measurement|visit)|measurement|measure)|(?:site\s*(?:measurement|visit)|measurement|measure).{0,90}(?:arrange|schedule|set\s*up|book|pass|send|get|ask)|(?:安排|转给|轉給|让团队|讓團隊|交给团队|交給團隊).{0,30}(?:上门量尺|上門量尺|量尺|现场测量|現場測量)|(?:上门量尺|上門量尺|量尺|现场测量|現場測量).{0,30}(?:安排|转给|轉給|团队|團隊)|(?:arrange|atur|pass).{0,60}(?:site\s*measurement|site\s*visit|ukur)|(?:site\s*measurement|site\s*visit|ukur).{0,60}(?:arrange|atur|pass)/i;
+const MEASUREMENT_OFFER_CTA_PATTERN = /would\s+you\s+like|want\s+me|shall\s+i|can\s+i|do\s+you\s+want|shall\s+we|want\s+us\s+to|要不要|需要我|要我|我帮你|我幫你|可以帮你|可以幫你|nak\s+saya|mahu\s+saya|boleh\s+saya/i;
+const MEASUREMENT_EXPLANATION_PATTERN = /(?:explain|tell\s+you|show\s+you).{0,40}(?:how|what).{0,30}(?:site\s*measurement|measurement|site\s*visit)|(?:how|what).{0,30}(?:site\s*measurement|measurement|site\s*visit).{0,30}(?:works?|means?)/i;
+const MEASUREMENT_ACCEPT_START_PATTERN = /^(?:yes|yeah|yep|yup|sure|okay|ok|can\b|please\s+do|go\s+ahead|let['’]?s\s+do\s+it|arrange\s+it|boleh\b|ya\b|teruskan\b|可以|好|要|行|没问题|沒問題|安排吧)/i;
+const MEASUREMENT_ACCEPT_NEGATION_PATTERN = /\b(?:not\s+now|not\s+yet|maybe|later|think\s+(?:about\s+it|first)|don['’]?t|do\s+not)\b|\b(?:tak|tidak|belum|nanti)\b|先不用|不要|考虑|考慮|再说|再說|迟点|遲點/i;
+const STRONG_BUYING_INTENT_PATTERN = /\b(?:ready\s+to\s+proceed|want\s+to\s+proceed|would\s+like\s+to\s+proceed|let['’]?s\s+(?:proceed|do\s+it|go\s+ahead)|go\s+ahead|move\s+forward|want\s+to\s+start|ready\s+to\s+start)\b|(?:想做|要做|可以做|继续做|繼續做|继续吧|繼續吧|开始吧|開始吧)|\b(?:nak|mahu)\s+(?:proceed|teruskan|mula)\b|\bteruskan\b/i;
 
 function lastUserText(messages) {
   for (let index = (messages || []).length - 1; index >= 0; index -= 1) {
@@ -59,14 +64,28 @@ function previousAssistantBeforeLatestUser(messages) {
   return "";
 }
 
+function isMeasurementOfferText(text) {
+  const value = String(text || "").trim();
+  if (!value || !MEASUREMENT_TOPIC_PATTERN.test(value)) return false;
+  const hasAction = MEASUREMENT_OFFER_ACTION_PATTERN.test(value);
+  const hasCta = MEASUREMENT_OFFER_CTA_PATTERN.test(value);
+  if (MEASUREMENT_EXPLANATION_PATTERN.test(value) && !(hasAction && hasCta)) return false;
+  return hasAction && hasCta;
+}
+
 function measurementOfferSent(messages) {
-  return (messages || []).some((message) => message?.role === "assistant" && MEASUREMENT_OFFER_PATTERN.test(String(message.content || "")));
+  return (messages || []).some((message) => message?.role === "assistant" && isMeasurementOfferText(message.content));
 }
 
 function measurementOfferAccepted(messages) {
   const latest = lastUserText(messages).trim();
-  if (!latest || !MEASUREMENT_ACCEPT_PATTERN.test(latest)) return false;
-  return MEASUREMENT_OFFER_PATTERN.test(previousAssistantBeforeLatestUser(messages));
+  if (!latest || latest.length > 160 || MEASUREMENT_ACCEPT_NEGATION_PATTERN.test(latest)) return false;
+  if (!MEASUREMENT_ACCEPT_START_PATTERN.test(latest)) return false;
+  return isMeasurementOfferText(previousAssistantBeforeLatestUser(messages));
+}
+
+function strongBuyingIntent(messages) {
+  return STRONG_BUYING_INTENT_PATTERN.test(lastUserText(messages));
 }
 
 function measurementCloseQuestion(language) {
@@ -233,6 +252,7 @@ function enhancePlan(plan) {
   state.measurementReady = Boolean(state.serviceNames?.length && state.sizeKnown && state.hasLocation && !state.missingConstraints.length);
   state.measurementOfferSent = measurementOfferSent(state.scopedMessages);
   state.measurementOfferAccepted = measurementOfferAccepted(state.scopedMessages);
+  state.strongBuyingIntent = strongBuyingIntent(state.scopedMessages);
   const next = { ...plan, state };
 
   if (state.measurementOfferAccepted) {
@@ -267,7 +287,7 @@ function enhancePlan(plan) {
     next.adviceReply = advice;
     return next;
   }
-  if (state.measurementReady && state.adviceSent && state.budgetKnown && !state.measurementOfferSent) {
+  if (state.measurementReady && state.adviceSent && (state.budgetKnown || state.strongBuyingIntent) && !state.measurementOfferSent) {
     next.adviceReply = null;
     next.appendAfterAnswer = null;
     next.reply = measurementCloseQuestion(state.language);
@@ -307,8 +327,10 @@ module.exports = {
     contextualConstraintFacts,
     budgetKnown,
     removeRepeatedBudgetQuestion,
+    isMeasurementOfferText,
     measurementOfferSent,
     measurementOfferAccepted,
+    strongBuyingIntent,
     measurementCloseQuestion,
     measurementHandoffReply,
   },
