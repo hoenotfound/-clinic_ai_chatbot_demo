@@ -40,11 +40,12 @@ const BENIGN_TECH_REPLACEMENTS = [
 ];
 
 const GENERIC_CABINET_DESCRIPTOR_WORDS = new Set([
-  "a", "an", "the", "my", "our", "this", "that", "same", "new", "custom", "some", "another",
+  "a", "an", "the", "my", "our", "this", "that", "same", "new", "custom", "some", "another", "any", "just",
   "i", "we", "you", "want", "need", "would", "like", "to", "ask", "asking", "enquire", "enquiry",
   "enquiries", "inquire", "inquiry", "inquiries", "question", "questions", "know", "learn", "more", "about",
   "looking", "for", "interested", "in", "can", "could", "do", "does", "make", "build", "provide", "offer",
-  "info", "information", "hi", "hello", "hey", "me", "us", "home", "house",
+  "info", "information", "hi", "hello", "hey", "me", "us", "home", "house", "have", "has", "had", "tell",
+  "regarding", "regards",
 ]);
 
 function isExplicitHumanRequest(text) {
