@@ -22,6 +22,9 @@ function qualificationTargets(state) {
     else targets.push(item);
   }
   if (!targets.length && !state.adviceSent) targets.push("useful preliminary advice");
+  if (!targets.length && state.measurementReady && !state.measurementOfferSent && state.strongBuyingIntent) {
+    targets.push("actively offer a site measurement now; do not block on budget");
+  }
   if (!targets.length && !state.budgetKnown) targets.push("budget, when commercially useful");
   if (!targets.length && state.measurementReady && !state.measurementOfferSent) {
     targets.push("actively offer a site measurement as the next useful step");
@@ -92,12 +95,14 @@ function buildRenovationAiContext(plan) {
     `Power / plugs: ${powerState}`,
     `Extra site facts volunteered: ${extras.length ? extras.join(", ") : "none recorded"}`,
     `Budget: ${state.budgetKnown ? "known in the conversation" : "not yet confirmed"}`,
+    `Strong buying intent in latest reply: ${state.strongBuyingIntent ? "yes" : "no"}`,
     `Preliminary advice already sent: ${state.adviceSent ? "yes" : "no"}`,
     `Site-measurement close readiness: ${state.measurementReady ? "ready — enough core project context exists" : "not ready yet"}`,
     `Site-measurement offer already made: ${state.measurementOfferSent ? "yes" : "no"}`,
     `Site-measurement offer accepted: ${state.measurementOfferAccepted ? "yes — hand off now" : "no"}`,
     `Conservative next goals: ${qualificationTargets(state).join("; ") || "continue naturally toward quotation/site measurement when appropriate"}`,
     "When measurement-ready, the sales goal is to move the customer toward a site measurement instead of endlessly collecting optional fields.",
+    "Strong buying intent can justify offering measurement before collecting budget. Budget is useful context, not a mandatory gate.",
     "Do not hand off merely because the lead is measurement-ready. Handoff happens after an explicit site-measurement request, exact/formal quotation request, human request, or clear acceptance of your site-measurement offer.",
     "The full conversation is the source of truth. This tracker is intentionally conservative and can lag behind natural language.",
     "If the latest customer reply clearly answers a question from context, accept it even when this tracker still says not confirmed.",
