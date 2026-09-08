@@ -6,7 +6,14 @@ const {
   isStandaloneUnconfiguredCabinetRequest,
   sanitizeLegacyRoutingMessages,
 } = require("./renovationRoutingIntent");
+const {
+  isMeasurementOfferText,
+  measurementOfferSent,
+  measurementOfferAccepted,
+  markMeasurementOffer,
+} = require("./renovationMeasurementIntent");
 
+const OPENING_MESSAGE = "Hi 👋 What are you planning to build — kitchen cabinet, wardrobe, TV cabinet, shoe cabinet, or something else?";
 const ALL_CLEAR_PATTERN = /no\s+(?:other\s+)?obstruction|nothing\s+(?:else|there)|all\s+clear|clear\s+all\s+the\s+way|tiada\s+halangan|tak\s+ada\s+halangan|dinding\s+kosong|\u6ca1\u6709(?:\u5176\u4ed6)?\u963b\u788d|\u6c92\u6709(?:\u5176\u4ed6)?\u963b\u7919|\u6574\u9762\u5899\u90fd\u53ef\u4ee5\u7528/i;
 
 const GROUP_PATTERNS = {
@@ -32,13 +39,16 @@ const NEGATIVE_PATTERNS = {
 
 const SHORT_CONTEXT_ANSWER = /^(?:yes|yeah|yep|yup|can|can\s+use|usable|okay|ok|fine|all\s+good|no|none|nope|cannot|can['’]?t|not\s+usable|have|got|got\s+one|one|two|three|\d+|boleh|boleh\s+guna|ada|ada\s+satu|tak\s+ada|tiada|tak\s+boleh|ya|\u53ef\u4ee5(?:\u7684)?(?:\u554a|\u5440)?|\u53ef\u4ee5\u7528(?:\u554a|\u5440)?|\u80fd(?:\u7528)?(?:\u554a|\u5440)?|\u884c(?:\u7684)?(?:\u554a|\u5440)?|\u6709|\u6709\u7684|\u6ca1\u6709|\u6c92\u6709|\u4e0d\u53ef\u4ee5|\u4e0d\u80fd|\u6ca1\u95ee\u9898(?:\u554a|\u5440)?|\u6c92\u554f\u984c(?:\u554a|\u5440)?)[.!\uff01\u3002]?$/i;
 const POSITIVE_WALL_CONTEXT = /^(?:yes|yeah|yep|yup|can|can\s+use|usable|okay|ok|fine|all\s+good|boleh|boleh\s+guna|ya|\u53ef\u4ee5(?:\u7684)?(?:\u554a|\u5440)?|\u53ef\u4ee5\u7528(?:\u554a|\u5440)?|\u80fd(?:\u7528)?(?:\u554a|\u5440)?|\u884c(?:\u7684)?(?:\u554a|\u5440)?|\u6ca1\u95ee\u9898(?:\u554a|\u5440)?|\u6c92\u554f\u984c(?:\u554a|\u5440)?)[.!\uff01\u3002]?$/i;
-const MEASUREMENT_TOPIC_PATTERN = /site\s*(?:measurement|visit)|come\s+(?:and\s+)?measure|measure\s+(?:the\s+)?(?:space|site|unit|place)|measurement|上门量尺|上門量尺|量尺|现场测量|現場測量|site\s*visit|datang\s+ukur|ukur\s+(?:site|rumah)/i;
-const MEASUREMENT_OFFER_ACTION_PATTERN = /(?:arrange|schedule|set\s*up|book|pass|send|get|ask).{0,90}(?:site\s*(?:measurement|visit)|measurement|measure)|(?:site\s*(?:measurement|visit)|measurement|measure).{0,90}(?:arrange|schedule|set\s*up|book|pass|send|get|ask)|(?:安排|转给|轉給|让团队|讓團隊|交给团队|交給團隊).{0,30}(?:上门量尺|上門量尺|量尺|现场测量|現場測量)|(?:上门量尺|上門量尺|量尺|现场测量|現場測量).{0,30}(?:安排|转给|轉給|团队|團隊)|(?:arrange|atur|pass).{0,60}(?:site\s*measurement|site\s*visit|ukur)|(?:site\s*measurement|site\s*visit|ukur).{0,60}(?:arrange|atur|pass)/i;
-const MEASUREMENT_OFFER_CTA_PATTERN = /would\s+you\s+like|want\s+me|shall\s+i|can\s+i|do\s+you\s+want|shall\s+we|want\s+us\s+to|要不要|需要我|要我|我帮你|我幫你|可以帮你|可以幫你|nak\s+saya|mahu\s+saya|boleh\s+saya/i;
-const MEASUREMENT_EXPLANATION_PATTERN = /(?:explain|tell\s+you|show\s+you).{0,40}(?:how|what).{0,30}(?:site\s*measurement|measurement|site\s*visit)|(?:how|what).{0,30}(?:site\s*measurement|measurement|site\s*visit).{0,30}(?:works?|means?)/i;
-const MEASUREMENT_ACCEPT_START_PATTERN = /^(?:yes|yeah|yep|yup|sure|okay|ok|can\b|please\s+do|go\s+ahead|let['’]?s\s+do\s+it|arrange\s+it|boleh\b|ya\b|teruskan\b|可以|好|要|行|没问题|沒問題|安排吧)/i;
-const MEASUREMENT_ACCEPT_NEGATION_PATTERN = /\b(?:not\s+now|not\s+yet|maybe|later|think\s+(?:about\s+it|first)|don['’]?t|do\s+not)\b|\b(?:tak|tidak|belum|nanti)\b|先不用|不要|考虑|考慮|再说|再說|迟点|遲點/i;
 const STRONG_BUYING_INTENT_PATTERN = /\b(?:ready\s+to\s+proceed|want\s+to\s+proceed|would\s+like\s+to\s+proceed|let['’]?s\s+(?:proceed|do\s+it|go\s+ahead)|go\s+ahead|move\s+forward|want\s+to\s+start|ready\s+to\s+start)\b|(?:想做|要做|可以做|继续做|繼續做|继续吧|繼續吧|开始吧|開始吧)|\b(?:nak|mahu)\s+(?:proceed|teruskan|mula)\b|\bteruskan\b/i;
+
+const SERVICE_REQUIRED_CONSTRAINTS = {
+  "Kitchen Cabinets": ["wall"],
+  "Built-in Wardrobes": ["wall"],
+  "TV Console & Living Room Carpentry": ["wall", "power"],
+  "Shoe Cabinet & Entrance Storage": ["wall"],
+  "Study, Display & Storage Cabinets": ["wall"],
+  "Full-Home Custom Carpentry": [],
+};
 
 function lastUserText(messages) {
   for (let index = (messages || []).length - 1; index >= 0; index -= 1) {
@@ -47,45 +57,14 @@ function lastUserText(messages) {
   return "";
 }
 
-function previousAssistantBeforeLatestUser(messages) {
-  const items = messages || [];
-  let latestUserIndex = -1;
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    if (items[index]?.role === "user") {
-      latestUserIndex = index;
-      break;
-    }
-  }
-  if (latestUserIndex < 0) return "";
-  for (let index = latestUserIndex - 1; index >= 0; index -= 1) {
-    if (items[index]?.role === "assistant") return String(items[index].content || "");
-    if (items[index]?.role === "user") break;
-  }
-  return "";
-}
-
-function isMeasurementOfferText(text) {
-  const value = String(text || "").trim();
-  if (!value || !MEASUREMENT_TOPIC_PATTERN.test(value)) return false;
-  const hasAction = MEASUREMENT_OFFER_ACTION_PATTERN.test(value);
-  const hasCta = MEASUREMENT_OFFER_CTA_PATTERN.test(value);
-  if (MEASUREMENT_EXPLANATION_PATTERN.test(value) && !(hasAction && hasCta)) return false;
-  return hasAction && hasCta;
-}
-
-function measurementOfferSent(messages) {
-  return (messages || []).some((message) => message?.role === "assistant" && isMeasurementOfferText(message.content));
-}
-
-function measurementOfferAccepted(messages) {
-  const latest = lastUserText(messages).trim();
-  if (!latest || latest.length > 160 || MEASUREMENT_ACCEPT_NEGATION_PATTERN.test(latest)) return false;
-  if (!MEASUREMENT_ACCEPT_START_PATTERN.test(latest)) return false;
-  return isMeasurementOfferText(previousAssistantBeforeLatestUser(messages));
-}
-
 function strongBuyingIntent(messages) {
   return STRONG_BUYING_INTENT_PATTERN.test(lastUserText(messages));
+}
+
+function fallbackOpening(language) {
+  if (language === "zh") return "你好 👋 你想做哪一种柜子？厨房柜、衣柜、电视柜、鞋柜，还是其他？";
+  if (language === "ms") return "Hi 👋 Anda nak buat cabinet apa — kitchen cabinet, wardrobe, TV cabinet, shoe cabinet atau yang lain?";
+  return OPENING_MESSAGE;
 }
 
 function measurementCloseQuestion(language) {
@@ -196,31 +175,37 @@ function refinedFacts(state) {
 }
 
 function requiredConstraintGroups(serviceNames) {
-  return (serviceNames || []).length ? ["wall", "power"] : [];
+  const services = [...new Set((serviceNames || []).filter(Boolean))];
+  if (!services.length || services.includes("Full-Home Custom Carpentry")) return [];
+  const required = new Set();
+  for (const service of services) {
+    for (const group of SERVICE_REQUIRED_CONSTRAINTS[service] || ["wall"]) required.add(group);
+  }
+  return [...required];
 }
 
 function missingConstraintGroups(serviceNames, facts) {
   return requiredConstraintGroups(serviceNames).filter((group) => !facts.groups.has(group));
 }
 
-function obstructionQuestion(language) {
-  if (language === "zh") return "好的。现在先确认两样就可以：这面墙的空间能不能用来做柜子？那里有没有 switch 或 plug？";
-  if (language === "ms") return "Baik. Dua benda saja buat masa ini: ruang dinding itu boleh guna untuk cabinet, dan ada switch atau plug point tak?";
-  return "Got it. Just two things for now: is the wall space usable for the cabinet, and are there any switches or plug points there?";
+function obstructionQuestion(language, missing = ["wall", "power"]) {
+  return missingConstraintQuestion(language, missing);
 }
 
 function missingConstraintQuestion(language, missing) {
   const needsWall = missing.includes("wall");
   const needsPower = missing.includes("power");
-  if (needsWall && needsPower) return obstructionQuestion(language);
   if (language === "zh") {
+    if (needsWall && needsPower) return "好的。这个位置先确认两样就可以：墙面空间能不能用？那里有没有 switch 或 plug？";
     if (needsWall) return "收到。再确认一下，这面墙的空间能不能用来做柜子？";
     return "收到。那里有没有 switch 或 plug？";
   }
   if (language === "ms") {
+    if (needsWall && needsPower) return "Baik. Dua benda saja buat masa ini: ruang dinding itu boleh guna untuk cabinet, dan ada switch atau plug point tak?";
     if (needsWall) return "Faham. Tinggal confirm ruang dinding itu boleh guna untuk cabinet atau tidak.";
     return "Faham. Ada switch atau plug point di situ tak?";
   }
+  if (needsWall && needsPower) return "Got it. Just two things for now: is the wall space usable for the cabinet, and are there any switches or plug points there?";
   if (needsWall) return "Got it. Is the wall space usable for the cabinet?";
   return "Got it. Are there any switches or plug points there?";
 }
@@ -273,8 +258,7 @@ function enhancePlan(plan) {
 
   const readyForConstraints = state.sizeKnown && state.hasLocation && state.serviceNames?.length;
   if (readyForConstraints && state.missingConstraints.length) {
-    const hasAnyConstraintInfo = state.facts.groups.size > 0 || state.facts.allClear;
-    const question = hasAnyConstraintInfo ? missingConstraintQuestion(state.language, state.missingConstraints) : obstructionQuestion(state.language);
+    const question = missingConstraintQuestion(state.language, state.missingConstraints);
     next.adviceReply = null;
     if (next.answerFirst) next.appendAfterAnswer = question;
     else next.reply = question;
@@ -290,7 +274,7 @@ function enhancePlan(plan) {
   if (state.measurementReady && state.adviceSent && (state.budgetKnown || state.strongBuyingIntent) && !state.measurementOfferSent) {
     next.adviceReply = null;
     next.appendAfterAnswer = null;
-    next.reply = measurementCloseQuestion(state.language);
+    next.reply = markMeasurementOffer(measurementCloseQuestion(state.language));
     return next;
   }
   if (next.adviceReply && state.budgetKnown) next.adviceReply = removeRepeatedBudgetQuestion(next.adviceReply, state.language);
@@ -305,7 +289,11 @@ function buildRenovationIntakePlan(messages, options = {}) {
   const latest = lastUserText(messages);
   if (isStandaloneUnconfiguredCabinetRequest(latest)) return bypassPlan();
   const sourceMessages = sanitizeLegacyRoutingMessages(messages);
-  return enhancePlan(base.buildRenovationIntakePlan(sourceMessages, options));
+  const plan = enhancePlan(base.buildRenovationIntakePlan(sourceMessages, options));
+  if (plan?.reply === base.OPENING_MESSAGE) {
+    plan.reply = fallbackOpening(plan.state?.language || "en");
+  }
+  return plan;
 }
 
 function buildRenovationIntakeReply(messages, options = {}) {
@@ -314,10 +302,13 @@ function buildRenovationIntakeReply(messages, options = {}) {
 
 module.exports = {
   ...base,
+  OPENING_MESSAGE,
   buildRenovationIntakeReply,
   buildRenovationIntakePlan,
   _test: {
     ...base._test,
+    OPENING_MESSAGE,
+    fallbackOpening,
     obstructionQuestion,
     requiredConstraintGroups,
     missingConstraintGroups,
