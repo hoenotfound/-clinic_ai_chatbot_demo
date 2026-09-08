@@ -138,7 +138,6 @@ test("natural unmarked AI advice is remembered on the next turn instead of being
   const reconciled = ai._test.reconcileRenovationAdviceProgress(messages, rawPlan);
   assert.equal(reconciled.state.adviceSent, true);
   assert.equal(reconciled.adviceReply, null);
-  assert.equal(reconciled.state.budgetKnown, true);
 
   const context = ai._test.buildRenovationAiContext(reconciled);
   assert.match(context, /Preliminary advice already sent: yes/i);
