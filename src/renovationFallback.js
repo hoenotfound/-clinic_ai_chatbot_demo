@@ -6,6 +6,7 @@ const {
   isUnconfiguredServiceRequest,
 } = require("./renovationServiceDetection");
 const { correctionTargetText, isGenuineRejection } = require("./renovationConversationIntent");
+const { resolveServices, measurementStateForServices } = require("./renovationLeadState");
 
 const HUMAN_REQUEST_PATTERN = /(?:speak|talk|chat|connect)\s+(?:me\s+)?(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:can|could)\s+i\s+(?:speak|talk)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:need|want)\s+(?:a\s+)?(?:human|designer|salesperson|project manager)|human\s+(?:please|pls)|真人|人工|转人工|轉人工|找设计师|找設計師|联系顾问|聯繫顧問|nak\s+cakap\s+dengan\s+(?:staff|designer|sales)|mahu\s+cakap\s+dengan\s+(?:staff|designer|sales)/i;
 const SITE_VISIT_PATTERN = /site\s*(?:visit|measurement|measure)|come\s+(?:and\s+)?measure|come\s+measure|measure\s+(?:my|the)\s+(?:house|home|unit|place)|arrange\s+(?:a\s+)?measurement|quotation\s+appointment|home\s+visit|上门量尺|上門量尺|量尺|现场测量|現場測量|datang\s+ukur|site\s+measurement|ukur\s+rumah/i;
@@ -40,6 +41,27 @@ function latestUserText(messages) {
 
 function conversationText(messages) {
   return userTexts(messages).join(" \n");
+}
+
+function activeConversationMessages(messages) {
+  const items = messages || [];
+  let latestUserIndex = -1;
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (items[index]?.role === "user") {
+      latestUserIndex = index;
+      break;
+    }
+  }
+  if (latestUserIndex < 0) return items;
+
+  // Once a customer genuinely ends an enquiry, a later renewed enquiry starts with
+  // fresh project facts. Keep assistant/user messages after that rejection so a new
+  // budget-only reply can still be interpreted from the immediately preceding question.
+  for (let index = latestUserIndex - 1; index >= 0; index -= 1) {
+    if (items[index]?.role !== "user") continue;
+    if (isGenuineRejection(items[index].content || "")) return items.slice(index + 1);
+  }
+  return items;
 }
 
 function languageOf(text) {
@@ -148,6 +170,14 @@ function detectKnownService(messages) {
   return null;
 }
 
+function resolvedKnownServiceNames(messages, extraNames = []) {
+  const userMessages = (messages || []).filter((message) => message.role === "user");
+  return [...new Set([
+    ...resolveServices(userMessages, []),
+    ...(extraNames || []).filter(Boolean),
+  ])];
+}
+
 function hasPropertyType(text) {
   return /condo(?:minium)?|apartment|service\s+residence|flat|landed|terrace|semi[- ]?d|bungalow|commercial|office|shop|retail|公寓|排屋|独立屋|獨立屋|rumah\s+landed/i.test(String(text || ""));
 }
@@ -166,25 +196,6 @@ function previousQuestionKind(messages) {
   if (TIMELINE_QUESTION_PATTERN.test(text)) return "timeline";
   if (SERVICE_QUESTION_PATTERN.test(text)) return "service";
   return null;
-}
-
-function currentScopeMeasurementText(messages, fallbackContextText) {
-  const items = messages || [];
-  let correctionIndex = -1;
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    if (items[index]?.role !== "user") continue;
-    if (detectCorrectedService(items[index].content || "")) {
-      correctionIndex = index;
-      break;
-    }
-  }
-  if (correctionIndex < 0) return fallbackContextText;
-
-  const userMessages = items.slice(correctionIndex).filter((message) => message.role === "user");
-  return userMessages.map((message, index) => {
-    const value = String(message.content || "");
-    return index === 0 ? correctionTargetText(value) : value;
-  }).join(" \n");
 }
 
 function serviceNameForLanguage(service, language) {
@@ -214,7 +225,15 @@ function priceGuideForLanguage(service, language) {
   return `From ${amount}`;
 }
 
-function questionFor(kind, language) {
+function questionFor(kind, language, serviceName = null) {
+  if (kind === "measurement" && serviceName) {
+    const service = renovation.services.find((item) => item.name === serviceName) || { name: serviceName };
+    const label = serviceNameForLanguage(service, language);
+    if (language === "zh") return `你有${label}的大概尺寸或 floor plan 吗？`;
+    if (language === "ms") return `Ada rough measurement atau floor plan untuk ${label} tak?`;
+    return `Do you have rough measurements or a floor plan for ${label}?`;
+  }
+
   const questions = {
     property: {
       zh: "你的房子是 condo、landed 还是 commercial？",
@@ -245,16 +264,27 @@ function questionFor(kind, language) {
   return questions[kind]?.[language] || questions[kind]?.en || null;
 }
 
-function nextQualificationQuestion(language, messages, contextText, { avoidKind = null } = {}) {
+function nextQualificationQuestion(language, messages, contextText, { avoidKind = null, serviceNames = [] } = {}) {
   const missing = [];
-  if (!hasPropertyType(contextText)) missing.push("property");
-  if (!hasArea(contextText)) missing.push("area");
-  if (!MEASUREMENT_PATTERN.test(currentScopeMeasurementText(messages, contextText))) missing.push("measurement");
-  if (!detectKnownBudget(messages)) missing.push("budget");
-  if (!TIMELINE_PATTERN.test(contextText)) missing.push("timeline");
+  if (!hasPropertyType(contextText)) missing.push({ kind: "property" });
+  if (!hasArea(contextText)) missing.push({ kind: "area" });
 
-  const kind = missing.find((item) => item !== avoidKind) || null;
-  return kind ? { kind, text: questionFor(kind, language) } : null;
+  const knownServiceNames = resolvedKnownServiceNames(messages, serviceNames);
+  if (knownServiceNames.length) {
+    const measurementState = measurementStateForServices(messages, knownServiceNames);
+    const missingMeasurementService = knownServiceNames.find((name) => !measurementState[name]);
+    if (missingMeasurementService) {
+      missing.push({ kind: "measurement", serviceName: missingMeasurementService });
+    }
+  } else if (!MEASUREMENT_PATTERN.test(contextText)) {
+    missing.push({ kind: "measurement" });
+  }
+
+  if (!detectKnownBudget(messages)) missing.push({ kind: "budget" });
+  if (!TIMELINE_PATTERN.test(contextText)) missing.push({ kind: "timeline" });
+
+  const item = missing.find((entry) => entry.kind !== avoidKind) || null;
+  return item ? { ...item, text: questionFor(item.kind, language, item.serviceName) } : null;
 }
 
 function handoffReply(language, reason = "quote") {
@@ -297,7 +327,7 @@ function mixedScopeHandoffReply(service, language) {
 }
 
 function servicePriceReply(service, language, messages, contextText) {
-  const next = nextQualificationQuestion(language, messages, contextText);
+  const next = nextQualificationQuestion(language, messages, contextText, { serviceNames: [service.name] });
   const label = serviceNameForLanguage(service, language);
   const guide = priceGuideForLanguage(service, language);
   if (language === "zh") return `${label}的参考价格${guide}。最后报价会看实际尺寸、材料、五金和设计细节。${next?.text || "如果你要拿正式报价，我可以继续帮你整理资料。"}`;
@@ -306,7 +336,7 @@ function servicePriceReply(service, language, messages, contextText) {
 }
 
 function genericServiceReply(service, language, messages, contextText) {
-  const next = nextQualificationQuestion(language, messages, contextText);
+  const next = nextQualificationQuestion(language, messages, contextText, { serviceNames: [service.name] });
   const label = serviceNameForLanguage(service, language);
   if (language === "zh") return `可以，先记下是${label}。${next?.text || "如果你要正式报价或量尺，我可以继续帮你转给团队。"}`;
   if (language === "ms") return `Boleh, saya dah catat ${label}. ${next?.text || "Kalau nak quotation atau site measurement, saya boleh terus pass kepada team."}`;
@@ -314,7 +344,9 @@ function genericServiceReply(service, language, messages, contextText) {
 }
 
 function multiServiceCorrectionReply(services, language, messages, contextText) {
-  const next = nextQualificationQuestion(language, messages, contextText);
+  const next = nextQualificationQuestion(language, messages, contextText, {
+    serviceNames: services.map((service) => service.name),
+  });
   const labels = services.map((service) => serviceNameForLanguage(service, language));
   const joined = labels.length > 1
     ? `${labels.slice(0, -1).join(", ")} ${language === "zh" ? "和" : language === "ms" ? "dan" : "and"} ${labels.at(-1)}`
@@ -327,7 +359,10 @@ function multiServiceCorrectionReply(services, language, messages, contextText) 
 
 function contextualServiceReply(service, language, messages, contextText, { correction = false } = {}) {
   const avoidKind = correction ? previousQuestionKind(messages) : null;
-  const next = nextQualificationQuestion(language, messages, contextText, { avoidKind });
+  const next = nextQualificationQuestion(language, messages, contextText, {
+    avoidKind,
+    serviceNames: [service.name],
+  });
   const label = serviceNameForLanguage(service, language);
 
   if (language === "zh") {
@@ -382,14 +417,15 @@ function avoidExactRepeat(reply, messages, language, knownService, contextText) 
 
 function buildFallbackReply(messages) {
   const text = latestUserText(messages);
-  const contextText = conversationText(messages);
   const language = conversationLanguage(messages);
 
   if (!text) return genericReply(language);
   if (COMPLAINT_PATTERN.test(text)) return handoffReply(language, "complaint");
   if (TECHNICAL_PATTERN.test(text)) return handoffReply(language, "technical");
 
-  const allowBareScope = previousQuestionKind(messages) === "service";
+  const activeMessages = activeConversationMessages(messages);
+  const contextText = conversationText(activeMessages);
+  const allowBareScope = previousQuestionKind(activeMessages) === "service";
   const correctedService = detectCorrectedService(text);
   const correctedServiceNames = correctedService ? detectServices(correctionTargetText(text)) : [];
   const correctedServiceObjects = correctedServiceNames
@@ -411,31 +447,31 @@ function buildFallbackReply(messages) {
     return directService ? mixedScopeHandoffReply(directService, language) : handoffReply(language, "scope");
   }
 
-  const contextualBudget = detectContextualBudget(messages);
-  if (contextualBudget) return budgetReply(contextualBudget, language, messages, contextText);
+  const contextualBudget = detectContextualBudget(activeMessages);
+  if (contextualBudget) return budgetReply(contextualBudget, language, activeMessages, contextText);
 
-  const knownService = directService || detectKnownService(messages);
+  const knownService = directService || detectKnownService(activeMessages);
 
   let reply;
   if (correctedServiceObjects.length > 1) {
-    reply = multiServiceCorrectionReply(correctedServiceObjects, language, messages, contextText);
+    reply = multiServiceCorrectionReply(correctedServiceObjects, language, activeMessages, contextText);
   } else if (knownService && PRICE_PATTERN.test(text)) {
-    reply = servicePriceReply(knownService, language, messages, contextText);
+    reply = servicePriceReply(knownService, language, activeMessages, contextText);
   } else if (directService) {
-    reply = genericServiceReply(directService, language, messages, contextText);
+    reply = genericServiceReply(directService, language, activeMessages, contextText);
   } else if (knownService && FRUSTRATION_PATTERN.test(text)) {
-    reply = contextualServiceReply(knownService, language, messages, contextText, { correction: true });
+    reply = contextualServiceReply(knownService, language, activeMessages, contextText, { correction: true });
   } else if (knownService) {
-    reply = contextualServiceReply(knownService, language, messages, contextText);
+    reply = contextualServiceReply(knownService, language, activeMessages, contextText);
   } else if (PRICE_PATTERN.test(text)) {
     if (language === "zh") reply = "可以先给你价格方向，不过木工最后报价需要看项目、尺寸和材料。你主要想做哪一个木工区域？";
     else if (language === "ms") reply = "Boleh bagi price direction dulu, tapi quotation akhir carpentry kena tengok scope, ukuran dan material. Anda nak buat scope carpentry mana dulu?";
     else reply = "I can give you a price direction first, but the final carpentry quote depends on scope, measurements and materials. Which carpentry area are you planning first?";
   } else {
-    reply = genericReply(language, FRUSTRATION_PATTERN.test(text) || previousQuestionKind(messages) === "service");
+    reply = genericReply(language, FRUSTRATION_PATTERN.test(text) || previousQuestionKind(activeMessages) === "service");
   }
 
-  return avoidExactRepeat(reply, messages, language, knownService, contextText);
+  return avoidExactRepeat(reply, activeMessages, language, knownService, contextText);
 }
 
 module.exports = { buildFallbackReply };
