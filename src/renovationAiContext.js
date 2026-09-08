@@ -10,9 +10,9 @@ function factGroups(state) {
 function qualificationTargets(state) {
   if (!state) return [];
   const targets = [];
+  if (!state.serviceNames?.length) targets.push("cabinet type / scope");
   if (!state.sizeKnown) targets.push("rough size");
   if (!state.hasLocation) targets.push("project location");
-  if (!state.serviceNames?.length) targets.push("cabinet type / scope");
   for (const item of state.missingConstraints || []) {
     if (item === "wall") targets.push("whether the wall space is usable");
     else if (item === "power") targets.push("switch / plug-point information");
