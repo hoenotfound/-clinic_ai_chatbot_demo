@@ -1,10 +1,9 @@
 const FORMAL_QUOTE_PATTERNS = [
-  /\b(?:send|prepare|provide|issue|email|whatsapp|make|give)\b[^.!?]{0,60}\b(?:formal|official|final|proper|detailed)?\s*(?:quotation|quote)\b/i,
-  /\b(?:can|could|may)\s+i\s+(?:get|have|receive)\b[^.!?]{0,50}\b(?:quotation|quote)\b/i,
+  /\b(?:send|prepare|issue|email|whatsapp|make)\b[^.!?]{0,60}\b(?:quotation|quote)\b/i,
   /\b(?:formal|official|final|proper|detailed)\s+(?:quotation|quote)\b/i,
   /\b(?:quotation|quote)\s+(?:pdf|file|document)\b/i,
-  /(?:正式|完整|final).{0,4}(?:报价单|報價單|quotation)|(?:发|發|给|給|出|做|准备|準備).{0,12}(?:报价单|報價單|quotation)|(?:报价单|報價單|quotation).{0,10}(?:吗|嗎|可以|能不能|发|發|给|給)/i,
-  /\b(?:hantar|bagi|sediakan|buat|keluarkan)\b[^.!?]{0,40}\b(?:quotation|sebut\s+harga)\b|\b(?:quotation|sebut\s+harga)\s+(?:rasmi|final)\b|\b(?:boleh|dapat)\s+saya\s+(?:dapat|terima)\b[^.!?]{0,30}\b(?:quotation|sebut\s+harga)\b/i,
+  /(?:正式|完整|final).{0,4}(?:报价单|報價單|quotation)|(?:发|發|给|給|出|做|准备|準備).{0,12}(?:报价单|報價單)|(?:报价单|報價單).{0,10}(?:吗|嗎|可以|能不能|发|發|给|給)/i,
+  /\b(?:hantar|sediakan|buat|keluarkan)\b[^.!?]{0,40}\b(?:quotation|sebut\s+harga)\b|\b(?:quotation|sebut\s+harga)\s+(?:rasmi|final)\b/i,
 ];
 
 const SITE_MEASUREMENT_PATTERNS = [
@@ -39,13 +38,14 @@ const CAPABILITY_DISCLOSURE_PATTERNS = [
   /\b(?:i|we)\s+(?:can(?:not|'t)|am\s+unable\s+to|are\s+unable\s+to|am\s+not\s+able\s+to|are\s+not\s+able\s+to)\s+(?:directly\s+)?(?:send|share|attach|upload|email|create|generate|issue|book|schedule|reserve|process|access)\b/i,
   /\b(?:i|we)\s+(?:do\s+not|don't)\s+have\s+(?:the\s+)?(?:ability|capability|access)\b/i,
   /\b(?:this|the)\s+(?:chat|demo|system|assistant)\s+(?:can(?:not|'t)|does(?:n't|\s+not))\b/i,
-  /\b(?:i|we)\s+(?:do\s+not|don't)\s+know(?:\s+(?:that|this|the)\s+(?:information|answer|details?)|\s+(?:the\s+)?(?:answer|information|details?))?[.!?]*$/i,
-  /\b(?:i\s+am|i'm)\s+not\s+sure(?:\s+about\s+that)?[.!?]*$/i,
+  /\b(?:i|we)\s+(?:do\s+not|don't)\s+know\b/i,
+  /\b(?:i\s+am|i'm)\s+not\s+sure\b/i,
   /(?:作为|身为)\s*AI/i,
   /(?:我|这里|這裡|这个聊天|這個聊天|这个系统|這個系統).{0,10}(?:无法|無法|不能).{0,16}(?:发送|發送|提供|上传|上傳|安排|预约|預約|确认|確認|处理|處理|访问|存取)/i,
-  /我(?:不知道|不确定|不確定)[。.!?？]*$|我(?:没有|沒有)(?:这个|這個|相关|相關)?(?:资料|資料|信息|資訊)/i,
+  /我(?:不知道|不确定|不確定)/i,
+  /我(?:没有|沒有)(?:这个|這個|相关|相關)?(?:资料|資料|信息|資訊)/i,
   /\bsaya\s+(?:tak|tidak)\s+(?:boleh|dapat)\s+(?:hantar|share|lampir|upload|buat|keluarkan|atur|tempah|proses|akses)\b/i,
-  /\bsaya\s+(?:tak|tidak)\s+(?:pasti|tahu)(?:\s+tentang\s+itu)?[.!?]*$/i,
+  /\bsaya\s+(?:tak|tidak)\s+(?:pasti|tahu)\b/i,
   /\b(?:sistem|chat|demo)\s+ini\s+(?:tak|tidak)\s+(?:boleh|dapat)\b/i,
 ];
 
@@ -66,9 +66,35 @@ function hasCapabilityDisclosure(reply) {
   return matchesAny(reply, CAPABILITY_DISCLOSURE_PATTERNS);
 }
 
+function stripCapabilityDisclosure(reply) {
+  const value = String(reply || "").trim();
+  if (!value) return "";
+
+  const sentences = value.match(/[^.!?。！？\n]+(?:[.!?。！？]+|$)/g) || [value];
+  const kept = [];
+
+  for (const sentence of sentences) {
+    const trimmed = sentence.trim();
+    if (!trimmed) continue;
+    if (!hasCapabilityDisclosure(trimmed)) {
+      kept.push(trimmed);
+      continue;
+    }
+
+    const fragments = trimmed.split(/\b(?:but|however)\b|(?:但是|但|不过|不過)|\b(?:tapi|namun)\b/i);
+    for (const fragment of fragments) {
+      const safe = fragment.trim().replace(/^[,;，；\s]+|[,;，；\s]+$/g, "");
+      if (safe.length >= 12 && !hasCapabilityDisclosure(safe)) kept.push(safe);
+    }
+  }
+
+  return kept.join(" ").replace(/\s+/g, " ").trim();
+}
+
 module.exports = {
   staffActionReason,
   hasCapabilityDisclosure,
+  stripCapabilityDisclosure,
   _test: {
     FORMAL_QUOTE_PATTERNS,
     SITE_MEASUREMENT_PATTERNS,
