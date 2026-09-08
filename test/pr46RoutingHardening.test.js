@@ -213,7 +213,7 @@ test("a price-first enquiry still asks for budget later when no real budget was 
   assert.match(plan.adviceReply, /What budget range are you aiming for/i);
 });
 
-test("renovation Gemini path keeps adaptive intake orchestration around a mocked provider reply", () => {
+test("renovation Gemini path keeps qualification state underneath an AI-first reply", () => {
   const repoRoot = path.resolve(__dirname, "..");
   const script = `
     process.env.DEMO_INDUSTRY = "renovation";
@@ -221,16 +221,18 @@ test("renovation Gemini path keeps adaptive intake orchestration around a mocked
     process.env.GEMINI_API_KEY_1 = "routing-test-key";
     delete process.env.GEMINI_API_KEY_2;
     delete process.env.GEMINI_API_KEY;
-    process.env.GEMINI_MODEL = "gemini-2.5-flash";
-    process.env.GEMINI_FALLBACK_MODEL = "gemini-2.5-flash-lite";
+    process.env.GEMINI_MODEL = "gemini-3.6-flash";
+    process.env.GEMINI_FALLBACK_MODEL = "gemini-3.5-flash-lite";
     process.env.GEMINI_RETRY_DELAY_MS = "0";
     process.env.GEMINI_ATTEMPT_TIMEOUT_MS = "200";
     process.env.GEMINI_FALLBACK_ATTEMPT_TIMEOUT_MS = "200";
     process.env.GEMINI_FAILOVER_BUDGET_MS = "800";
 
     let calls = 0;
-    global.fetch = async () => {
+    let requestBody = null;
+    global.fetch = async (_url, options) => {
       calls += 1;
+      requestBody = JSON.parse(options.body);
       return {
         ok: true,
         status: 200,
@@ -244,10 +246,15 @@ test("renovation Gemini path keeps adaptive intake orchestration around a mocked
       .then((reply) => {
         if (calls !== 1) throw new Error("Expected one mocked Gemini call, got " + calls);
         if (!/RM\\s*6,800/i.test(reply)) throw new Error("Gemini answer was not preserved: " + reply);
-        if (!/wall space usable/i.test(reply)) throw new Error("Usable-wall site question was not appended: " + reply);
-        if (!/switches or plug points/i.test(reply)) throw new Error("Power-point site question was not appended: " + reply);
-        if (/sink\\/water points|hob\\/hood|fridge|beams\\/columns/i.test(reply)) throw new Error("Old long site checklist leaked into the reply: " + reply);
+        if (/wall space usable|switches or plug points/i.test(reply)) throw new Error("Deterministic questionnaire was appended to the AI reply: " + reply);
         if (/Site photo:/i.test(reply)) throw new Error("Known size/location should not reset to opening template: " + reply);
+        if (!requestBody) throw new Error("Gemini request body was not captured");
+        const prompt = requestBody.systemInstruction?.parts?.[0]?.text || "";
+        if (!/AI-FIRST RENOVATION OVERRIDE/i.test(prompt)) throw new Error("AI-first instructions were missing");
+        const sent = (requestBody.contents || []).map((item) => item.parts?.[0]?.text || "").join("\\n");
+        if (!/APP_INTERNAL_RENOVATION_STATE/i.test(sent)) throw new Error("Internal renovation state was missing");
+        if (!/whether the wall space is usable/i.test(sent)) throw new Error("Missing wall goal was not supplied to AI: " + sent);
+        if (!/switch \/ plug-point information/i.test(sent)) throw new Error("Missing power goal was not supplied to AI: " + sent);
       })
       .catch((error) => {
         console.error(error.stack || error);
@@ -269,6 +276,7 @@ test("clinic startup does not eagerly load renovation-only conversation modules"
     process.env.AI_PROVIDER = "mock";
     require("./src/aiService");
     const forbidden = [
+      "renovationAiContext.js",
       "renovationIntakeFlow.js",
       "renovationIntakeFlowBase.js",
       "renovationCustomerLanguage.js",
