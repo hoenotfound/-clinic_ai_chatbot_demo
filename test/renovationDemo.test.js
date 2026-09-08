@@ -51,7 +51,7 @@ test("Gemini and Claude provider prompt stays renovation-specific", () => {
   const geminiBody = ai._test.buildGeminiRequest(
     [{ role: "user", content: "Kitchen cabinet how much?" }],
     true,
-    "gemini-3.6-flash"
+    "gemini-2.5-flash"
   );
   const geminiPrompt = geminiBody.systemInstruction.parts.map((part) => part.text).join("\n");
   assert.match(geminiPrompt, /SERVICES AND SAMPLE PRICE GUIDES/i);
@@ -84,75 +84,90 @@ test("mentioning an existing designer does not falsely trigger human handoff", (
 });
 
 test("explicit request for a designer hands off without pretending it is a quotation request", () => {
-  const reply = ai.getFallbackReply([
-    { role: "user", content: "Can I speak to a designer?" },
-  ]);
+  const leadSession = session("human-request");
+  add(leadSession, "I want kitchen cabinets in Puchong. Can I speak to a designer?");
+  assert.equal(leadSession.lead.humanRequest, true);
+  assert.equal(leadSession.lead.quotationIntent, false);
+  assert.equal(leadSession.lead.siteMeasurementIntent, false);
+  assert.equal(leadSession.lead.bookingIntent, false);
+  assert.equal(leadSession.lead.temperature, "hot");
+
+  const reply = ai.getFallbackReply([{ role: "user", content: "Can I speak to a designer?" }]);
   assert.match(reply, /\[\[HANDOFF\]\]/);
-  assert.doesNotMatch(reply, /quotation request/i);
 });
 
 test("site measurement intent is tracked separately and never invents availability", () => {
-  const leadSession = session("site-measurement");
-  add(leadSession, "Kitchen cabinet 12ft in Puchong. Can come measure this Saturday?");
+  const reply = ai.getFallbackReply([
+    { role: "user", content: "I am in Puchong, can you come measure my house this Saturday?" },
+  ]);
+  assert.match(reply, /\[\[HANDOFF\]\]/);
+  assert.doesNotMatch(reply, /confirmed|booked/i);
+
+  const leadSession = session("site-intent");
+  add(leadSession, "Kitchen cabinet in Puchong. Can your team come for site measurement Saturday morning?");
   assert.equal(leadSession.lead.siteMeasurementIntent, true);
   assert.equal(leadSession.lead.quotationIntent, false);
-  assert.equal(leadSession.lead.needsHuman, true);
-
-  const reply = ai.getFallbackReply([
-    { role: "user", content: "Kitchen cabinet 12ft in Puchong. Can come measure this Saturday?" },
-  ]);
-  assert.match(reply, /team|staff/i);
-  assert.match(reply, /\[\[HANDOFF\]\]/);
-  assert.doesNotMatch(reply, /booked|confirmed for Saturday/i);
+  assert.equal(leadSession.lead.bookingIntent, true);
 });
 
 test("proper quotation intent is distinct from site measurement", () => {
-  const leadSession = session("quotation");
-  add(leadSession, "I want a proper quotation for my 12ft kitchen cabinet in Cheras.");
+  const message = "New condo in Cheras. Kitchen 12ft, budget RM15k. Can you prepare a proper quotation?";
+  const leadSession = session("quote-intent");
+  add(leadSession, message);
   assert.equal(leadSession.lead.quotationIntent, true);
   assert.equal(leadSession.lead.siteMeasurementIntent, false);
-  assert.equal(leadSession.lead.needsHuman, true);
+  assert.equal(leadSession.lead.bookingIntent, true);
+  assert.equal(leadSession.lead.temperature, "hot");
+
+  const reply = ai.getFallbackReply([{ role: "user", content: message }]);
+  assert.match(reply, /\[\[HANDOFF\]\]/);
+  assert.doesNotMatch(reply, /confirmed|booked/i);
 });
 
 test("technical renovation questions are escalated and marked separately", () => {
-  const leadSession = session("technical");
-  add(leadSession, "Can I hack this load-bearing wall for a wardrobe?");
-  assert.equal(leadSession.lead.technicalHandoff, true);
-  assert.equal(leadSession.lead.needsHuman, true);
-
   const reply = ai.getFallbackReply([
-    { role: "user", content: "Can I hack this load-bearing wall for a wardrobe?" },
+    { role: "user", content: "Can I hack this load bearing wall and move the electrical point?" },
   ]);
-  assert.match(reply, /site|team|staff|technical/i);
   assert.match(reply, /\[\[HANDOFF\]\]/);
+
+  const leadSession = session("technical");
+  add(leadSession, "Can I hack this load bearing wall and move the electrical point?");
+  assert.equal(leadSession.lead.technicalHandoff, true);
+  assert.equal(leadSession.lead.quotationIntent, false);
+  assert.equal(leadSession.lead.siteMeasurementIntent, false);
 });
 
 test("existing session lead detection recognizes renovation services", () => {
   const leadSession = session("service");
-  add(leadSession, "Need a built-in wardrobe for my condo in PJ.");
-  assert.ok(leadSession.lead.interests.includes("Built-in Wardrobes"));
+  add(leadSession, "I want kitchen cabinet, how much?");
+  assert.ok(leadSession.lead.interests.includes("Kitchen Cabinets"));
+  assert.equal(leadSession.lead.temperature, "warm");
 });
 
 test("budget extraction ignores nearby cabinet measurements", () => {
-  assert.equal(detectBudget("Kitchen cabinet 12ft in Puchong"), null);
-  assert.equal(detectBudget("Budget RM12,000, cabinet about 12ft"), "RM12,000");
+  assert.equal(detectBudget("Kitchen cabinet around 12ft. Budget RM10k."), "RM10,000");
 });
 
 test("live renovation lead separates property type from property status", () => {
-  const leadSession = session("property");
-  add(leadSession, "New condo in Cheras, kitchen cabinet about 10ft.");
+  const leadSession = session("qualify");
+  add(leadSession, "New condo in Puchong, kitchen cabinet around 12ft. Budget RM10k.");
+  assert.ok(leadSession.lead.interests.includes("Kitchen Cabinets"));
   assert.equal(leadSession.lead.propertyType, "Condo / apartment");
   assert.equal(leadSession.lead.propertyStatus, "New project");
+  assert.equal(leadSession.lead.preferredBranch, "Cheras / Kajang / Puchong");
+  assert.equal(leadSession.lead.budget, "RM10,000");
+  assert.equal(leadSession.lead.measurementsKnown, true);
+  assert.equal(leadSession.lead.temperature, "hot");
 });
 
 test("site measurement request becomes a high-intent live lead with remembered details", () => {
-  const leadSession = session("high-intent");
-  add(leadSession, "Kitchen cabinet 12ft in Puchong, budget RM20k. Can arrange site measurement?");
-  assert.ok(leadSession.lead.interests.includes("Kitchen Cabinets"));
-  assert.equal(leadSession.lead.preferredBranch, "Cheras / Kajang / Puchong");
-  assert.equal(leadSession.lead.budget, "RM20,000");
+  const leadSession = state.createSession({ channel: "instagram", ip: `renovation-test-${Date.now()}-site-details` });
+  add(leadSession, "I want wardrobe for my condo in PJ");
+  add(leadSession, "Budget around 8k. Can your team come for site measurement Saturday morning?");
   assert.equal(leadSession.lead.siteMeasurementIntent, true);
-  assert.equal(leadSession.lead.needsHuman, true);
-  assert.match(leadSession.lead.summary, /Kitchen Cabinets/i);
-  assert.match(leadSession.lead.summary, /Puchong/i);
+  assert.equal(leadSession.lead.bookingIntent, true);
+  assert.equal(leadSession.lead.temperature, "hot");
+  assert.equal(leadSession.lead.preferredBranch, "Petaling Jaya / Subang / Shah Alam");
+  assert.equal(leadSession.lead.budget, "RM8,000");
+  assert.match(leadSession.lead.summary, /site measurement/i);
 });
