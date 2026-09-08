@@ -12,6 +12,7 @@ const FLOOR_PLAN_PATTERN = /floor\s*plan|layout\s*plan|平面图|平面圖|pelan
 const MEASUREMENT_GROUP_PATTERN = /\b(?:both|all|each)\b|两个|兩個|全部|都|semua|kedua-dua/i;
 const MEASUREMENT_CLAUSE_SPLIT_PATTERN = /\s*(?:[,;]|\+|&)\s*|\s+(?:and|dan)\s+|(?:以及|还有|還有|和)/i;
 const TIMELINE_PATTERN = /move\s*in|moving|collect(?:ed|ing)?\s+keys?|get(?:ting)?\s+keys?|handover|complete\s+by|finish\s+by|next\s+(?:week|month)|this\s+(?:week|month)|within\s+\d+\s+(?:week|weeks|month|months)|baru\s+dapat\s+kunci|dapat\s+kunci|nak\s+siap|pindah|拿钥匙|拿鑰匙|交房|入住|搬家|完工/i;
+const RENEWED_INTEREST_PATTERN = /\b(?:change(?:d)?\s+(?:my|our)\s+mind|let['’]?s\s+(?:proceed|continue|go ahead)|(?:i|we)\s+(?:want|would like|wanna)\s+to\s+(?:proceed|continue|go ahead)|(?:please\s+)?(?:proceed|go ahead|continue|resume)(?:\s+(?:with\s+)?(?:it|this|the project))?)\b|(?:tukar|ubah|berubah)\s+fikiran|(?:nak|mahu)\s+(?:teruskan|proceed)|\bteruskan\b|改变主意|改變主意|继续做|繼續做|继续吧|繼續吧|可以继续|可以繼續/i;
 
 function customerMessages(session) {
   return (session.messages || []).filter((message) => message.role === "user");
@@ -127,7 +128,12 @@ function hasRenewedInterest(messages, negativeIndex) {
   if (negativeIndex < 0) return true;
   return messages.slice(negativeIndex + 1).some((message) => {
     const text = message.content || "";
-    return detectServices(text).length || PRICE_PATTERN.test(text) || SITE_PATTERN.test(text) || QUOTE_INTENT_PATTERN.test(text);
+    if (isGenuineRejection(text)) return false;
+    return detectServices(text).length ||
+      PRICE_PATTERN.test(text) ||
+      SITE_PATTERN.test(text) ||
+      QUOTE_INTENT_PATTERN.test(text) ||
+      RENEWED_INTEREST_PATTERN.test(text);
   });
 }
 
@@ -188,6 +194,17 @@ function measurementStateForServices(messages, services, { initialState = {} } =
       continue;
     }
 
+    const messageMentions = detectServices(text, { allowBareScope: true })
+      .filter((name) => serviceNames.includes(name));
+    const groupedMeasurementForAll = serviceNames.length > 1 &&
+      MEASUREMENT_GROUP_PATTERN.test(text) &&
+      MEASUREMENT_PATTERN.test(text) &&
+      serviceNames.every((name) => messageMentions.includes(name));
+    if (groupedMeasurementForAll) {
+      for (const name of serviceNames) state[name] = true;
+      continue;
+    }
+
     let lastMentioned = [];
     const clauses = String(text).split(MEASUREMENT_CLAUSE_SPLIT_PATTERN).filter(Boolean);
     for (const clause of clauses) {
@@ -196,12 +213,12 @@ function measurementStateForServices(messages, services, { initialState = {} } =
       if (mentioned.length) lastMentioned = mentioned;
       if (!MEASUREMENT_PATTERN.test(clause)) continue;
 
-      if (mentioned.length) {
+      if (serviceNames.length > 1 && MEASUREMENT_GROUP_PATTERN.test(clause)) {
+        for (const name of serviceNames) state[name] = true;
+      } else if (mentioned.length) {
         for (const name of mentioned) state[name] = true;
       } else if (serviceNames.length === 1) {
         state[serviceNames[0]] = true;
-      } else if (MEASUREMENT_GROUP_PATTERN.test(clause)) {
-        for (const name of serviceNames) state[name] = true;
       } else if (lastMentioned.length === 1) {
         state[lastMentioned[0]] = true;
       }
