@@ -1,9 +1,11 @@
 const renovation = require("./renovationConfig");
 const {
   detectService,
+  detectServices,
   detectCorrectedService,
   isUnconfiguredServiceRequest,
 } = require("./renovationServiceDetection");
+const { correctionTargetText, isGenuineRejection } = require("./renovationConversationIntent");
 
 const HUMAN_REQUEST_PATTERN = /(?:speak|talk|chat|connect)\s+(?:me\s+)?(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:can|could)\s+i\s+(?:speak|talk)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|staff|designer|sales(?:person)?|project manager)|(?:need|want)\s+(?:a\s+)?(?:human|designer|salesperson|project manager)|human\s+(?:please|pls)|真人|人工|转人工|轉人工|找设计师|找設計師|联系顾问|聯繫顧問|nak\s+cakap\s+dengan\s+(?:staff|designer|sales)|mahu\s+cakap\s+dengan\s+(?:staff|designer|sales)/i;
 const SITE_VISIT_PATTERN = /site\s*(?:visit|measurement|measure)|come\s+(?:and\s+)?measure|come\s+measure|measure\s+(?:my|the)\s+(?:house|home|unit|place)|arrange\s+(?:a\s+)?measurement|quotation\s+appointment|home\s+visit|上门量尺|上門量尺|量尺|现场测量|現場測量|datang\s+ukur|site\s+measurement|ukur\s+rumah/i;
@@ -12,7 +14,6 @@ const TECHNICAL_PATTERN = /load[- ]?bearing|structural|hack(?:ing)?\s+(?:wall|be
 const OUT_OF_SCOPE_PATTERN = /\b(?:tiles?|tiling|floor(?:ing)?|paint(?:ing)?|ceiling|plaster(?:ing)?|wallpaper|masonry|wet\s*works?|bathroom\s+renovation|toilet\s+renovation|kitchen\s+renovation|jubin|lantai|siling|renovasi\s+(?:dapur|bilik\s+air))\b|瓷砖|瓷磚|地砖|地磚|地板|油漆|天花|墙纸|牆紙|泥水|厨房(?:装修|裝修|翻新)|廚房(?:裝修|翻新)|厕所(?:装修|裝修)|廁所裝修|浴室(?:装修|裝修)/i;
 const SERVICE_FINISH_PATTERN = /\b(?:paint(?:ed)?|spray[- ]paint(?:ed)?|lacquer(?:ed)?)\s+(?:finish(?:es)?|colour|color|cabinet|door)|\b(?:finish|colour|color)\s+(?:with\s+)?(?:paint|spray[- ]paint|lacquer)|烤漆|喷漆|噴漆|油漆(?:面|柜门|櫃門|finish|颜色|顏色)/i;
 const COMPLAINT_PATTERN = /complaint|refund|defect|damage|poor workmanship|wrong colour|wrong color|not happy|very disappointed|投诉|投訴|退款|瑕疵|做坏|做壞|rosak|aduan/i;
-const NEGATIVE_PATTERN = /not interested|no longer interested|never ?mind|don['’]?t want|do not want|cancel|no thanks|tak berminat|tidak berminat|tak nak|tidak mahu|tak jadi|tidak jadi|batal|不要了|不想做|没兴趣|沒興趣|算了|取消/i;
 const PRICE_PATTERN = /price|how much|cost|quotation|quote|budget|harga|berapa|kos|sebut harga|多少钱|多少錢|价格|價格|价钱|價錢|报价|報價|预算|預算/i;
 const BUDGET_QUESTION_PATTERN = /(?:do you (?:already )?have|what(?:'s| is)|how much).{0,30}\bbudget\b|\bbudget\b.{0,30}(?:range|in mind|roughly|approximately|around how much)|\bbudget\s*\?|\bbajet\b.{0,24}(?:berapa|range|anggaran)|(?:berapa|anggaran).{0,24}\bbajet\b|\bbajet\s*\?|(?:预算|預算).{0,12}(?:多少|几|幾|范围|範圍)|(?:多少|几|幾).{0,12}(?:预算|預算)|(?:预算|預算)\s*[?？]/i;
 const MEASUREMENT_PATTERN = /\b\d+(?:\.\d+)?\s*(?:ft|feet|foot|mm|cm|m|meter|metre)s?\b|floor\s*plan|layout\s*plan|尺寸|平面图|平面圖|ukuran|pelan/i;
@@ -178,11 +179,12 @@ function currentScopeMeasurementText(messages, fallbackContextText) {
     }
   }
   if (correctionIndex < 0) return fallbackContextText;
-  return items
-    .slice(correctionIndex)
-    .filter((message) => message.role === "user")
-    .map((message) => String(message.content || ""))
-    .join(" \n");
+
+  const userMessages = items.slice(correctionIndex).filter((message) => message.role === "user");
+  return userMessages.map((message, index) => {
+    const value = String(message.content || "");
+    return index === 0 ? correctionTargetText(value) : value;
+  }).join(" \n");
 }
 
 function serviceNameForLanguage(service, language) {
@@ -311,6 +313,18 @@ function genericServiceReply(service, language, messages, contextText) {
   return `Yes, I've got ${label} as the project. ${next?.text || "If you want a proper quotation or site measurement, I can pass this to the team."}`;
 }
 
+function multiServiceCorrectionReply(services, language, messages, contextText) {
+  const next = nextQualificationQuestion(language, messages, contextText);
+  const labels = services.map((service) => serviceNameForLanguage(service, language));
+  const joined = labels.length > 1
+    ? `${labels.slice(0, -1).join(", ")} ${language === "zh" ? "和" : language === "ms" ? "dan" : "and"} ${labels.at(-1)}`
+    : labels[0];
+
+  if (language === "zh") return `好的，我把项目改成${joined}，两个范围都记下了。${next?.text || "如果你要正式报价或量尺，我可以继续帮你转给团队。"}`;
+  if (language === "ms") return `Baik, saya tukar scope kepada ${joined}. Kedua-dua scope sudah dicatat. ${next?.text || "Kalau nak quotation atau site measurement, saya boleh pass kepada team."}`;
+  return `Got it, I've switched the scope to ${joined} and kept both items. ${next?.text || "If you want a proper quotation or site measurement, I can pass this to the team."}`;
+}
+
 function contextualServiceReply(service, language, messages, contextText, { correction = false } = {}) {
   const avoidKind = correction ? previousQuestionKind(messages) : null;
   const next = nextQualificationQuestion(language, messages, contextText, { avoidKind });
@@ -377,13 +391,15 @@ function buildFallbackReply(messages) {
 
   const allowBareScope = previousQuestionKind(messages) === "service";
   const correctedService = detectCorrectedService(text);
+  const correctedServiceNames = correctedService ? detectServices(correctionTargetText(text)) : [];
+  const correctedServiceObjects = correctedServiceNames
+    .map((name) => renovation.services.find((service) => service.name === name))
+    .filter(Boolean);
   const directService = correctedService || detectService(text, { allowBareScope });
   const serviceFinishQuestion = Boolean(directService && SERVICE_FINISH_PATTERN.test(text));
   const unconfiguredScope = isUnconfiguredServiceRequest(text);
 
-  // A real rejection must stop qualification. Explicit same-message replacements are
-  // excluded here so "I don't want kitchen cabinet. I want wardrobe." keeps moving.
-  if (NEGATIVE_PATTERN.test(text) && !correctedService) return declineReply(language);
+  if (isGenuineRejection(text)) return declineReply(language);
 
   if (OUT_OF_SCOPE_PATTERN.test(text) && !serviceFinishQuestion) {
     return directService ? mixedScopeHandoffReply(directService, language) : handoffReply(language, "scope");
@@ -401,7 +417,9 @@ function buildFallbackReply(messages) {
   const knownService = directService || detectKnownService(messages);
 
   let reply;
-  if (knownService && PRICE_PATTERN.test(text)) {
+  if (correctedServiceObjects.length > 1) {
+    reply = multiServiceCorrectionReply(correctedServiceObjects, language, messages, contextText);
+  } else if (knownService && PRICE_PATTERN.test(text)) {
     reply = servicePriceReply(knownService, language, messages, contextText);
   } else if (directService) {
     reply = genericServiceReply(directService, language, messages, contextText);
