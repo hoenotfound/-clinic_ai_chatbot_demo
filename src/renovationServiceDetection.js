@@ -70,10 +70,11 @@ const CONTEXTUAL_SCOPE_ALIASES = {
 
 const NON_CARPENTRY_ROOM_PATTERN = /\b(?:tiles?|tiling|floor(?:ing)?|paint(?:ing)?|ceiling|plaster(?:ing)?|wallpaper|plumb(?:ing)?|sink|tap|faucet|pipe|electrical|wiring|renovation|wet\s*works?|masonry|jubin|lantai|siling|paip|elektrik|renovasi)\b|瓷砖|瓷磚|地砖|地磚|地板|油漆|天花|水管|水喉|电线|電線|装修|裝修|翻新/i;
 const PROJECT_DETAIL_PATTERN = /\b(?:condo(?:minium)?|apartment|landed|terrace|semi[- ]?d|bungalow|commercial|office|shop|retail|puchong|cheras|kajang|petaling\s+jaya|pj|subang|shah\s+alam|kuala\s+lumpur|kl|mont\s+kiara|bukit\s+jalil|setapak)\b|\b(?:rm\s*)?\d+(?:[,.]\d+)?\s*(?:k|ft|feet|foot|mm|cm|m|meter|metre)?\b|公寓|排屋|独立屋|獨立屋|蒲种|蒲種|蕉赖|蕉賴|加影|八打灵再也|八打靈再也|吉隆坡|预算|預算|尺寸|平面图|平面圖/i;
-const CARPENTRY_SCOPE_NOUN_PATTERN = /\b(?:cabinet(?:s)?|carpentry|built[- ]?ins?|counter(?:s)?)\b|柜|櫃|木工|收纳|收納/i;
+const CARPENTRY_SCOPE_NOUN_PATTERN = /\b(?:cabinet(?:s)?|cupboard(?:s)?|carpentry|built[- ]?ins?|counter(?:s)?|vanit(?:y|ies))\b|柜|櫃|木工|收纳|收納/i;
 const NEW_SCOPE_REQUEST_PATTERN = /\b(?:do|does|can|could|would)\s+(?:you|your\s+team)\s+(?:also\s+)?(?:do|build|make|provide|offer)|\b(?:i|we)\s+(?:also\s+)?(?:want|need|am\s+looking\s+for|are\s+looking\s+for)|\b(?:also\s+)?(?:need|want)\s+(?:a\s+|some\s+)?(?:new\s+)?|\b(?:ada|boleh|nak|mahu)\s+(?:buat|buatkan)?\b|(?:有做|也做|可以做|能做|想做|要做)/i;
-const UNCONFIGURED_SCOPE_HINT_PATTERN = /\b(?:reception|vanity|bathroom|toilet|laundry|altar|prayer|bar|clinic|reception\s+counter|cashier\s+counter)\b|接待|前台|浴室|厕所|廁所|洗衣|神台|祈祷|祈禱|诊所|診所/i;
-const KNOWN_SCOPE_REFERENCE_PATTERN = /\b(?:this|that|the|same|my|our|existing)\s+(?:cabinet(?:s)?|carpentry|built[- ]?in)\b|这个柜|這個櫃|同一个柜|同一個櫃|这个木工|這個木工/i;
+const UNCONFIGURED_SCOPE_PHRASE_PATTERN = /\b(?:(?:reception|office|clinic|cashier|bar|laundry|altar|prayer|bathroom|toilet)\s+(?:cabinet(?:s)?|cupboard(?:s)?|counter(?:s)?|carpentry|built[- ]?ins?|vanit(?:y|ies))|(?:cabinet(?:s)?|cupboard(?:s)?|counter(?:s)?|vanit(?:y|ies))\s+(?:for\s+)?(?:reception|office|clinic|cashier|bar|laundry|altar|prayer|bathroom|toilet)|vanit(?:y|ies)\s+(?:cabinet(?:s)?|unit(?:s)?))\b|(?:接待|前台|办公室|辦公室|诊所|診所|浴室|厕所|廁所|洗衣房|神台).{0,4}(?:柜|櫃|台|收纳|收納)/i;
+const KNOWN_SCOPE_REFERENCE_PATTERN = /\b(?:this|that|the|same|my|our|existing)\s+(?:cabinet(?:s)?|cupboard(?:s)?|carpentry|built[- ]?in|counter)\b|这个柜|這個櫃|同一个柜|同一個櫃|这个木工|這個木工/i;
+const EXISTING_SCOPE_DETAIL_PATTERN = /\b(?:taller|shorter|wider|narrower|deeper|shallower|height|width|depth|size|drawers?|shelves?|doors?|handles?|hinges?|finish|colour|color|modify|adjust|resize|add\s+(?:a\s+)?(?:drawer|shelf|door|handle))\b|加高|加宽|加寬|改高|改宽|改寬|抽屉|抽屜|层板|層板|柜门|櫃門|颜色|顏色/i;
 
 function normalizeText(value) {
   return String(value || "")
@@ -180,6 +181,9 @@ function detectCorrectedService(text) {
 
   // Explicit rejection followed by the replacement. The wanted service is on the RIGHT.
   for (const pattern of [
+    /^(?:i|we)\s+(?:don['’]?t|do\s+not)\s+want\s+(.+?)[,;]\s*(?:i|we)\s+(?:want|need)\s+(.+?)(?:\s+instead)?$/i,
+    /^(?:cancel|drop|remove)\s+(.+?)[,;]\s*(?:i|we)\s+(?:want|need)\s+(.+?)(?:\s+instead)?$/i,
+    /^(?:tak|tidak)\s+(?:nak|mahu)\s+(.+?)[,;]\s*(?:nak|mahu)\s+(.+?)(?:\s+sebaliknya)?$/i,
     /^(?:not|bukan)\s+(.+?)[,;]\s*(?:actually\s+|but\s+|instead\s+)?(.+)$/i,
     /^(?:not|bukan)\s+(.+?)\s+(?:but|actually|instead)\s+(.+)$/i,
     /^(?:不是|不要)\s*(.+?)[,，;]\s*(?:而是|是|要|改做|改成)?\s*(.+)$/i,
@@ -206,15 +210,22 @@ function detectCorrectedService(text) {
 
 function isUnconfiguredServiceRequest(text) {
   const normalized = normalizeText(text);
-  if (!normalized) return false;
-  if (detectServiceObjects(normalized, { allowBareScope: false }).length) return false;
-  if (!CARPENTRY_SCOPE_NOUN_PATTERN.test(normalized) || !NEW_SCOPE_REQUEST_PATTERN.test(normalized)) return false;
+  if (!normalized || !NEW_SCOPE_REQUEST_PATTERN.test(normalized)) return false;
 
-  // A reference such as "make the cabinet taller" is a follow-up about the known
-  // project, not a new service request. "Also" or a clearly unsupported cabinet
-  // type, however, indicates a new scope that the configured demo cannot confirm.
-  if (KNOWN_SCOPE_REFERENCE_PATTERN.test(normalized) && !/\balso\b|也|另外|tambahan|juga/i.test(normalized)) return false;
-  return /\balso\b|也|另外|tambahan|juga/i.test(normalized) || UNCONFIGURED_SCOPE_HINT_PATTERN.test(normalized);
+  // Explicit unsupported cabinet/carpentry phrases win even when the same message
+  // also mentions a configured service, e.g. "kitchen cabinets and bathroom vanity".
+  if (UNCONFIGURED_SCOPE_PHRASE_PATTERN.test(normalized)) return true;
+
+  const configuredMatches = detectServiceObjects(normalized, { allowBareScope: false });
+  if (configuredMatches.length) return false;
+  if (!CARPENTRY_SCOPE_NOUN_PATTERN.test(normalized)) return false;
+
+  // Modification requests about the already-known cabinet are not new scope.
+  if (KNOWN_SCOPE_REFERENCE_PATTERN.test(normalized) || EXISTING_SCOPE_DETAIL_PATTERN.test(normalized)) return false;
+
+  // Generic unlisted scope is only escalated when the customer clearly introduces
+  // an additional item; otherwise the bot can continue clarifying normally.
+  return /\balso\b|也|另外|tambahan|juga/i.test(normalized);
 }
 
 function detectServices(text, options) {
