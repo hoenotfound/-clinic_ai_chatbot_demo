@@ -169,10 +169,26 @@ function updateRenovationLead(session) {
       break;
     }
   }
-  const negative = lastNegativeIndex >= 0 && !hasRenewedInterest(messages, lastNegativeIndex);
-  const activeMessages = negative ? [] : lastNegativeIndex >= 0 ? messages.slice(lastNegativeIndex + 1) : messages;
-  const activeText = activeMessages.map((message) => message.content || "").join(" \n");
 
+  const sameMessageReplacement = lastNegativeIndex >= 0
+    ? detectCorrectedService(messages[lastNegativeIndex]?.content || "")
+    : null;
+  const renewedAfterNegative = lastNegativeIndex >= 0 && hasRenewedInterest(messages, lastNegativeIndex);
+  const negative = lastNegativeIndex >= 0 && !sameMessageReplacement && !renewedAfterNegative;
+
+  let activeMessages;
+  if (negative) activeMessages = [];
+  else if (lastNegativeIndex < 0) activeMessages = messages;
+  else if (sameMessageReplacement) {
+    // This is a scope correction, not a true pause. Keep earlier property/budget/location
+    // context while resolveServices() replaces only the stale service interest.
+    activeMessages = messages;
+  } else {
+    // A genuinely paused lead that later renews interest starts a fresh active segment.
+    activeMessages = messages.slice(lastNegativeIndex + 1);
+  }
+
+  const activeText = activeMessages.map((message) => message.content || "").join(" \n");
   const services = resolveServices(activeMessages, session.lead?.interests || []);
 
   const siteMeasurementIntent = !negative && SITE_PATTERN.test(activeText);
