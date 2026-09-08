@@ -27,6 +27,8 @@ function loadRenovationDependencies() {
       buildRenovationIntakePlan,
       ensureAdviceMarker,
     } = require("./renovationIntakeFlow");
+    const { buildFallbackReply: buildRenovationFallbackReply } = require("./renovationFallback");
+    const { currentConversationContext } = require("./aiMemoryContext");
     const {
       renovationRoutingReason,
       isTechnicalHandoffRequest,
@@ -38,6 +40,8 @@ function loadRenovationDependencies() {
       buildRenovationIntakeReply,
       buildRenovationIntakePlan,
       ensureAdviceMarker,
+      buildRenovationFallbackReply,
+      currentConversationContext,
       renovationRoutingReason,
       isTechnicalHandoffRequest,
       sanitizeLegacyRoutingMessages,
@@ -120,14 +124,20 @@ function enhancedSystemPrompt(isFirstMessage) {
 
 function getFallbackReply(messages) {
   const deps = activeRenovationDependencies();
-  const routedMessages = deps ? deps.sanitizeLegacyRoutingMessages(messages) : messages;
-  const safetyReply = enforceSafetyRules(routedMessages);
-  if (safetyReply) return customerReply(safetyReply);
-  const ruleReply = enforceBookingRules(routedMessages);
-  if (ruleReply) return customerReply(ruleReply);
-  const concernReply = buildConcernFallback(routedMessages);
-  if (concernReply) return customerReply(concernReply);
-  return customerReply(buildFallbackReply(routedMessages));
+  if (deps) {
+    const fullMessages = deps.currentConversationContext()?.fullMessages;
+    const sourceMessages = Array.isArray(fullMessages) && fullMessages.length ? fullMessages : messages;
+    const routedMessages = deps.sanitizeLegacyRoutingMessages(sourceMessages);
+    return customerReply(deps.buildRenovationFallbackReply(routedMessages));
+  }
+
+  const safetyReply = enforceSafetyRules(messages);
+  if (safetyReply) return safetyReply;
+  const ruleReply = enforceBookingRules(messages);
+  if (ruleReply) return ruleReply;
+  const concernReply = buildConcernFallback(messages);
+  if (concernReply) return concernReply;
+  return buildFallbackReply(messages);
 }
 
 function plannedFallbackReply(messages, plan) {
