@@ -1,4 +1,5 @@
 const INTERNAL_STATE_MARKER = "APP_INTERNAL_RENOVATION_STATE";
+const NATURAL_ADVICE_PATTERN = /(?:preliminary\s+advice|layout|cabinet\s+run|planning|plan(?:ned)?\s+(?:around|for)|material|melamine|\bmfc\b|plywood|aluminium|aluminum|accessible|clearance|work\s+around|adjust\s+around|subject\s+to\s+(?:actual\s+)?measurement|final\s+(?:sizing|dimensions)|初步建议|初步建議|布局|規劃|规划|材料|板材|连续柜|連續櫃|可用来规划|可用來規劃|保留.{0,12}(?:使用|维修|維修|检修|檢修)|避开|避開|量尺|cadangan\s+awal|susun\s+atur|akses|ukur|pengukuran)/i;
 
 function factGroups(state) {
   const groups = state?.facts?.groups;
@@ -21,6 +22,38 @@ function qualificationTargets(state) {
   if (!targets.length && !state.adviceSent) targets.push("useful preliminary advice");
   if (!targets.length && !state.budgetKnown) targets.push("budget, when commercially useful");
   return targets;
+}
+
+function latestAssistantBeforeLatestUser(messages) {
+  const items = Array.isArray(messages) ? messages : [];
+  let latestUserIndex = -1;
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (items[index]?.role === "user") {
+      latestUserIndex = index;
+      break;
+    }
+  }
+  if (latestUserIndex < 0) return "";
+  for (let index = latestUserIndex - 1; index >= 0; index -= 1) {
+    if (items[index]?.role === "assistant") return String(items[index].content || "").trim();
+  }
+  return "";
+}
+
+function reconcileNaturalAdviceProgress(messages, plan, previousPlan) {
+  if (!plan?.state || plan.state.adviceSent || !plan.adviceReply) return plan;
+  if (!previousPlan?.adviceReply || previousPlan.state?.adviceSent) return plan;
+  const previousAssistant = latestAssistantBeforeLatestUser(messages);
+  if (!previousAssistant || !NATURAL_ADVICE_PATTERN.test(previousAssistant)) return plan;
+
+  return {
+    ...plan,
+    adviceReply: null,
+    state: {
+      ...plan.state,
+      adviceSent: true,
+    },
+  };
 }
 
 function buildRenovationAiContext(plan) {
@@ -91,5 +124,12 @@ module.exports = {
   INTERNAL_STATE_MARKER,
   buildRenovationAiContext,
   withRenovationAiContext,
-  _test: { factGroups, qualificationTargets, neutralizeCustomerInternalMarkers },
+  reconcileNaturalAdviceProgress,
+  _test: {
+    factGroups,
+    qualificationTargets,
+    latestAssistantBeforeLatestUser,
+    reconcileNaturalAdviceProgress,
+    neutralizeCustomerInternalMarkers,
+  },
 };
