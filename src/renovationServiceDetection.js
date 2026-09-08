@@ -180,13 +180,13 @@ function detectCorrectedService(text) {
   }
 
   // Explicit rejection followed by the replacement. The wanted service is on the RIGHT.
+  // Accept normal WhatsApp punctuation and "but"/"tapi" separators, not only commas.
   for (const pattern of [
-    /^(?:i|we)\s+(?:don['’]?t|do\s+not)\s+want\s+(.+?)[,;]\s*(?:i|we)\s+(?:want|need)\s+(.+?)(?:\s+instead)?$/i,
-    /^(?:cancel|drop|remove)\s+(.+?)[,;]\s*(?:i|we)\s+(?:want|need)\s+(.+?)(?:\s+instead)?$/i,
-    /^(?:tak|tidak)\s+(?:nak|mahu)\s+(.+?)[,;]\s*(?:nak|mahu)\s+(.+?)(?:\s+sebaliknya)?$/i,
-    /^(?:not|bukan)\s+(.+?)[,;]\s*(?:actually\s+|but\s+|instead\s+)?(.+)$/i,
-    /^(?:not|bukan)\s+(.+?)\s+(?:but|actually|instead)\s+(.+)$/i,
-    /^(?:不是|不要)\s*(.+?)[,，;]\s*(?:而是|是|要|改做|改成)?\s*(.+)$/i,
+    /^(?:i|we)\s+(?:don['’]?t|do\s+not)\s+want\s+(.+?)(?:[,;.!?]+\s*|\s+but\s+)(?:but\s+)?(?:i|we)\s+(?:want|need)\s+(.+?)(?:\s+instead)?[.!?]*$/i,
+    /^(?:cancel|drop|remove)\s+(.+?)(?:[,;.!?]+\s*|\s+but\s+)(?:but\s+)?(?:i|we)\s+(?:want|need)\s+(.+?)(?:\s+instead)?[.!?]*$/i,
+    /^(?:tak|tidak)\s+(?:nak|mahu)\s+(.+?)(?:[,;.!?]+\s*|\s+(?:tapi|tetapi)\s+)(?:(?:tapi|tetapi)\s+)?(?:saya\s+)?(?:nak|mahu)\s+(.+?)(?:\s+sebaliknya)?[.!?]*$/i,
+    /^(?:not|bukan)\s+(.+?)(?:[,;.!?]+\s*|\s+(?:but|actually|instead|tapi|tetapi)\s+)(?:(?:but|actually|instead|tapi|tetapi)\s+)?(.+?)[.!?]*$/i,
+    /^(?:不是|不要)\s*(.+?)[,，;。！？]\s*(?:而是|是|要|改做|改成)?\s*(.+)$/i,
   ]) {
     const match = normalized.match(pattern);
     if (!match) continue;
@@ -210,11 +210,14 @@ function detectCorrectedService(text) {
 
 function isUnconfiguredServiceRequest(text) {
   const normalized = normalizeText(text);
-  if (!normalized || !NEW_SCOPE_REQUEST_PATTERN.test(normalized)) return false;
+  if (!normalized) return false;
 
-  // Explicit unsupported cabinet/carpentry phrases win even when the same message
-  // also mentions a configured service, e.g. "kitchen cabinets and bathroom vanity".
+  // A specific unlisted cabinet/carpentry noun is already enough to represent a
+  // new scope in chat. This catches shorthand such as "bathroom vanity" or
+  // "office cabinets" and mixed shorthand such as "kitchen cabinets + bathroom vanity".
   if (UNCONFIGURED_SCOPE_PHRASE_PATTERN.test(normalized)) return true;
+
+  if (!NEW_SCOPE_REQUEST_PATTERN.test(normalized)) return false;
 
   const configuredMatches = detectServiceObjects(normalized, { allowBareScope: false });
   if (configuredMatches.length) return false;
