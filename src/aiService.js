@@ -19,6 +19,7 @@ const {
 
 const provider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
 const SUPPORTED_PROVIDERS = new Set(["mock", "claude", "gemini"]);
+const RENOVATION_TECHNICAL_PRECHECK = /load[- ]?bearing|structural|hack(?:ing)?\s+(?:(?:this|the|a|my|our)\s+)?(?:wall|beam|column)|electrical|rewir(?:e|ing)|plumb(?:ing)?|waterproof(?:ing)?|gas\s+(?:pipe|line)|permit|authority|approval|承重墙|承重牆|敲(?:这个|這個|这面|這面)?墙|敲(?:這個|这个)?柱|电线|電線|防水|kelulusan|struktur|pendawaian/i;
 if (!SUPPORTED_PROVIDERS.has(provider)) {
   throw new Error(`Unknown AI_PROVIDER: ${provider}`);
 }
@@ -36,6 +37,18 @@ function renovationIntakeReply(messages, { isFirstMessage = false } = {}) {
 function renovationIntakePlan(messages, { isFirstMessage = false } = {}) {
   if (industry.key !== "renovation") return null;
   return buildRenovationIntakePlan(messages, { isFirstMessage });
+}
+
+function latestUserText(messages) {
+  for (let index = (messages || []).length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === "user") return String(messages[index].content || "").trim();
+  }
+  return "";
+}
+
+function renovationTechnicalPrecheckReply(messages) {
+  if (!RENOVATION_TECHNICAL_PRECHECK.test(latestUserText(messages))) return null;
+  return "That needs a site-specific technical check before we advise anything definite. I’ll flag this for the team to review the actual wall/site condition and confirm what is safe and feasible. [[HANDOFF]]";
 }
 
 function enhancedSystemPrompt(isFirstMessage) {
@@ -71,12 +84,10 @@ function plannedFallbackReply(messages, plan) {
 function finalizePlannedReply(reply, plan) {
   let text = customerReply(reply);
   if (!plan) return text;
-
   if (plan.adviceReply) {
     text = ensureAdviceMarker(text, plan.state?.language || "en");
     text = customerReply(text);
   }
-
   if (plan.appendAfterAnswer) {
     const prompt = customerReply(plan.appendAfterAnswer);
     if (prompt && !text.includes(prompt)) text = `${text}\n\n${prompt}`;
@@ -169,23 +180,20 @@ async function getReply(messages, isFirstMessage = false) {
     const ruleReply = enforceBookingRules(messages);
     if (ruleReply) return customerReply(ruleReply);
 
+    if (industry.key === "renovation") {
+      const technicalReply = renovationTechnicalPrecheckReply(messages);
+      if (technicalReply) return customerReply(technicalReply);
+    }
+
     const intakePlan = renovationIntakePlan(messages, { isFirstMessage });
     if (intakePlan?.reply) return customerReply(intakePlan.reply);
     if (intakePlan?.bypass) return getFallbackReply(messages);
 
     try {
-      if (provider === "mock") {
-        return finalizePlannedReply(plannedFallbackReply(messages, intakePlan), intakePlan);
-      }
-      if (provider === "claude") {
-        return finalizePlannedReply(await getClaudeReply(messages, isFirstMessage), intakePlan);
-      }
+      if (provider === "mock") return finalizePlannedReply(plannedFallbackReply(messages, intakePlan), intakePlan);
+      if (provider === "claude") return finalizePlannedReply(await getClaudeReply(messages, isFirstMessage), intakePlan);
       if (provider === "gemini") {
-        const reply = await gemini.getReply(
-          messages,
-          isFirstMessage,
-          () => plannedFallbackReply(messages, intakePlan)
-        );
+        const reply = await gemini.getReply(messages, isFirstMessage, () => plannedFallbackReply(messages, intakePlan));
         return finalizePlannedReply(reply, intakePlan);
       }
       throw new Error(`Unknown AI_PROVIDER: ${provider}`);
@@ -209,6 +217,7 @@ module.exports = {
     customerReply,
     renovationIntakeReply,
     renovationIntakePlan,
+    renovationTechnicalPrecheckReply,
     plannedFallbackReply,
     finalizePlannedReply,
     geminiThinkingConfig: gemini.thinkingConfig,
