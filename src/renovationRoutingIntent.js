@@ -7,7 +7,7 @@ const HUMAN_REQUEST_PATTERNS = [
   new RegExp(`\\b(?:i|we)\\s+(?:need|want|would\\s+like)\\s+(?:to\\s+(?:speak|talk|chat|connect)\\s+(?:to|with)\\s+)?(?:a\\s+)?${HUMAN_ROLE}\\b`, "i"),
   new RegExp(`\\b${HUMAN_ROLE}\\s+(?:please\\s+)?(?:call|contact|reply|message)\\s+me\\b`, "i"),
   /^(?:a\s+)?(?:human|designer|sales(?:person)?|project\s+manager|staff)\s+(?:please|pls)[.!?]*$/i,
-  /(?:\u771f\u4eba|\u4eba\u5de5|\u8f6c\u4eba\u5de5|\u8f49\u4eba\u5de5|\u627e\u8bbe\u8ba1\u5e08|\u627e\u8a2d\u8a08\u5e2b|\u8054\u7cfb\u987e\u95ee|\u806f\u7e6b\u9867\u554f)/i,
+  /(?:真人|人工|转人工|轉人工|找设计师|找設計師|联系顾问|聯繫顧問)/i,
   /(?:nak|mahu)\s+(?:cakap|bercakap|chat)\s+dengan\s+(?:staff|designer|sales|orang)/i,
   /(?:nak|mahu)\s+(?:staff|designer|sales)\s+(?:call|contact|hubungi)/i,
 ];
@@ -17,7 +17,7 @@ const TECHNICAL_REQUEST_PATTERNS = [
   /\brewir(?:e|ing)\b|\belectrical\s+(?:work|works|wiring|upgrade|relocation|alteration|changes?)\b|(?:move|relocate|shift|add|remove|change)\s+(?:the\s+)?(?:switch|socket|plug|power\s*point|electrical\s*point|wiring)\b/i,
   /\bplumb(?:ing)?\s+(?:work|works|relocation|rerout(?:e|ing)|alteration|changes?)\b|(?:move|relocate|shift|reroute|change)\s+(?:the\s+)?(?:sink|water\s*point|pipe|pipes|plumbing)\b/i,
   /waterproof(?:ing)?|gas\s+(?:pipe|line)|permit|authority\s+approval|building\s+approval/i,
-  /\u627f\u91cd\u5899|\u627f\u91cd\u7246|\u6572(?:\u8fd9\u4e2a|\u9019\u500b|\u8fd9\u9762|\u9019\u9762)?(?:\u5899|\u7246|\u6881|\u67f1)|\u62c6(?:\u5899|\u7246|\u6881|\u67f1)|\u6539\u7535|\u6539\u96fb|\u79fb\u63d2\u5ea7|\u79fb\u5f00\u5173|\u79fb\u958b\u95dc|\u6539\u6c34\u7ba1|\u79fb\u6c34\u4f4d|\u9632\u6c34|\u7164\u6c14|\u7164\u6c23|\u71c3\u6c14|\u71c3\u6c23/i,
+  /承重墙|承重牆|敲(?:这个|這個|这面|這面)?(?:墙|牆|梁|柱)|拆(?:墙|牆|梁|柱)|改电|改電|移插座|移开关|移開關|改水管|移水位|防水|煤气|煤氣|燃气|燃氣/i,
   /(?:buat|kerja)\s+(?:elektrik|pendawaian|plumbing)|(?:ubah|alih|pindah|tambah)\s+(?:pendawaian|suis|soket|plug|paip|water\s*point)|waterproof|kelulusan\s+(?:majlis|pihak\s+berkuasa)|struktur\s+(?:dinding|beam|column)/i,
 ];
 
@@ -35,8 +35,15 @@ const BENIGN_TECH_REPLACEMENTS = [
   [/\bplumbing\b/gi, "water"],
   [/\bpendawaian\b/gi, "power point"],
   [/\bpaip\b/gi, "water point"],
-  [/\u7535\u7ebf|\u96fb\u7dda/g, "power point"],
-  [/\u6c34\u7ba1/g, "water point"],
+  [/电线|電線/g, "power point"],
+  [/水管/g, "water point"],
+];
+
+const SUPPORTED_VARIANT_REPLACEMENTS = [
+  [/\bstudy\s+(?:room|area)\s+(?:cabinet|cabinets|cupboard|cupboards|built[- ]?in|built[- ]?ins)\b/gi, "study cabinet"],
+  [/\b(?:cabinet|cabinets|cupboard|cupboards)\s+(?:for\s+)?(?:the\s+)?study\s+(?:room|area)\b/gi, "study cabinet"],
+  [/\bkabinet\s+(?:bilik\s+)?study\b/gi, "study cabinet"],
+  [/书房柜|書房櫃/g, "书柜"],
 ];
 
 const GENERIC_CABINET_DESCRIPTOR_WORDS = new Set([
@@ -48,6 +55,12 @@ const GENERIC_CABINET_DESCRIPTOR_WORDS = new Set([
   "regarding", "regards",
 ]);
 
+const GENERIC_CABINET_ENQUIRY_PATTERNS = [
+  /^(?:hi|hello|hey|hai|halo)?[,.!\s]*(?:(?:i|we)\s+)?(?:want|would\s+like|need)?\s*(?:to\s+)?(?:ask|enquire|inquire|know|learn)?\s*(?:a\s+)?(?:question\s+)?(?:about|regarding)?\s*(?:custom\s+)?(?:cabinet|cabinets|cupboard|cupboards|built[- ]?ins?)[.!?\s]*$/i,
+  /^(?:hi|hello|hai|halo)?[,.!\s]*(?:saya\s+)?(?:nak|mahu)?\s*(?:tanya|bertanya|enquire|inquire)?\s*(?:pasal|tentang|mengenai)?\s*(?:buat\s+)?(?:cabinet|kabinet)(?:s)?[.!?\s]*$/i,
+  /^(?:你好|嗨|哈咯|哈囉)?[，,。！？!?\s]*(?:我)?(?:想|要)?(?:问|問|咨询|諮詢|了解)?(?:一下)?(?:做)?(?:柜子|櫃子|柜|櫃)(?:的)?(?:事|项目|項目|装修|裝修)?[。！？!?\s]*$/i,
+];
+
 function isExplicitHumanRequest(text) {
   const value = String(text || "").trim();
   return Boolean(value && HUMAN_REQUEST_PATTERNS.some((pattern) => pattern.test(value)));
@@ -58,14 +71,27 @@ function isTechnicalHandoffRequest(text) {
   return Boolean(value && TECHNICAL_REQUEST_PATTERNS.some((pattern) => pattern.test(value)));
 }
 
+function normalizeSupportedCabinetVariants(text) {
+  let value = String(text || "");
+  for (const [pattern, replacement] of SUPPORTED_VARIANT_REPLACEMENTS) value = value.replace(pattern, replacement);
+  return value;
+}
+
+function isGenericCabinetEnquiry(text) {
+  const value = String(text || "").normalize("NFKC").trim();
+  return Boolean(value && GENERIC_CABINET_ENQUIRY_PATTERNS.some((pattern) => pattern.test(value)));
+}
+
 function isGenericCabinetDescriptor(descriptor) {
   const words = String(descriptor || "").toLowerCase().match(/[a-z0-9-]+/g) || [];
   return Boolean(words.length) && words.every((word) => GENERIC_CABINET_DESCRIPTOR_WORDS.has(word));
 }
 
 function isStandaloneUnconfiguredCabinetRequest(text) {
-  const value = String(text || "").normalize("NFKC").toLowerCase().trim();
+  const routedValue = normalizeSupportedCabinetVariants(text);
+  const value = String(routedValue || "").normalize("NFKC").toLowerCase().trim();
   if (!value || detectServices(value).length) return false;
+  if (isGenericCabinetEnquiry(value)) return false;
   if (/\b(?:this|that|same|my|our|existing)\s+(?:cabinet|cupboard|built[- ]?in)s?\b/i.test(value)) return false;
   if (/\b(?:height|width|depth|size|drawer|shelf|door|handle|hinge|finish|colour|color|modify|adjust|resize)\b/i.test(value)) return false;
 
@@ -76,7 +102,7 @@ function isStandaloneUnconfiguredCabinetRequest(text) {
   if (latinAfter && !isGenericCabinetDescriptor(latinAfter[1])) return true;
 
   if (/\bkabinet\s+[a-z][a-z0-9-]*(?:\s+[a-z][a-z0-9-]*){0,2}\b/i.test(value)) return true;
-  if (/(?:\u60f3\u505a|\u8981\u505a|\u505a)?[\u4e00-\u9fff]{1,8}(?:\u67dc|\u6ac3)/.test(value) && !/(?:\u8fd9\u4e2a|\u9019\u500b|\u6211\u7684|\u540c\u4e00\u4e2a|\u540c\u4e00\u500b)(?:\u67dc|\u6ac3)/.test(value)) return true;
+  if (/(?:想做|要做|做)?[一-鿿]{1,8}(?:柜|櫃)/.test(value) && !/(?:这个|這個|我的|同一个|同一個)(?:柜|櫃)/.test(value)) return true;
   return false;
 }
 
@@ -92,7 +118,7 @@ function sanitizeLegacyRoutingMessages(messages) {
   if (latestUserIndex < 0) return items;
 
   const original = String(items[latestUserIndex]?.content || "");
-  let content = original;
+  let content = normalizeSupportedCabinetVariants(original);
   if (!isExplicitHumanRequest(original)) {
     for (const [pattern, replacement] of PASSIVE_ROLE_REPLACEMENTS) content = content.replace(pattern, replacement);
   }
@@ -114,6 +140,8 @@ module.exports = {
   isExplicitHumanRequest,
   isTechnicalHandoffRequest,
   isStandaloneUnconfiguredCabinetRequest,
+  isGenericCabinetEnquiry,
+  normalizeSupportedCabinetVariants,
   sanitizeLegacyRoutingMessages,
   renovationRoutingReason,
 };
