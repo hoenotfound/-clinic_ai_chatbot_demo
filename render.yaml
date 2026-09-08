@@ -36,7 +36,7 @@ services:
       - key: GEMINI_MODEL_COOLDOWN_MS
         value: 60000
       - key: AI_REQUEST_TIMEOUT_MS
-        value: 6000
+        value: 4500
       - key: REDIS_URL
         sync: false
       - key: DATABASE_URL
