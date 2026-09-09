@@ -56,6 +56,7 @@ test.after(() => {
 test("quotation education stays separate from formal fulfilment intent in EN, BM and Chinese", () => {
   const education = [
     "How do you prepare a quotation?",
+    "How can you prepare a quotation?",
     "Macam mana quotation disediakan?",
     "正式报价的流程是怎样的？",
   ];
@@ -68,6 +69,8 @@ test("quotation education stays separate from formal fulfilment intent in EN, BM
   const ordinaryEstimate = [
     "Can I get a quote for a 10ft kitchen cabinet?",
     "Can you quote a 10ft kitchen cabinet?",
+    "Could you give me a quote for a 10ft kitchen cabinet?",
+    "Boleh bagi saya quotation untuk kitchen cabinet 10ft?",
   ];
   for (const text of ordinaryEstimate) {
     assert.equal(isFormalQuotationRequest(text), false, text);
