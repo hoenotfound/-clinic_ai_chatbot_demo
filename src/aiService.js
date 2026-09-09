@@ -337,50 +337,91 @@ const configured = provider === "mock" ||
   (provider === "claude" && Boolean(process.env.ANTHROPIC_API_KEY)) ||
   (provider === "gemini" && gemini.getApiKeys().length > 0);
 
-async function getReply(messages, isFirstMessage = false) {
+function makeReplyResult(text, { source = "ai", degraded = false, providerName = provider } = {}) {
+  return {
+    text: String(text || ""),
+    source,
+    degraded: Boolean(degraded),
+    provider: providerName,
+  };
+}
+
+async function getReplyResult(messages, isFirstMessage = false) {
   const startedAt = Date.now();
   try {
     const safetyReply = enforceSafetyRules(messages);
-    if (safetyReply) return customerReply(safetyReply);
+    if (safetyReply) {
+      return makeReplyResult(customerReply(safetyReply), { source: "rule" });
+    }
 
     const ruleReply = enforceBookingRules(messages);
-    if (ruleReply) return customerReply(ruleReply);
+    if (ruleReply) {
+      return makeReplyResult(customerReply(ruleReply), { source: "rule" });
+    }
 
     if (industry.key === "renovation") {
       const routingReply = renovationRoutingPrecheckReply(messages);
-      if (routingReply) return customerReply(routingReply);
+      if (routingReply) {
+        return makeReplyResult(customerReply(routingReply), { source: "rule" });
+      }
     }
 
     let intakePlan = renovationIntakePlan(messages, { isFirstMessage });
     intakePlan = reconcileRenovationAdviceProgress(messages, intakePlan);
-    if (intakePlan?.bypass) return getFallbackReply(messages);
+    if (intakePlan?.bypass) {
+      return makeReplyResult(getFallbackReply(messages), { source: "deterministic" });
+    }
 
     const modelMessages = aiMessages(messages, intakePlan);
     const deterministicFallback = () => deterministicPlannedFallback(messages, intakePlan);
 
     try {
-      if (provider === "mock") return shieldRenovationCapabilityDisclosure(messages, deterministicFallback());
+      if (provider === "mock") {
+        return makeReplyResult(
+          shieldRenovationCapabilityDisclosure(messages, deterministicFallback()),
+          { source: "deterministic" }
+        );
+      }
       if (provider === "claude") {
         const reply = await getClaudeReply(modelMessages, isFirstMessage);
-        return shieldRenovationCapabilityDisclosure(messages, reply);
+        return makeReplyResult(shieldRenovationCapabilityDisclosure(messages, reply), { source: "ai" });
       }
       if (provider === "gemini") {
-        const reply = await gemini.getReply(modelMessages, isFirstMessage, deterministicFallback);
-        return shieldRenovationCapabilityDisclosure(messages, reply);
+        let usedDeterministicFallback = false;
+        const trackedFallback = () => {
+          usedDeterministicFallback = true;
+          return deterministicFallback();
+        };
+        const reply = await gemini.getReply(modelMessages, isFirstMessage, trackedFallback);
+        return makeReplyResult(
+          shieldRenovationCapabilityDisclosure(messages, reply),
+          {
+            source: usedDeterministicFallback ? "deterministic" : "ai",
+            degraded: usedDeterministicFallback,
+          }
+        );
       }
       throw new Error(`Unknown AI_PROVIDER: ${provider}`);
     } catch (error) {
       console.error(`AI provider "${provider}" failed; using deterministic demo fallback:`, error);
       if (provider === "gemini") opsStats.recordDeterministicFallback("escaped_provider_error");
-      return shieldRenovationCapabilityDisclosure(messages, deterministicFallback());
+      return makeReplyResult(
+        shieldRenovationCapabilityDisclosure(messages, deterministicFallback()),
+        { source: "deterministic", degraded: true }
+      );
     }
   } finally {
     opsStats.recordLatency("ai_response", Date.now() - startedAt);
   }
 }
 
+async function getReply(messages, isFirstMessage = false) {
+  return (await getReplyResult(messages, isFirstMessage)).text;
+}
+
 module.exports = {
   getReply,
+  getReplyResult,
   getFallbackReply,
   provider,
   configured,
@@ -399,6 +440,7 @@ module.exports = {
     withRenovationAiContext,
     aiMessages,
     reconcileRenovationAdviceProgress,
+    makeReplyResult,
     loadRenovationDependencies,
     geminiThinkingConfig: gemini.thinkingConfig,
     buildGeminiRequest: gemini.buildRequest,

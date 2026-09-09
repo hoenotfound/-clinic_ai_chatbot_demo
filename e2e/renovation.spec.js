@@ -23,7 +23,7 @@ async function openDashboardPage(frame, name, heading = name) {
   await expect(frame.getByRole("heading", { name: heading, exact: true }).first()).toBeVisible();
 }
 
-test("renovation profile stays industry-specific across customer view and the complete dashboard", async ({ page }) => {
+test("renovation profile stays AI-first and industry-specific across customer view and dashboard", async ({ page }) => {
   test.skip(process.env.DEMO_INDUSTRY !== "renovation", "Renovation profile only");
   const browserErrors = collectBrowserErrors(page);
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -33,8 +33,10 @@ test("renovation profile stays industry-specific across customer view and the co
 
   const leadCard = page.locator(".hero-lead-card");
   const journeyCaption = page.locator(".hero-product-caption");
-  await expect(leadCard).toContainText("PROJECT DETAILS CAPTURED");
-  await expect(leadCard).toContainText("Kitchen Cabinets · 12ft · Puchong");
+  await expect(leadCard).toContainText("PROJECT CONTEXT UNDERSTOOD");
+  await expect(leadCard).toContainText("Kitchen Cabinets · 12ft · Puchong · RM10k");
+  await expect(page.locator("body")).not.toContainText("☀️Pls let us know");
+  await expect(page.locator("body")).not.toContainText("Site-first qualification");
   await expect(journeyCaption).toContainText("AI-POWERED CUSTOMER JOURNEY");
   await expect(journeyCaption).toContainText("Reply. Qualify. Hand off.");
   await expect(page.locator('link[data-hero-showcase-layout="true"]')).toHaveCount(1);
@@ -68,51 +70,42 @@ test("renovation profile stays industry-specific across customer view and the co
     channel: "facebook",
   });
 
-  const startChip = page.locator(".prompt-panel .suggestion-chip").filter({ hasText: "Start renovation enquiry" });
+  const startChip = page.locator(".prompt-panel .suggestion-chip").filter({ hasText: "Kitchen cabinet price" });
   await expect(startChip).toHaveCount(1);
-  await expect(startChip).toHaveAttribute("data-message", "Hi, I want to ask about cabinets.");
+  await expect(startChip).toHaveAttribute("data-message", "Kitchen cabinet around 12ft in Puchong. Roughly how much?");
   await startChip.click();
-  await expect(page.locator("#messages")).toContainText("Site photo:");
-  await expect(page.locator("#messages")).toContainText("Rough size:");
-  await expect(page.locator("#messages")).toContainText("Location:");
 
-  await sendCustomerMessage(page, "Site photo available. Rough size: 12ft. Location: Puchong.");
-  await expect(page.locator("#messages")).toContainText("upper + lower kitchen cabinets");
-  await expect(page.locator("#messages")).toContainText("wardrobe cabinet");
-  await expect(page.locator("#messages")).toContainText("TV cabinet");
-  await expect(page.locator("#messages")).toContainText("shoe cabinet");
-
-  await sendCustomerMessage(page, "Upper and lower kitchen cabinet");
+  // Browser E2E intentionally runs the deterministic outage layer. It should still
+  // behave conversationally rather than exposing the old Site photo/size/location form.
+  await expect(page.locator("#messages")).not.toContainText("Site photo:");
+  await expect(page.locator("#messages")).not.toContainText("Rough size:");
+  await expect(page.locator("#messages")).not.toContainText("Location:");
   await expect(page.locator("#messages")).toContainText("wall space usable");
-  await expect(page.locator("#messages")).toContainText("switches or plug points");
-  await expect(page.locator("#messages")).not.toContainText("sink/water points");
-  await expect(page.locator("#messages")).not.toContainText("beams/columns");
 
-  // Natural partial answers should be understood from meaning and conversation context.
-  await sendCustomerMessage(page, "one waterpoint and one plug");
-  await expect(page.locator("#messages")).toContainText("Is the wall space usable for the cabinet?");
-  const messagesAfterPartial = page.locator("#messages");
-  await expect(messagesAfterPartial).not.toContainText("fridge position");
-  await expect(messagesAfterPartial).not.toContainText("hob/hood");
-
-  // A short answer belongs to the wall-space question just asked.
-  await sendCustomerMessage(page, "yes");
+  await sendCustomerMessage(page, "Yes, wall is usable. There is one water point and one plug.");
   await expect(page.locator("#messages")).toContainText("Preliminary advice");
-  await expect(page.locator("#messages")).toContainText("melamine/MFC");
-  await expect(page.locator("#messages")).toContainText("plywood");
-  await expect(page.locator("#messages")).toContainText("budget range");
+  await expect(page.locator("#messages")).toContainText("budget");
 
   await sendCustomerMessage(page, "Budget RM10k.");
-  const literalCustomerMessage = "Do you also build reception cabinets for a clinic?";
-  await sendCustomerMessage(page, literalCustomerMessage);
+  await expect(page.locator("#messages")).toContainText("site measurement");
+  await expect(page.locator("#messages")).not.toContainText("MEASUREMENT_OFFERED");
+
+  await sendCustomerMessage(page, "Saturday afternoon can?");
+  await expect(page.locator("#messages")).toContainText("confirm the actual site-measurement timing");
+  await expect(page.locator("#messages")).not.toContainText("HANDOFF");
 
   await page.getByRole("tab", { name: /Sales dashboard/i }).click();
   const frame = page.frameLocator("#reactDashboardFrame");
   await expect(frame.getByRole("heading", { name: "Inbox", exact: true })).toBeVisible();
-
-  // Customer-authored text must stay literal even when it contains a clinic word.
-  await expect(frame.getByText(literalCustomerMessage, { exact: true }).first()).toBeVisible();
   await expect(frame.getByText("Kitchen Cabinets Demo Campaign", { exact: true }).first()).toBeVisible();
+  await expect(frame.getByText("Needs attention", { exact: true }).first()).toBeVisible();
+
+  // Inbox keeps intent inside the contact Details panel. Verify the real live intent
+  // there rather than expecting an intent label on the default conversation surface.
+  await frame.getByRole("button", { name: "View details for Demo Customer", exact: true }).click();
+  await expect(frame.getByText("Current intent", { exact: true }).first()).toBeVisible();
+  await expect(frame.getByText("Site measurement requested", { exact: true }).first()).toBeVisible();
+  await frame.getByRole("button", { name: "Close details", exact: true }).click();
 
   await openDashboardPage(frame, "Pipeline", "Lead Pipeline");
   await expect(frame.getByText("Cheras / Kajang / Puchong", { exact: true }).first()).toBeVisible();
@@ -123,6 +116,7 @@ test("renovation profile stays industry-specific across customer view and the co
   await expect(frame.getByText("RM 10,000", { exact: true }).first()).toBeVisible();
   await expect(frame.getByText("Project", { exact: true }).first()).toBeVisible();
   await expect(frame.getByText("Area", { exact: true }).first()).toBeVisible();
+  await expect(frame.getByText("Site measurement requested", { exact: true }).first()).toBeVisible();
   const closeDrawer = frame.getByRole("button", { name: "Close lead drawer" });
   await closeDrawer.evaluate((button) => button.click());
   await expect(closeDrawer).toHaveCount(0);
@@ -131,8 +125,9 @@ test("renovation profile stays industry-specific across customer view and the co
   await frame.getByRole("button", { name: "Filters", exact: true }).click();
 
   const projectSelect = frame.locator("label").filter({ hasText: /^Project/ }).locator("select");
+  await expect(projectSelect.locator('option[value="TV Console & Living Room Carpentry"]')).toHaveText("TV / Living Room Cabinets");
+  await expect(projectSelect.locator('option[value="Full-Home Custom Carpentry"]')).toHaveText("Full-Home Cabinets");
   await expect(projectSelect.locator('option[value="Shoe Cabinet & Entrance Storage"]')).toHaveText("Shoe / Entrance Storage");
-  await expect(projectSelect.locator('option[value="Study, Display & Storage Cabinets"]')).toHaveText("Study / Display / Storage");
   await projectSelect.selectOption("Shoe Cabinet & Entrance Storage");
   await expect(projectSelect).toHaveValue("Shoe Cabinet & Entrance Storage");
 
@@ -150,6 +145,8 @@ test("renovation profile stays industry-specific across customer view and the co
   await expect(frame.getByText("Nur Izzati · Built-in Wardrobes", { exact: true })).toBeVisible();
   await expect(frame.getByText("Customer chat preview", { exact: true })).toBeVisible();
   await expect(frame.getByText("Site-measurement reminders", { exact: true })).toBeVisible();
+  await expect(frame.locator("body")).not.toContainText("carpentry planning");
+  await expect(frame.locator("body")).not.toContainText("木工规划");
   await expect(frame.locator("body")).not.toContainText("Pico Laser");
   await expect(frame.locator("body")).not.toContainText("Patient chat preview");
 

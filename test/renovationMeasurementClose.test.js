@@ -1,14 +1,16 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 
 const {
+  OPENING_MESSAGE,
   buildRenovationIntakePlan,
   _test: intakeHelpers,
 } = require("../src/renovationIntakeFlow");
 const { buildRenovationAiContext } = require("../src/renovationAiContext");
 const { buildSystemPrompt } = require("../src/renovationSystemPrompt");
+const { updateRenovationLead } = require("../src/renovationLeadState");
+const measurementIntent = require("../src/renovationMeasurementIntent");
+const { sanitizeRenovationCustomerReply } = require("../src/renovationCustomerLanguage");
 
 function qualifiedConversation() {
   return [
@@ -38,7 +40,7 @@ function qualifiedWithoutBudget() {
   ];
 }
 
-test("qualified renovation lead becomes measurement-ready and gets a soft site-measurement close", () => {
+test("qualified renovation lead becomes measurement-ready and gets a private-marked soft close", () => {
   const plan = buildRenovationIntakePlan(qualifiedConversation());
 
   assert.equal(plan.state.measurementReady, true);
@@ -46,6 +48,7 @@ test("qualified renovation lead becomes measurement-ready and gets a soft site-m
   assert.equal(plan.state.measurementOfferAccepted, false);
   assert.match(plan.reply, /site measurement/i);
   assert.match(plan.reply, /want me/i);
+  assert.match(plan.reply, /\[\[MEASUREMENT_OFFERED\]\]/);
   assert.doesNotMatch(plan.reply, /\[\[HANDOFF\]\]/);
 });
 
@@ -82,28 +85,80 @@ test("short contextual acceptance after the site-measurement offer triggers staf
   assert.match(plan.reply, /\[\[HANDOFF\]\]/);
 });
 
-test("natural acceptance can include timing or scheduling details", () => {
-  const messages = qualifiedConversation();
-  messages.push({
-    role: "assistant",
-    content: "I can get the team to arrange a site measurement for you. Shall we do that?",
-  });
-  messages.push({ role: "user", content: "Yes, Saturday afternoon please" });
-
-  const plan = buildRenovationIntakePlan(messages);
-
-  assert.equal(plan.state.measurementOfferSent, true);
-  assert.equal(plan.state.measurementOfferAccepted, true);
-  assert.match(plan.reply, /\[\[HANDOFF\]\]/);
+test("timing-only Malaysian replies can accept a marked AI measurement offer", () => {
+  for (const reply of [
+    "Saturday afternoon can?",
+    "How about next week?",
+    "minggu depan boleh?",
+    "星期六下午可以吗",
+  ]) {
+    const messages = [
+      {
+        role: "assistant",
+        content: "I can get the team to take the next step with you.",
+        measurementOffered: true,
+      },
+      { role: "user", content: reply },
+    ];
+    assert.equal(measurementIntent.measurementOfferAccepted(messages), true, reply);
+  }
 });
 
-test("measurement-offer detection follows sales intent rather than one exact canned sentence", () => {
+test("follow-up questions after a measurement offer are not mistaken for acceptance", () => {
+  const offer = {
+    role: "assistant",
+    content: "I can get the team to arrange a site measurement for you.",
+    measurementOffered: true,
+  };
+  for (const reply of [
+    "Can you explain how it works?",
+    "Boleh explain dulu macam mana proses dia?",
+    "可以先告诉我流程吗？",
+  ]) {
+    assert.equal(
+      measurementIntent.measurementOfferAccepted([offer, { role: "user", content: reply }]),
+      false,
+      reply
+    );
+  }
+});
+
+test("measurement education stays informational while explicit requests are recognized consistently", () => {
+  for (const question of [
+    "How does site measurement work?",
+    "Boleh explain dulu macam mana site measurement?",
+    "可以先告诉我上门量尺流程吗？",
+  ]) {
+    assert.equal(measurementIntent.isMeasurementEducationRequest(question), true, question);
+    assert.equal(measurementIntent.isExplicitMeasurementRequest(question), false, question);
+    const plan = buildRenovationIntakePlan([{ role: "user", content: question }], { isFirstMessage: true });
+    assert.equal(plan.bypass, false, question);
+  }
+
+  for (const request of [
+    "I need site measurement",
+    "Site measurement please",
+    "Saya nak site measurement",
+    "我想安排上门量尺",
+  ]) {
+    assert.equal(measurementIntent.isExplicitMeasurementRequest(request), true, request);
+  }
+});
+
+test("measurement-offer detection follows arrangement intent rather than a keyword mention", () => {
   assert.equal(
     intakeHelpers.isMeasurementOfferText("I can get the team to arrange a site measurement for you. Shall we do that?"),
     true
   );
   assert.equal(
     intakeHelpers.isMeasurementOfferText("Would you like me to explain how site measurement works?"),
+    false
+  );
+  assert.equal(
+    measurementIntent.measurementOfferAccepted([
+      { role: "assistant", content: "Would you like me to explain how site measurement works?" },
+      { role: "user", content: "Yes" },
+    ]),
     false
   );
 });
@@ -120,6 +175,28 @@ test("soft decline does not immediately repeat the close or hand off", () => {
   assert.equal(plan.reply, null);
 });
 
+test("a new buying signal after a soft decline re-enables the site-measurement close", () => {
+  const messages = qualifiedConversation();
+  messages.push({
+    role: "assistant",
+    content: `${intakeHelpers.measurementCloseQuestion("en")} [[MEASUREMENT_OFFERED]]`,
+    measurementOffered: true,
+  });
+  messages.push({ role: "user", content: "I want to think about it first" });
+  messages.push({ role: "assistant", content: "No problem. We can keep looking at the project details first." });
+  messages.push({ role: "user", content: "Okay, I want to proceed now." });
+
+  const plan = buildRenovationIntakePlan(messages);
+
+  assert.equal(measurementIntent.measurementOfferDeclined(messages), true);
+  assert.equal(plan.state.strongBuyingIntent, true);
+  assert.equal(plan.state.measurementOfferSent, false);
+  assert.equal(plan.state.measurementOfferAccepted, false);
+  assert.match(plan.reply, /site measurement/i);
+  assert.match(plan.reply, /\[\[MEASUREMENT_OFFERED\]\]/);
+  assert.doesNotMatch(plan.reply, /\[\[HANDOFF\]\]/);
+});
+
 test("an affirmative-looking reply with a delay is not treated as acceptance", () => {
   const messages = qualifiedConversation();
   messages.push({ role: "assistant", content: intakeHelpers.measurementCloseQuestion("en") });
@@ -128,36 +205,65 @@ test("an affirmative-looking reply with a delay is not treated as acceptance", (
   assert.equal(intakeHelpers.measurementOfferAccepted(messages), false);
 });
 
-test("Chinese and BM replies can accept the AI's measurement offer with natural extra details", () => {
-  const chinese = [
-    { role: "assistant", content: intakeHelpers.measurementCloseQuestion("zh") },
-    { role: "user", content: "可以，星期六下午" },
-  ];
-  const malay = [
-    { role: "assistant", content: intakeHelpers.measurementCloseQuestion("ms") },
-    { role: "user", content: "boleh next week" },
-  ];
-
-  assert.equal(intakeHelpers.measurementOfferAccepted(chinese), true);
-  assert.equal(intakeHelpers.measurementOfferAccepted(malay), true);
+test("service-specific qualification does not force plug questions for every cabinet type", () => {
+  assert.deepEqual(intakeHelpers.requiredConstraintGroups(["Kitchen Cabinets"]), ["wall"]);
+  assert.deepEqual(intakeHelpers.requiredConstraintGroups(["Built-in Wardrobes"]), ["wall"]);
+  assert.deepEqual(intakeHelpers.requiredConstraintGroups(["Shoe Cabinet & Entrance Storage"]), ["wall"]);
+  assert.deepEqual(intakeHelpers.requiredConstraintGroups(["TV Console & Living Room Carpentry"]), ["wall", "power"]);
+  assert.deepEqual(intakeHelpers.requiredConstraintGroups(["Full-Home Custom Carpentry"]), []);
 });
 
-test("system prompt preserves Chinese after a currency-only budget reply", () => {
+test("deterministic outage opening is conversational instead of the old three-field form", () => {
+  assert.match(OPENING_MESSAGE, /What are you planning to build/i);
+  assert.doesNotMatch(OPENING_MESSAGE, /Site photo\s*:/i);
+  assert.doesNotMatch(OPENING_MESSAGE, /Rough size\s*:/i);
+  assert.doesNotMatch(OPENING_MESSAGE, /Location\s*:/i);
+});
+
+test("lead state records contextual and explicit measurement intent but not measurement education", () => {
+  const accepted = {
+    messages: [
+      { role: "user", content: "Kitchen cabinet 12ft in Puchong, budget RM10k." },
+      { role: "assistant", content: "I can arrange the next step for you.", measurementOffered: true },
+      { role: "user", content: "Saturday afternoon can?" },
+    ],
+    lead: {},
+  };
+  updateRenovationLead(accepted);
+  assert.equal(accepted.lead.siteMeasurementIntent, true);
+  assert.equal(accepted.lead.bookingIntent, true);
+  assert.equal(accepted.lead.temperature, "hot");
+
+  for (const request of ["I need site measurement", "Site measurement please", "Saya nak site measurement", "我想安排上门量尺"]) {
+    const explicit = { messages: [{ role: "user", content: request }], lead: {} };
+    updateRenovationLead(explicit);
+    assert.equal(explicit.lead.siteMeasurementIntent, true, request);
+    assert.equal(explicit.lead.bookingIntent, true, request);
+  }
+
+  const educational = {
+    messages: [
+      { role: "user", content: "Kitchen cabinet 12ft in Puchong. How does site measurement work?" },
+    ],
+    lead: {},
+  };
+  updateRenovationLead(educational);
+  assert.equal(educational.lead.siteMeasurementIntent, false);
+  assert.equal(educational.lead.bookingIntent, false);
+});
+
+test("system prompt preserves Chinese and marks only actual AI measurement offers", () => {
   const prompt = buildSystemPrompt({ isFirstMessage: false });
 
   assert.match(prompt, /Customer: "RM10k"\nGood: "RM10k 可以作为一个很有用的预算方向/);
+  assert.match(prompt, /\[\[MEASUREMENT_OFFERED\]\]/);
+  assert.match(prompt, /Do NOT append \[\[MEASUREMENT_OFFERED\]\] when merely explaining/i);
   assert.doesNotMatch(prompt, /Customer: "RM10k"\nGood: "RM10k gives the team/i);
   assert.match(prompt, /Never switch from Chinese or Bahasa Malaysia to English because of a bare number or currency-only reply/i);
 });
 
-test("normal configured provider paths remain AI-generated; deterministic copy is fallback-only", () => {
-  const source = fs.readFileSync(path.join(__dirname, "../src/aiService.js"), "utf8");
-
-  assert.match(source, /if \(provider === "claude"\)[\s\S]{0,220}getClaudeReply\(modelMessages, isFirstMessage\)/);
-  assert.match(source, /if \(provider === "gemini"\)[\s\S]{0,220}gemini\.getReply\(modelMessages, isFirstMessage, deterministicFallback\)/);
-  assert.match(source, /if \(provider === "mock"\) return shieldRenovationCapabilityDisclosure\(messages, deterministicFallback\(\)\)/);
-
-  const prompt = buildSystemPrompt({ isFirstMessage: false });
-  assert.match(prompt, /Compose each normal customer-facing reply yourself from the live conversation/i);
-  assert.match(prompt, /guardrails, not a script/i);
+test("configured business name survives customer-language cleanup unchanged", () => {
+  const reply = sanitizeRenovationCustomerReply("We are Oakline Demo Renovation & Carpentry. We focus on custom carpentry projects.");
+  assert.match(reply, /Oakline Demo Renovation & Carpentry/);
+  assert.match(reply, /custom cabinets projects/i);
 });

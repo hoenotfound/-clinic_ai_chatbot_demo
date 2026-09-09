@@ -84,21 +84,22 @@ test("generic cabinet enquiry wording starts intake instead of being treated as 
   assert.equal(routingReply, null);
 });
 
-test("exact English, BM and Chinese public starter messages all enter the site-first intake", () => {
+test("exact English, BM and Chinese public starter messages enter conversational intake in the established language", () => {
   const starters = [
-    "Hi, I want to ask about cabinets.",
-    "Hi, saya nak tanya pasal cabinet.",
-    "你好，我想问一下做柜子。",
+    ["Hi, I want to ask about cabinets.", OPENING_MESSAGE],
+    ["Hi, saya nak tanya pasal cabinet.", "Hi 👋 Anda nak buat cabinet apa — kitchen cabinet, wardrobe, TV cabinet, shoe cabinet atau yang lain?"],
+    ["你好，我想问一下做柜子。", "你好 👋 你想做哪一种柜子？厨房柜、衣柜、电视柜、鞋柜，还是其他？"],
   ];
 
-  for (const text of starters) {
+  for (const [text, expectedOpening] of starters) {
     assert.equal(isGenericCabinetEnquiry(text), true, text);
     assert.equal(isStandaloneUnconfiguredCabinetRequest(text), false, text);
     assert.equal(aiHelpers.renovationRoutingPrecheckReply([{ role: "user", content: text }]), null, text);
 
     const plan = buildRenovationIntakePlan([{ role: "user", content: text }], { isFirstMessage: true });
     assert.equal(plan.bypass, false, text);
-    assert.equal(plan.reply, OPENING_MESSAGE, text);
+    assert.equal(plan.reply, expectedOpening, text);
+    assert.doesNotMatch(plan.reply, /Site photo\s*:|Rough size\s*:|Location\s*:/i, text);
   }
 });
 
@@ -213,7 +214,7 @@ test("a price-first enquiry still asks for budget later when no real budget was 
   assert.match(plan.adviceReply, /What budget range are you aiming for/i);
 });
 
-test("renovation Gemini path keeps qualification state underneath an AI-first reply", () => {
+test("renovation Gemini path keeps service-specific qualification state underneath an AI-first reply", () => {
   const repoRoot = path.resolve(__dirname, "..");
   const script = `
     process.env.DEMO_INDUSTRY = "renovation";
@@ -253,8 +254,8 @@ test("renovation Gemini path keeps qualification state underneath an AI-first re
         if (!/AI-FIRST RENOVATION OVERRIDE/i.test(prompt)) throw new Error("AI-first instructions were missing");
         const sent = (requestBody.contents || []).map((item) => item.parts?.[0]?.text || "").join("\\n");
         if (!/APP_INTERNAL_RENOVATION_STATE/i.test(sent)) throw new Error("Internal renovation state was missing");
-        if (!/whether the wall space is usable/i.test(sent)) throw new Error("Missing wall goal was not supplied to AI: " + sent);
-        if (!/plug-point information/i.test(sent)) throw new Error("Missing power goal was not supplied to AI: " + sent);
+        if (!/Conservative next goals: whether the wall space is usable/i.test(sent)) throw new Error("Missing wall goal was not supplied to AI: " + sent);
+        if (/Conservative next goals:[^\\n]*(?:plug|power)/i.test(sent)) throw new Error("Kitchen intake should not force a power-point goal: " + sent);
       })
       .catch((error) => {
         console.error(error.stack || error);

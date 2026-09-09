@@ -1,4 +1,5 @@
 const { detectServices } = require("./renovationServiceDetection");
+const { isMeasurementEducationRequest } = require("./renovationMeasurementIntent");
 
 const HUMAN_ROLE = "(?:human|person|staff|designer|sales(?:person)?|project\\s+manager)";
 const HUMAN_REQUEST_PATTERNS = [
@@ -131,6 +132,14 @@ function isStandaloneUnconfiguredCabinetRequest(text) {
   return false;
 }
 
+function measurementEducationPlanningText(original) {
+  if (/[一-鿿]/.test(original)) return "我想了解一下现场尺寸确认的流程。";
+  if (/\b(?:saya|nak|mahu|boleh|macam\s+mana|bagaimana|apa\s+itu)\b/i.test(original)) {
+    return "Saya nak faham proses semakan saiz di lokasi dulu.";
+  }
+  return "How does the on-site sizing process work?";
+}
+
 function sanitizeLegacyRoutingMessages(messages) {
   const items = Array.isArray(messages) ? messages : [];
   let latestUserIndex = -1;
@@ -143,7 +152,9 @@ function sanitizeLegacyRoutingMessages(messages) {
   if (latestUserIndex < 0) return items;
 
   const original = String(items[latestUserIndex]?.content || "");
-  let content = normalizeSupportedCabinetVariants(original);
+  let content = isMeasurementEducationRequest(original)
+    ? measurementEducationPlanningText(original)
+    : normalizeSupportedCabinetVariants(original);
   if (!isExplicitHumanRequest(original)) {
     for (const [pattern, replacement] of PASSIVE_ROLE_REPLACEMENTS) content = content.replace(pattern, replacement);
   }
@@ -169,6 +180,7 @@ module.exports = {
   isStandaloneUnconfiguredCabinetRequest,
   isGenericCabinetEnquiry,
   normalizeSupportedCabinetVariants,
+  measurementEducationPlanningText,
   sanitizeLegacyRoutingMessages,
   renovationRoutingReason,
 };

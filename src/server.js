@@ -374,15 +374,25 @@ async function handleSessionAction(req, res, session, action) {
         if (session.mode === "human") {
           return sendJson(res, 200, { session: state.publicSession(session), aiReplied: false });
         }
-        const history = session.messages.map((message) => ({ role: message.role, content: message.content }));
+        const history = session.messages.map((message) => ({
+          role: message.role,
+          content: message.content,
+          ...(message.measurementOffered ? { measurementOffered: true } : {}),
+        }));
         const isFirstMessage = session.customerMessageCount === 1;
         let reply;
         let degraded = false;
+        let replySource = "deterministic";
         try {
-          reply = await ai.getReply(history, isFirstMessage);
+          const result = await ai.getReplyResult(history, isFirstMessage);
+          reply = result.text;
+          degraded = Boolean(result.degraded);
+          replySource = result.source || (degraded ? "deterministic" : "ai");
         } catch (aiError) {
           console.error("AI service escaped its fallback boundary; using deterministic demo fallback:", aiError);
           reply = ai.getFallbackReply(history);
+          degraded = true;
+          replySource = "deterministic";
         }
 
         if (session.mode === "human") {
@@ -400,8 +410,9 @@ async function handleSessionAction(req, res, session, action) {
         await persistSession(session);
         return sendJson(res, 200, {
           session: state.publicSession(session),
-          aiReplied: !degraded,
+          aiReplied: replySource === "ai",
           degraded,
+          replySource,
           promotion: showPromotion ? (business.promotion || null) : null,
         });
       } finally {
@@ -431,6 +442,7 @@ async function handleApi(req, res, url) {
       visitorId: body.visitorId,
       event,
       surface: body.surface,
+      industry: body.industry,
     });
     return sendJson(res, accepted ? 202 : 400, accepted ? { ok: true } : { error: "Invalid visitor id." });
   }

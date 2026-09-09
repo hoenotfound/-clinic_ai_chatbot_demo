@@ -2,6 +2,10 @@ const crypto = require("crypto");
 const industry = require("./industryProfile");
 const business = industry.config;
 const { updateRenovationLead } = require("./renovationLeadState");
+const {
+  MEASUREMENT_OFFER_MARKER,
+  stripMeasurementOfferMarker,
+} = require("./renovationMeasurementIntent");
 
 const CHANNELS = new Set(["whatsapp", "instagram", "facebook"]);
 const sessions = new Map();
@@ -316,12 +320,18 @@ function addCustomerMessage(session, rawText) {
 function addAssistantMessage(session, rawText) {
   const raw = typeof rawText === "string" ? rawText : "";
   const handoff = raw.includes("[[HANDOFF]]");
-  const cleanText = sanitizeText(raw.replaceAll("[[HANDOFF]]", ""));
+  const measurementOffered = raw.includes(MEASUREMENT_OFFER_MARKER);
+  const withoutControlMarkers = stripMeasurementOfferMarker(raw.replaceAll("[[HANDOFF]]", ""));
+  const cleanText = sanitizeText(withoutControlMarkers);
   if (handoff) {
     session.needsAttention = true;
     session.attentionReason = "AI requested human assistance.";
   }
-  return appendMessage(session, "assistant", cleanText, "ai");
+  const message = appendMessage(session, "assistant", cleanText, "ai");
+  if (measurementOffered) message.measurementOffered = true;
+  if (handoff) message.handoff = true;
+  if (industry.key === "renovation" && (measurementOffered || handoff)) updateLead(session);
+  return message;
 }
 
 function shouldShowPromotion(session) {
@@ -385,11 +395,12 @@ function restoreSession(session) {
 
 function publicSession(session) {
   const { score, reducedInterest, ...publicLead } = session.lead;
+  const publicMessages = session.messages.map(({ measurementOffered, handoff, ...message }) => message);
   return {
     id: session.id,
     channel: session.channel,
     mode: session.mode,
-    messages: session.messages,
+    messages: publicMessages,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
     expiresAt: session.expiresAt,
