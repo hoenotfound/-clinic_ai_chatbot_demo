@@ -8,6 +8,7 @@ const ROOT = path.join(__dirname, "..");
 delete process.env.REDIS_URL;
 
 const protection = require("../src/abuseProtection");
+const { currentConversationContext } = require("../src/aiMemoryContext");
 
 function sendRequest(port, { path: requestPath, ip = "203.0.113.20" } = {}) {
   return new Promise((resolve, reject) => {
@@ -33,13 +34,30 @@ function sendRequest(port, { path: requestPath, ip = "203.0.113.20" } = {}) {
   });
 }
 
-test("AI history cap keeps recent well-formed history inside both message and character budgets", async () => {
+function assertTrimmedHistory(received, history) {
+  assert.ok(received.length <= 16);
+  assert.ok(received.reduce((sum, message) => sum + message.content.length, 0) <= 12000);
+  assert.equal(received[0].role, "user", "trimmed Gemini history should begin with a customer turn");
+  assert.equal(received.at(-1).content, history.at(-1).content);
+  assert.ok(Number(received[0].content.slice(0, 2)) >= 5, "old conversation history should be discarded first");
+}
+
+test("AI history cap and structured memory wrap both legacy and live reply-result APIs", async () => {
   const ai = require("../src/aiService");
-  const original = ai.getReply;
-  let received = null;
+  const originalReply = ai.getReply;
+  const originalReplyResult = ai.getReplyResult;
+  let legacyReceived = null;
+  let liveReceived = null;
+  let liveContext = null;
+
   ai.getReply = async (messages) => {
-    received = messages;
+    legacyReceived = messages;
     return "ok";
+  };
+  ai.getReplyResult = async (messages) => {
+    liveReceived = messages;
+    liveContext = currentConversationContext();
+    return { text: "ok", source: "ai", degraded: false };
   };
 
   protection.installAbuseProtection();
@@ -49,14 +67,21 @@ test("AI history cap keeps recent well-formed history inside both message and ch
     content: `${String(index).padStart(2, "0")}:` + "x".repeat(997),
   }));
   await ai.getReply(history, false);
+  const result = await ai.getReplyResult(history, false);
 
-  assert.ok(received.length <= 16);
-  assert.ok(received.reduce((sum, message) => sum + message.content.length, 0) <= 12000);
-  assert.equal(received[0].role, "user", "trimmed Gemini history should begin with a customer turn");
-  assert.equal(received.at(-1).content, history.at(-1).content);
-  assert.ok(Number(received[0].content.slice(0, 2)) >= 5, "old conversation history should be discarded first");
+  assertTrimmedHistory(legacyReceived, history);
+  assertTrimmedHistory(liveReceived, history);
+  assert.equal(result.text, "ok");
+  assert.equal(liveContext.fullMessages.length, history.length, "structured memory must keep the full conversation outside the trimmed provider history");
+  assert.equal(liveContext.fullMessages[0].content, history[0].content);
+  assert.match(liveContext.memory, /Established customer language:/i);
+  assert.ok(liveContext.language, "established language should be available to the live AI path");
 
-  ai.getReply = original;
+  const serverSource = fs.readFileSync(path.join(ROOT, "src", "server.js"), "utf8");
+  assert.match(serverSource, /ai\.getReplyResult\(history, isFirstMessage\)/, "the live /message route must use the reply-result API covered by this wrapper");
+
+  ai.getReply = originalReply;
+  ai.getReplyResult = originalReplyResult;
 });
 
 test("message matcher protects both direct Render and mounted /ai-chatbot API paths only", () => {
