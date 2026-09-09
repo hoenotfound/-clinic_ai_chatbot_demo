@@ -34,6 +34,19 @@ test("Netlify deployment config publishes only the generated static bundle", () 
   assert.doesNotMatch(config, /onrender\.com/);
 });
 
+test("Netlify avoids duplicate dashboard builds and skips non-production deploy builds", () => {
+  const config = fs.readFileSync(path.join(ROOT, "netlify.toml"), "utf8");
+  const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+
+  assert.equal(packageJson.scripts.postinstall, "npm run build:dashboard");
+  assert.equal(packageJson.scripts["build:netlify"], "node scripts/build-netlify.js");
+  assert.doesNotMatch(packageJson.scripts["build:netlify"], /build:dashboard/);
+
+  assert.match(config, /\[context\.deploy-preview\]\s+ignore = "exit 0"/);
+  assert.match(config, /\[context\.branch-deploy\]\s+ignore = "exit 0"/);
+  assert.doesNotMatch(config.split("[context.deploy-preview]")[0], /^\s*ignore\s*=/m);
+});
+
 test("cold-start readiness backs off, validates config JSON and stops for manual retry", () => {
   const readiness = fs.readFileSync(path.join(ROOT, "public", "backend-readiness.js"), "utf8");
   const styles = fs.readFileSync(path.join(ROOT, "public", "cold-start.css"), "utf8");
