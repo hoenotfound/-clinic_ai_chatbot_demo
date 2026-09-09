@@ -7,6 +7,7 @@ const RETENTION_SECONDS = RETENTION_DAYS * 24 * 60 * 60;
 const HISTORY_DAYS = 90;
 const HISTORY_CACHE_MS = Math.max(5_000, Number.parseInt(process.env.DEMO_OPS_HISTORY_CACHE_MS || "60000", 10) || 60_000);
 const KEY_STATUS_WINDOW_MS = 15 * 60_000;
+const GEMINI_KEY_COUNT = 5;
 const SLOW_RESPONSE_MS = Math.max(500, Number.parseInt(process.env.DEMO_SLOW_RESPONSE_MS || "4000", 10) || 4000);
 const LATENCY_BUCKETS_MS = [250, 500, 750, 1000, 1500, 2000, 3000, 4000, 6000, 8000, 12000, 16000, 20000, 30000, 60000];
 const HISTORY_EVENTS = [
@@ -472,8 +473,10 @@ async function redisSnapshot(day) {
     pipeline.zcard(redisActiveKey());
     pipeline.zcard(redisActiveKey("patient"));
     pipeline.zcard(redisActiveKey("dashboard"));
-    pipeline.hgetall(redisKeyStatsKey(day, 1));
-    pipeline.hgetall(redisKeyStatsKey(day, 2));
+    const keyStatsStartIndex = 11;
+    for (let keyIndex = 1; keyIndex <= GEMINI_KEY_COUNT; keyIndex += 1) {
+      pipeline.hgetall(redisKeyStatsKey(day, keyIndex));
+    }
     const results = await pipeline.exec();
     const value = (index) => results[index]?.[1];
     return {
@@ -485,7 +488,9 @@ async function redisSnapshot(day) {
       activeVisitors: Number(value(8)) || 0,
       activePatientVisitors: Number(value(9)) || 0,
       activeDashboardVisitors: Number(value(10)) || 0,
-      keys: [normalizeKeySnapshot(value(11) || {}), normalizeKeySnapshot(value(12) || {})],
+      keys: Array.from({ length: GEMINI_KEY_COUNT }, (_, index) =>
+        normalizeKeySnapshot(value(keyStatsStartIndex + index) || {})
+      ),
     };
   }, null);
 }
@@ -723,7 +728,9 @@ async function getSnapshot() {
   const persistent = await redisSnapshot(day);
   const counters = persistent?.counters || numericObject(dayCounters(day));
   const meta = persistent?.meta || dayMeta(day);
-  const keys = persistent?.keys || [keyStats(day, 1), keyStats(day, 2)].map((item) => ({ ...item }));
+  const keys = persistent?.keys || Array.from({ length: GEMINI_KEY_COUNT }, (_, index) => ({
+    ...keyStats(day, index + 1),
+  }));
   const uniqueVisitors = persistent?.uniqueVisitors ?? uniqueSet(day).size;
   const uniquePatientVisitors = persistent?.uniquePatientVisitors ?? uniqueSet(day, "patient").size;
   const uniqueDashboardVisitors = persistent?.uniqueDashboardVisitors ?? uniqueSet(day, "dashboard").size;

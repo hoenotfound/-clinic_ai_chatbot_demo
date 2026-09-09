@@ -24,13 +24,19 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
   const timeoutStreaks = new Map();
 
   function getApiKeys() {
-    const keys = [process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY_2]
-      .map((value) => String(value || "").trim())
-      .filter(Boolean);
-    const unique = [...new Set(keys)];
-    if (unique.length) return unique;
-    const legacy = String(process.env.GEMINI_API_KEY || "").trim();
-    return legacy ? [legacy] : [];
+    const candidates = [];
+    if (process.env.GEMINI_API_KEYS) {
+      candidates.push(...String(process.env.GEMINI_API_KEYS).split(/[\n,;]/));
+    }
+    candidates.push(
+      process.env.GEMINI_API_KEY,
+      process.env.GEMINI_API_KEY_1,
+      process.env.GEMINI_API_KEY_2,
+      process.env.GEMINI_API_KEY_3,
+      process.env.GEMINI_API_KEY_4,
+      process.env.GEMINI_API_KEY_5
+    );
+    return [...new Set(candidates.map((value) => String(value || "").trim()).filter(Boolean))];
   }
 
   function thinkingConfig(model) {

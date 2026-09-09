@@ -30,6 +30,51 @@ function restoreEnv(previous) {
   }
 }
 
+test("Gemini key pool loads numbered keys through key 5 and deduplicates optional list entries", () => {
+  const names = [
+    "GEMINI_API_KEYS",
+    "GEMINI_API_KEY",
+    "GEMINI_API_KEY_1",
+    "GEMINI_API_KEY_2",
+    "GEMINI_API_KEY_3",
+    "GEMINI_API_KEY_4",
+    "GEMINI_API_KEY_5",
+  ];
+  const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+
+  try {
+    delete process.env.GEMINI_API_KEYS;
+    delete process.env.GEMINI_API_KEY;
+    process.env.GEMINI_API_KEY_1 = "key-one";
+    process.env.GEMINI_API_KEY_2 = "key-two";
+    process.env.GEMINI_API_KEY_3 = "key-three";
+    process.env.GEMINI_API_KEY_4 = "key-four";
+    process.env.GEMINI_API_KEY_5 = "key-five";
+
+    const gemini = makeFailover(async () => ({}));
+    assert.deepEqual(gemini.getApiKeys(), [
+      "key-one",
+      "key-two",
+      "key-three",
+      "key-four",
+      "key-five",
+    ]);
+
+    process.env.GEMINI_API_KEYS = "list-one, key-three\nlist-two;key-five";
+    assert.deepEqual(gemini.getApiKeys(), [
+      "list-one",
+      "key-three",
+      "list-two",
+      "key-five",
+      "key-one",
+      "key-two",
+      "key-four",
+    ]);
+  } finally {
+    restoreEnv(previous);
+  }
+});
+
 test("model-level 404 stops key rotation immediately", async () => {
   const calls = [];
   const gemini = makeFailover(async (_url, options) => {
@@ -80,15 +125,23 @@ test("production timeout switches away from the model without retrying another k
 
 test("getReply routes one 3.6 timeout directly to 3.5 Flash-Lite and retries 3.6 on the next request", async () => {
   const previous = {
+    GEMINI_API_KEYS: process.env.GEMINI_API_KEYS,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     GEMINI_API_KEY_1: process.env.GEMINI_API_KEY_1,
     GEMINI_API_KEY_2: process.env.GEMINI_API_KEY_2,
+    GEMINI_API_KEY_3: process.env.GEMINI_API_KEY_3,
+    GEMINI_API_KEY_4: process.env.GEMINI_API_KEY_4,
+    GEMINI_API_KEY_5: process.env.GEMINI_API_KEY_5,
     GEMINI_MODEL: process.env.GEMINI_MODEL,
     GEMINI_FALLBACK_MODEL: process.env.GEMINI_FALLBACK_MODEL,
   };
 
+  delete process.env.GEMINI_API_KEYS;
   process.env.GEMINI_API_KEY_1 = "key-one";
   process.env.GEMINI_API_KEY_2 = "key-two";
+  delete process.env.GEMINI_API_KEY_3;
+  delete process.env.GEMINI_API_KEY_4;
+  delete process.env.GEMINI_API_KEY_5;
   delete process.env.GEMINI_API_KEY;
   process.env.GEMINI_MODEL = "gemini-3.6-flash";
   process.env.GEMINI_FALLBACK_MODEL = "gemini-3.5-flash-lite";
@@ -173,6 +226,12 @@ test("Gemini deployment defaults stay aligned without changing the generic provi
     assert.match(source, /gemini-3\.6-flash/);
     assert.match(source, /gemini-3\.5-flash-lite/);
     assert.doesNotMatch(source, /gemini-2\.5-flash-lite/);
+    assert.match(source, /GEMINI_API_KEYS/);
+    assert.match(source, /GEMINI_API_KEY_1/);
+    assert.match(source, /GEMINI_API_KEY_2/);
+    assert.match(source, /GEMINI_API_KEY_3/);
+    assert.match(source, /GEMINI_API_KEY_4/);
+    assert.match(source, /GEMINI_API_KEY_5/);
   }
 
   assert.match(envExample, /GEMINI_ATTEMPT_TIMEOUT_MS=6000/);
