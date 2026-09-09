@@ -2,6 +2,15 @@
   command = "npm run build:netlify"
   publish = "netlify-dist"
 
+# Keep Netlify focused on the production branch. Pull-request previews and
+# non-production branch deploys exit before dependency installation/build work,
+# which avoids spending the legacy free-tier build-minute allowance on them.
+[context.deploy-preview]
+  ignore = "exit 0"
+
+[context.branch-deploy]
+  ignore = "exit 0"
+
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
