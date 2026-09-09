@@ -10,6 +10,7 @@ const previousEnv = {
   GEMINI_FALLBACK_MODEL: process.env.GEMINI_FALLBACK_MODEL,
   GEMINI_RETRY_DELAY_MS: process.env.GEMINI_RETRY_DELAY_MS,
   GEMINI_FAILOVER_BUDGET_MS: process.env.GEMINI_FAILOVER_BUDGET_MS,
+  GEMINI_FALLBACK_RESERVE_MS: process.env.GEMINI_FALLBACK_RESERVE_MS,
   GEMINI_ATTEMPT_TIMEOUT_MS: process.env.GEMINI_ATTEMPT_TIMEOUT_MS,
   GEMINI_FALLBACK_ATTEMPT_TIMEOUT_MS: process.env.GEMINI_FALLBACK_ATTEMPT_TIMEOUT_MS,
   GEMINI_KEY_COOLDOWN_MS: process.env.GEMINI_KEY_COOLDOWN_MS,
@@ -29,6 +30,7 @@ process.env.GEMINI_RETRY_DELAY_MS = "0";
 process.env.GEMINI_ATTEMPT_TIMEOUT_MS = "25";
 process.env.GEMINI_FALLBACK_ATTEMPT_TIMEOUT_MS = "20";
 process.env.GEMINI_FAILOVER_BUDGET_MS = "90";
+process.env.GEMINI_FALLBACK_RESERVE_MS = "25";
 process.env.GEMINI_KEY_COOLDOWN_MS = "100";
 process.env.GEMINI_QUOTA_COOLDOWN_MS = "200";
 process.env.GEMINI_MODEL_COOLDOWN_MS = "100";
@@ -146,12 +148,12 @@ test("Gemini prefers the two configured rotation keys and keeps legacy compatibi
   assert.deepEqual(aiService._test.getGeminiApiKeys(), ["test-key-1", "test-key-2"]);
 });
 
-test("Gemini retries INVALID_ARGUMENT once without thinkingConfig", async () => {
+test("Gemini retries thinkingConfig INVALID_ARGUMENT once without thinkingConfig", async () => {
   const calls = [];
   global.fetch = async (_url, options) => {
     calls.push(JSON.parse(options.body));
     if (calls.length === 1) {
-      return errorResponse(400, "INVALID_ARGUMENT", "Request contains an invalid argument.");
+      return errorResponse(400, "INVALID_ARGUMENT", "thinkingConfig is not supported for this model.");
     }
     return successResponse("Recovered reply");
   };
