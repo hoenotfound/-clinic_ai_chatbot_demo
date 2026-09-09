@@ -71,6 +71,7 @@ jobs:
           node --check test/renovationAiFirst.test.js
           node --check test/renovationMeasurementClose.test.js
           node --check test/renovationQuotationIntent.test.js
+          node --check test/renovationFullHistory.test.js
           node --check test/renovationCapabilityShield.test.js
           node --check test/pr46RoutingHardening.test.js
       - name: Run clinic browser E2E tests
@@ -128,6 +129,7 @@ jobs:
           node --check test/renovationAiFirst.test.js
           node --check test/renovationMeasurementClose.test.js
           node --check test/renovationQuotationIntent.test.js
+          node --check test/renovationFullHistory.test.js
           node --check test/renovationCapabilityShield.test.js
           node --check test/pr46RoutingHardening.test.js
       - name: Run renovation deterministic fallback browser E2E
