@@ -58,7 +58,14 @@ test("quotation education stays separate from formal fulfilment intent in EN, BM
     "How do you prepare a quotation?",
     "How can you prepare a quotation?",
     "Macam mana quotation disediakan?",
+    "Macam mana buat quotation?",
+    "Bagaimana buat quotation?",
+    "Bagaimana nak sediakan quotation?",
     "正式报价的流程是怎样的？",
+    "怎么做报价？",
+    "怎么出报价？",
+    "如何准备报价？",
+    "报价怎么做？",
   ];
   for (const text of education) {
     assert.equal(isQuotationEducationQuestion(text), true, text);
@@ -104,8 +111,10 @@ test("an education clause cannot suppress a separate explicit quotation request"
     "How do you prepare a quotation and could you give me a formal quotation?",
     "Macam mana quotation dibuat? Saya nak quotation juga.",
     "Macam mana quotation dibuat, boleh bagi saya quotation juga?",
+    "Bagaimana buat quotation, tapi saya nak quotation juga.",
     "报价流程怎样？请给我报价。",
     "报价流程怎样，也请给我报价。",
+    "怎么做报价，也请给我报价。",
   ];
 
   for (const text of mixedRequests) {
@@ -162,6 +171,31 @@ test("quotation education remains AI-first and does not create Pipeline quotatio
   assert.equal(fetchCalls, 1);
   assert.equal(result.source, "ai");
   assert.doesNotMatch(result.text, /\[\[HANDOFF\]\]/);
+});
+
+test("natural BM and Chinese quotation-process questions remain AI-first", async () => {
+  const processQuestions = [
+    "Bagaimana buat quotation?",
+    "怎么做报价？",
+  ];
+
+  for (const text of processQuestions) {
+    const session = demoState.createSession({ ip: `quotation-process-ai-${encodeURIComponent(text)}` });
+    demoState.addCustomerMessage(session, text);
+    assert.equal(session.lead.quotationIntent, false, text);
+    assert.equal(session.lead.bookingIntent, false, text);
+
+    let fetchCalls = 0;
+    global.fetch = async () => {
+      fetchCalls += 1;
+      return successResponse("The quotation process starts from the project scope, rough dimensions, site details and material direction before the team confirms the proper quotation.");
+    };
+
+    const result = await ai.getReplyResult([{ role: "user", content: text }], true);
+    assert.equal(fetchCalls, 1, text);
+    assert.equal(result.source, "ai", text);
+    assert.doesNotMatch(result.text, /\[\[HANDOFF\]\]/, text);
+  }
 });
 
 test("formal quotation fulfilment bypasses Gemini and matches the lead intent classifier", async () => {
