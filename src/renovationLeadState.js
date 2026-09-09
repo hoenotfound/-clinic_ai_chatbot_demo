@@ -4,10 +4,10 @@ const { detectKnownBudget } = require("./renovationBudgetContext");
 const { isExplicitHumanRequest, isTechnicalHandoffRequest } = require("./renovationRoutingIntent");
 const { staffActionReason } = require("./renovationCapabilityShield");
 const { measurementOfferAccepted } = require("./renovationMeasurementIntent");
+const { isFormalQuotationRequest } = require("./renovationQuotationIntent");
 
 const PRICE_PATTERN = /price|how much|cost|quotation|quote|budget|harga|berapa|kos|sebut harga|多少钱|多少錢|价格|價格|价钱|價錢|报价|報價|预算|預算/i;
 const BUDGET_QUESTION_PATTERN = /(?:do you (?:already )?have|what(?:'s| is)|how much).{0,30}\bbudget\b|\bbudget\b.{0,30}(?:range|in mind|roughly|approximately|around how much)|\bbudget\s*\?|\bbajet\b.{0,24}(?:berapa|range|anggaran)|(?:berapa|anggaran).{0,24}\bbajet\b|\bbajet\s*\?|(?:预算|預算).{0,12}(?:多少|几|幾|范围|範圍)|(?:多少|几|幾).{0,12}(?:预算|預算)|(?:预算|預算)\s*[?？]/i;
-const QUOTE_INTENT_PATTERN = /exact\s+(?:price|quote|quotation)|proper\s+(?:quote|quotation)|send\s+(?:me\s+)?(?:a\s+)?quote|prepare\s+(?:a\s+)?quotation|can\s+(?:you\s+)?quote|nak\s+quotation|mahu\s+quotation|buat\s+quotation|正式报价|正式報價|给我报价|給我報價|出报价|出報價/i;
 const MEASUREMENT_PATTERN = /\b\d+(?:\.\d+)?\s*(?:ft|feet|foot|mm|cm|m|meter|metre)s?\b|floor\s*plan|layout\s*plan|尺寸|尺|平面图|平面圖|ukuran|pelan/i;
 const FLOOR_PLAN_PATTERN = /floor\s*plan|layout\s*plan|平面图|平面圖|pelan/i;
 const MEASUREMENT_GROUP_PATTERN = /\b(?:both|all|each)\b|两个|兩個|全部|都|semua|kedua-dua/i;
@@ -133,7 +133,7 @@ function hasRenewedInterest(messages, negativeIndex) {
     return detectServices(text).length ||
       PRICE_PATTERN.test(text) ||
       staffActionReason(text) === "site_measurement" ||
-      QUOTE_INTENT_PATTERN.test(text) ||
+      isFormalQuotationRequest(text) ||
       RENEWED_INTEREST_PATTERN.test(text);
   });
 }
@@ -293,7 +293,9 @@ function updateRenovationLead(session) {
   const contextualMeasurementIntent = !negative && measurementOfferAccepted(activeConversation);
   const previousMeasurementIntent = !negative && carryPreviousProject && Boolean(session.lead?.siteMeasurementIntent);
   const siteMeasurementIntent = explicitMeasurementIntent || contextualMeasurementIntent || previousMeasurementIntent;
-  const quotationIntent = !negative && QUOTE_INTENT_PATTERN.test(activeText);
+  const quotationIntent = !negative && activeMessages.some(
+    (message) => isFormalQuotationRequest(message.content || "")
+  );
   const humanRequest = !negative && activeMessages.some((message) => isExplicitHumanRequest(message.content || ""));
   const technicalHandoff = !negative && activeMessages.some((message) => isTechnicalHandoffRequest(message.content || ""));
   const bookingIntent = siteMeasurementIntent || quotationIntent;
