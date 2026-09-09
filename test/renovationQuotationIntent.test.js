@@ -147,12 +147,14 @@ test("formal quotation fulfilment bypasses Gemini and matches the lead intent cl
   assert.equal(session.lead.bookingIntent, true);
 });
 
-test("a formal quotation request after a soft rejection renews the lead using the shared intent", () => {
+test("a formal quotation request after a rejection renews the lead using the shared intent", () => {
   const session = demoState.createSession({ ip: "quotation-renewal" });
   demoState.addCustomerMessage(session, "I want a kitchen cabinet in Puchong.");
+  session.lastCustomerMessageAt = 0;
   demoState.addCustomerMessage(session, "No thanks, not interested now.");
   assert.equal(session.lead.reducedInterest, true);
 
+  session.lastCustomerMessageAt = 0;
   demoState.addCustomerMessage(session, "Actually, please email me a formal quotation.");
   assert.equal(session.lead.reducedInterest, false);
   assert.equal(session.lead.quotationIntent, true);
