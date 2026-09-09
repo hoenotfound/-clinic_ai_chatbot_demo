@@ -1,3 +1,5 @@
+const { isExplicitMeasurementRequest } = require("./renovationMeasurementIntent");
+
 const FORMAL_QUOTE_PATTERNS = [
   /\b(?:send|prepare|issue|email|whatsapp|make)\b[^.!?]{0,60}\b(?:quotation|quote)\b/i,
   /\b(?:formal|official|final|proper|detailed)\s+(?:quotation|quote)\b/i,
@@ -6,6 +8,8 @@ const FORMAL_QUOTE_PATTERNS = [
   /\b(?:hantar|sediakan|buat|keluarkan)\b[^.!?]{0,40}\b(?:quotation|sebut\s+harga)\b|\b(?:quotation|sebut\s+harga)\s+(?:rasmi|final)\b/i,
 ];
 
+// Retained for focused regression visibility. Runtime classification uses the shared
+// semantic helper below so Pipeline intent and hard handoff routing cannot drift apart.
 const SITE_MEASUREMENT_PATTERNS = [
   /\b(?:book|arrange|schedule|set\s*up)\b[^.!?]{0,60}\b(?:site\s+(?:measurement|visit)|measurement|measure|site\s+visit|consultation)\b/i,
   /\b(?:can|could|would|will)\s+(?:you|your\s+team|the\s+team|designer)\s+(?:come|visit|measure)\b/i,
@@ -56,7 +60,7 @@ function matchesAny(text, patterns) {
 
 function staffActionReason(text) {
   if (matchesAny(text, FORMAL_QUOTE_PATTERNS)) return "formal_quote";
-  if (matchesAny(text, SITE_MEASUREMENT_PATTERNS)) return "site_measurement";
+  if (isExplicitMeasurementRequest(text)) return "site_measurement";
   if (matchesAny(text, PAYMENT_DOCUMENT_PATTERNS)) return "payment_details";
   if (matchesAny(text, DOCUMENT_REQUEST_PATTERNS)) return "documents";
   return null;
