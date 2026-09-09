@@ -68,6 +68,13 @@ function activeRenovationDependencies() {
   return industry.key === "renovation" ? loadRenovationDependencies() : null;
 }
 
+function fullRenovationMessages(messages) {
+  const deps = activeRenovationDependencies();
+  if (!deps) return messages;
+  const fullMessages = deps.currentConversationContext()?.fullMessages;
+  return Array.isArray(fullMessages) && fullMessages.length ? fullMessages : messages;
+}
+
 function customerReply(reply) {
   const deps = activeRenovationDependencies();
   return deps ? deps.sanitizeRenovationCustomerReply(reply) : reply;
@@ -359,32 +366,36 @@ async function getReplyResult(messages, isFirstMessage = false) {
       return makeReplyResult(customerReply(ruleReply), { source: "rule" });
     }
 
+    const renovationMessages = fullRenovationMessages(messages);
+
     if (industry.key === "renovation") {
-      const routingReply = renovationRoutingPrecheckReply(messages);
+      const routingReply = renovationRoutingPrecheckReply(renovationMessages);
       if (routingReply) {
         return makeReplyResult(customerReply(routingReply), { source: "rule" });
       }
     }
 
-    let intakePlan = renovationIntakePlan(messages, { isFirstMessage });
-    intakePlan = reconcileRenovationAdviceProgress(messages, intakePlan);
+    let intakePlan = renovationIntakePlan(renovationMessages, { isFirstMessage });
+    intakePlan = reconcileRenovationAdviceProgress(renovationMessages, intakePlan);
     if (intakePlan?.bypass) {
-      return makeReplyResult(getFallbackReply(messages), { source: "deterministic" });
+      return makeReplyResult(getFallbackReply(renovationMessages), { source: "deterministic" });
     }
 
+    // Keep the provider payload on the capped recent history supplied by abuseProtection,
+    // while deriving renovation qualification and fallback state from the full session above.
     const modelMessages = aiMessages(messages, intakePlan);
-    const deterministicFallback = () => deterministicPlannedFallback(messages, intakePlan);
+    const deterministicFallback = () => deterministicPlannedFallback(renovationMessages, intakePlan);
 
     try {
       if (provider === "mock") {
         return makeReplyResult(
-          shieldRenovationCapabilityDisclosure(messages, deterministicFallback()),
+          shieldRenovationCapabilityDisclosure(renovationMessages, deterministicFallback()),
           { source: "deterministic" }
         );
       }
       if (provider === "claude") {
         const reply = await getClaudeReply(modelMessages, isFirstMessage);
-        return makeReplyResult(shieldRenovationCapabilityDisclosure(messages, reply), { source: "ai" });
+        return makeReplyResult(shieldRenovationCapabilityDisclosure(renovationMessages, reply), { source: "ai" });
       }
       if (provider === "gemini") {
         let usedDeterministicFallback = false;
@@ -394,7 +405,7 @@ async function getReplyResult(messages, isFirstMessage = false) {
         };
         const reply = await gemini.getReply(modelMessages, isFirstMessage, trackedFallback);
         return makeReplyResult(
-          shieldRenovationCapabilityDisclosure(messages, reply),
+          shieldRenovationCapabilityDisclosure(renovationMessages, reply),
           {
             source: usedDeterministicFallback ? "deterministic" : "ai",
             degraded: usedDeterministicFallback,
@@ -406,7 +417,7 @@ async function getReplyResult(messages, isFirstMessage = false) {
       console.error(`AI provider "${provider}" failed; using deterministic demo fallback:`, error);
       if (provider === "gemini") opsStats.recordDeterministicFallback("escaped_provider_error");
       return makeReplyResult(
-        shieldRenovationCapabilityDisclosure(messages, deterministicFallback()),
+        shieldRenovationCapabilityDisclosure(renovationMessages, deterministicFallback()),
         { source: "deterministic", degraded: true }
       );
     }
@@ -440,6 +451,7 @@ module.exports = {
     withRenovationAiContext,
     aiMessages,
     reconcileRenovationAdviceProgress,
+    fullRenovationMessages,
     makeReplyResult,
     loadRenovationDependencies,
     geminiThinkingConfig: gemini.thinkingConfig,

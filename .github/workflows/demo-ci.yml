@@ -44,6 +44,7 @@ jobs:
           node --check src/renovationAiContext.js
           node --check src/renovationIntakeFlow.js
           node --check src/renovationMeasurementIntent.js
+          node --check src/renovationQuotationIntent.js
           node --check src/renovationLeadState.js
           node --check src/renovationServiceDetection.js
           node --check src/renovationConversationIntent.js
@@ -69,6 +70,8 @@ jobs:
           node --check e2e/renovation.spec.js
           node --check test/renovationAiFirst.test.js
           node --check test/renovationMeasurementClose.test.js
+          node --check test/renovationQuotationIntent.test.js
+          node --check test/renovationFullHistory.test.js
           node --check test/renovationCapabilityShield.test.js
           node --check test/pr46RoutingHardening.test.js
       - name: Run clinic browser E2E tests
@@ -109,6 +112,7 @@ jobs:
           node --check src/renovationAiContext.js
           node --check src/renovationIntakeFlow.js
           node --check src/renovationMeasurementIntent.js
+          node --check src/renovationQuotationIntent.js
           node --check src/renovationLeadState.js
           node --check src/renovationServiceDetection.js
           node --check src/renovationConversationIntent.js
@@ -124,6 +128,8 @@ jobs:
           node --check e2e/renovation.spec.js
           node --check test/renovationAiFirst.test.js
           node --check test/renovationMeasurementClose.test.js
+          node --check test/renovationQuotationIntent.test.js
+          node --check test/renovationFullHistory.test.js
           node --check test/renovationCapabilityShield.test.js
           node --check test/pr46RoutingHardening.test.js
       - name: Run renovation deterministic fallback browser E2E
