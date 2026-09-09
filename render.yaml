@@ -30,11 +30,13 @@ services:
       - key: GEMINI_FALLBACK_MODEL
         value: gemini-3.5-flash-lite
       - key: GEMINI_ATTEMPT_TIMEOUT_MS
-        value: 6000
+        value: 8000
       - key: GEMINI_FALLBACK_ATTEMPT_TIMEOUT_MS
-        value: 4500
+        value: 5000
       - key: GEMINI_FAILOVER_BUDGET_MS
-        value: 16000
+        value: 15000
+      - key: GEMINI_FALLBACK_RESERVE_MS
+        value: 5500
       - key: GEMINI_RETRY_DELAY_MS
         value: 0
       - key: GEMINI_KEY_COOLDOWN_MS
@@ -43,6 +45,10 @@ services:
         value: 900000
       - key: GEMINI_MODEL_COOLDOWN_MS
         value: 60000
+      - key: GEMINI_TIMEOUT_MODEL_COOLDOWN_MS
+        value: 30000
+      - key: GEMINI_TIMEOUT_STREAK_THRESHOLD
+        value: 2
       - key: AI_REQUEST_TIMEOUT_MS
         value: 4500
       - key: REDIS_URL
