@@ -42,8 +42,8 @@ const EXPLICIT_QUOTE_REQUEST_PATTERNS = [
 ];
 
 const ROUGH_ESTIMATE_CONTEXT_PATTERNS = [
-  /\b(?:quotation|quote)\b[^.!?]{0,45}\b\d+(?:\.\d+)?\s*(?:ft|feet|foot|mm|cm|m|meter|metre|kaki)s?\b/i,
-  /\b\d+(?:\.\d+)?\s*(?:ft|feet|foot|mm|cm|m|meter|metre|kaki)s?\b[^.!?]{0,45}\b(?:quotation|quote)\b/i,
+  /\b(?:quotation|quote|sebut\s+harga)\b[^.!?]{0,60}\b\d+(?:\.\d+)?\s*(?:ft|feet|foot|mm|cm|m|meter|metre|kaki)s?\b/i,
+  /\b\d+(?:\.\d+)?\s*(?:ft|feet|foot|mm|cm|m|meter|metre|kaki)s?\b[^.!?]{0,60}\b(?:quotation|quote|sebut\s+harga)\b/i,
 ];
 
 function matchesAny(text, patterns) {
@@ -87,10 +87,12 @@ function isFormalQuotationRequest(text) {
   const clauses = quotationClauses(value);
   if (clauses.some(clauseHasFormalQuotationRequest)) return true;
 
-  // A customer can ask about the quotation process and request the actual quotation
-  // in the same sentence. Explicit fulfilment must win over the education clause.
+  // Whole-message fallback exists only for a mixed education + fulfilment request
+  // that punctuation/clause splitting cannot isolate. Do not let it reclassify a
+  // rough estimate after clause-level logic intentionally kept that request AI-first.
+  if (!isQuotationEducationQuestion(value)) return false;
   if (matchesAny(value, NATURAL_DIRECT_QUOTE_REQUEST_PATTERNS) && !isRoughEstimateContext(value)) return true;
-  return matchesAny(value, EXPLICIT_QUOTE_REQUEST_PATTERNS);
+  return matchesAny(value, EXPLICIT_QUOTE_REQUEST_PATTERNS) && !isRoughEstimateContext(value);
 }
 
 module.exports = {
