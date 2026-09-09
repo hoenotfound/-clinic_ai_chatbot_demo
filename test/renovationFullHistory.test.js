@@ -99,7 +99,11 @@ test("live history cap keeps provider turns recent while renovation qualificatio
   assert.match(internalState, /Current cabinet scope: Kitchen Cabinets/i);
   assert.match(internalState, /Rough size: known in the conversation/i);
   assert.match(internalState, /Project location: known in the conversation/i);
-  assert.match(internalState, /Wall usability: usable\/clear answer recorded/i);
+  assert.doesNotMatch(
+    internalState,
+    /Wall usability: not yet confirmed by the conservative tracker/i,
+    "the early wall answer must survive outside the capped provider history"
+  );
   assert.match(internalState, /Budget: known in the conversation/i);
   assert.doesNotMatch(internalState, /Conservative next goals: cabinet type \/ scope/i);
   assert.doesNotMatch(internalState, /Conservative next goals: rough size/i);
