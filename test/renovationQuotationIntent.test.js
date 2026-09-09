@@ -78,15 +78,35 @@ test("quotation education stays separate from formal fulfilment intent in EN, BM
 test("formal quotation fulfilment and direct high-intent requests are classified consistently", () => {
   const requests = [
     "Please email me a formal quotation.",
+    "Could you give me a quotation?",
+    "Can I have a quotation?",
     "I need a quotation for this project.",
     "I need the exact price for this project.",
     "Boleh hantar quotation rasmi ke WhatsApp saya?",
+    "Boleh bagi saya quotation?",
     "Saya nak quotation untuk kitchen cabinet.",
     "可以发正式报价单给我吗？",
     "请给我报价。",
   ];
   for (const text of requests) {
-    assert.equal(isQuotationEducationQuestion(text), false, text);
+    assert.equal(isFormalQuotationRequest(text), true, text);
+    assert.equal(staffActionReason(text), "formal_quote", text);
+  }
+});
+
+test("an education clause cannot suppress a separate explicit quotation request", () => {
+  const mixedRequests = [
+    "How do you prepare a quotation? Please email me a formal quotation.",
+    "What do you need for a quotation? I want a quotation for my kitchen.",
+    "How do you prepare a quotation and could you give me a formal quotation?",
+    "Macam mana quotation dibuat? Saya nak quotation juga.",
+    "Macam mana quotation dibuat, boleh bagi saya quotation juga?",
+    "报价流程怎样？请给我报价。",
+    "报价流程怎样，也请给我报价。",
+  ];
+
+  for (const text of mixedRequests) {
+    assert.equal(isQuotationEducationQuestion(text), true, `education portion should still be recognized: ${text}`);
     assert.equal(isFormalQuotationRequest(text), true, text);
     assert.equal(staffActionReason(text), "formal_quote", text);
   }
@@ -95,7 +115,9 @@ test("formal quotation fulfilment and direct high-intent requests are classified
 test("formal quotation requests set the same Pipeline intent that triggers staff routing", () => {
   const requests = [
     "I need a quotation for the kitchen cabinet.",
+    "Could you give me a quotation for the kitchen cabinet?",
     "Saya nak quotation untuk kitchen cabinet.",
+    "Boleh bagi saya quotation untuk kitchen cabinet?",
     "厨房柜请给我报价。",
   ];
 
@@ -107,6 +129,15 @@ test("formal quotation requests set the same Pipeline intent that triggers staff
     assert.equal(session.lead.temperature, "hot", text);
     assert.match(session.lead.summary, /proper quotation/i, text);
   }
+});
+
+test("mixed education plus fulfilment also synchronizes Pipeline intent", () => {
+  const text = "How do you prepare a quotation? Please email me a formal quotation for the kitchen cabinet.";
+  const session = demoState.createSession({ ip: "quotation-mixed-sync" });
+  demoState.addCustomerMessage(session, text);
+  assert.equal(session.lead.quotationIntent, true);
+  assert.equal(session.lead.bookingIntent, true);
+  assert.equal(session.lead.temperature, "hot");
 });
 
 test("quotation education remains AI-first and does not create Pipeline quotation intent", async () => {
@@ -149,6 +180,21 @@ test("formal quotation fulfilment bypasses Gemini and matches the lead intent cl
   demoState.addCustomerMessage(session, text);
   assert.equal(session.lead.quotationIntent, true);
   assert.equal(session.lead.bookingIntent, true);
+});
+
+test("mixed education plus fulfilment bypasses Gemini because the explicit request wins", async () => {
+  let fetchCalls = 0;
+  global.fetch = async () => {
+    fetchCalls += 1;
+    throw new Error("Gemini should not be called when the same message also requests quotation fulfilment");
+  };
+
+  const text = "How do you prepare a quotation? Please email me a formal quotation for my kitchen cabinet.";
+  const result = await ai.getReplyResult([{ role: "user", content: text }], true);
+
+  assert.equal(fetchCalls, 0);
+  assert.equal(result.source, "rule");
+  assert.match(result.text, /\[\[HANDOFF\]\]/);
 });
 
 test("a formal quotation request after a rejection renews the lead using the shared intent", () => {
