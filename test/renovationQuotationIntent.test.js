@@ -75,11 +75,15 @@ test("quotation education stays separate from formal fulfilment intent in EN, BM
   }
 });
 
-test("formal quotation fulfilment is classified consistently in EN, BM and Chinese", () => {
+test("formal quotation fulfilment and direct high-intent requests are classified consistently", () => {
   const requests = [
     "Please email me a formal quotation.",
+    "I need a quotation for this project.",
+    "I need the exact price for this project.",
     "Boleh hantar quotation rasmi ke WhatsApp saya?",
+    "Saya nak quotation untuk kitchen cabinet.",
     "可以发正式报价单给我吗？",
+    "请给我报价。",
   ];
   for (const text of requests) {
     assert.equal(isQuotationEducationQuestion(text), false, text);
@@ -90,9 +94,9 @@ test("formal quotation fulfilment is classified consistently in EN, BM and Chine
 
 test("formal quotation requests set the same Pipeline intent that triggers staff routing", () => {
   const requests = [
-    "Please email me a formal quotation for the kitchen cabinet.",
-    "Boleh hantar quotation rasmi untuk kitchen cabinet ke WhatsApp saya?",
-    "厨房柜可以发正式报价单给我吗？",
+    "I need a quotation for the kitchen cabinet.",
+    "Saya nak quotation untuk kitchen cabinet.",
+    "厨房柜请给我报价。",
   ];
 
   for (const [index, text] of requests.entries()) {
