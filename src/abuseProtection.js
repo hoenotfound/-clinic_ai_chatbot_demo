@@ -254,20 +254,29 @@ function buildConversationMemory(messages) {
   return facts.join("\n");
 }
 
+function runWithPreparedAiHistory(handler, messages, isFirstMessage) {
+  const fullMessages = Array.isArray(messages) ? messages : [];
+  const context = {
+    fullMessages,
+    memory: buildConversationMemory(fullMessages),
+    language: establishedConversationLanguage(fullMessages),
+  };
+  return runWithConversationContext(
+    context,
+    () => handler(trimAiHistory(fullMessages), isFirstMessage)
+  );
+}
+
 function installAiHistoryCap() {
   if (aiHistoryInstalled) return;
   const ai = require("./aiService");
-  if (typeof ai.getReply !== "function") return;
-  const originalGetReply = ai.getReply.bind(ai);
-  ai.getReply = (messages, isFirstMessage) => {
-    const fullMessages = Array.isArray(messages) ? messages : [];
-    const context = {
-      fullMessages,
-      memory: buildConversationMemory(fullMessages),
-      language: establishedConversationLanguage(fullMessages),
-    };
-    return runWithConversationContext(context, () => originalGetReply(trimAiHistory(fullMessages), isFirstMessage));
-  };
+  const methodNames = ["getReply", "getReplyResult"].filter((name) => typeof ai[name] === "function");
+  if (!methodNames.length) return;
+
+  for (const name of methodNames) {
+    const original = ai[name].bind(ai);
+    ai[name] = (messages, isFirstMessage) => runWithPreparedAiHistory(original, messages, isFirstMessage);
+  }
   aiHistoryInstalled = true;
 }
 
@@ -333,6 +342,7 @@ module.exports = {
   enforceIpTelemetryLimit,
   trimAiHistory,
   buildConversationMemory,
+  runWithPreparedAiHistory,
   installAbuseProtection,
   resetForTests,
 };
