@@ -14,9 +14,12 @@ const QUOTATION_EDUCATION_PATTERNS = [
 
 const FORMAL_QUOTE_PATTERNS = [
   /\b(?:send|prepare|issue|email|whatsapp|make)\b[^.!?]{0,60}\b(?:quotation|quote)\b/i,
-  /\b(?:formal|official|final|proper|detailed)\s+(?:quotation|quote)\b/i,
+  /\b(?:formal|official|final|proper|detailed|exact)\s+(?:price|quotation|quote)\b/i,
   /\b(?:quotation|quote)\s+(?:pdf|file|document)\b/i,
+  /\b(?:i|we)\s+(?:need|want|would\s+like)\s+(?:a\s+)?(?:quotation|quote)\b/i,
+  /\b(?:nak|mahu|perlukan)\s+(?:quotation|sebut\s+harga)\b/i,
   /(?:正式|完整|final).{0,4}(?:报价单|報價單|quotation)|(?:发|發|给|給|出|做|准备|準備).{0,12}(?:报价单|報價單)|(?:报价单|報價單).{0,10}(?:吗|嗎|可以|能不能|发|發|给|給)/i,
+  /(?:给我|給我|我要|我想要|需要).{0,6}(?:报价|報價|报价单|報價單)|(?:出|做).{0,4}(?:报价|報價)/i,
   /\b(?:hantar|sediakan|buat|keluarkan)\b[^.!?]{0,40}\b(?:quotation|sebut\s+harga)\b|\b(?:quotation|sebut\s+harga)\s+(?:rasmi|final)\b/i,
 ];
 
