@@ -4,7 +4,8 @@ const QUOTATION_EDUCATION_PATTERNS = [
   /\b(?:quotation|quote)\b[^.!?]{0,35}\b(?:process|procedure|requirements?|works?)\b/i,
   /\bwhat\b[^.!?]{0,50}\b(?:need|required|information|details|documents?)\b[^.!?]{0,45}\b(?:quotation|quote)\b/i,
   /\bwhat\b[^.!?]{0,40}\b(?:quotation|quote)\b[^.!?]{0,45}\b(?:need|required|based\s+on)\b/i,
-  /\bmacam\s+mana\b[^.!?]{0,55}\b(?:quotation|sebut\s+harga)\b[^.!?]{0,30}\b(?:dibuat|disediakan|proses|berfungsi)?/i,
+  /\b(?:macam\s+mana|bagaimana)\b[^.!?]{0,55}\b(?:buat|sediakan|prepare|create|keluarkan)\b[^.!?]{0,25}\b(?:quotation|sebut\s+harga)\b/i,
+  /\b(?:macam\s+mana|bagaimana)\b[^.!?]{0,55}\b(?:quotation|sebut\s+harga)\b[^.!?]{0,30}\b(?:dibuat|disediakan|proses|berfungsi)?/i,
   /\b(?:quotation|sebut\s+harga)\b[^.!?]{0,35}\b(?:proses|cara|syarat|perlukan|perlu)\b/i,
   /\bapa\b[^.!?]{0,45}\b(?:perlu|perlukan|maklumat|butiran|dokumen)\b[^.!?]{0,45}\b(?:quotation|sebut\s+harga)\b/i,
   /(?:报价|報價|报价单|報價單).{0,18}(?:流程|怎么|怎麼|如何|怎样|怎樣|需要什么|需要什麼|要什么|要什麼|需要哪些|要哪些)/i,
@@ -39,6 +40,16 @@ const EXPLICIT_QUOTE_REQUEST_PATTERNS = [
   /\b(?:nak|mahu|perlukan)\s+(?:quotation|sebut\s+harga)\b/i,
   /\b(?:boleh\s+)?(?:hantar|sediakan|buat|keluarkan|bagi)\b[^.!?]{0,35}\b(?:saya\s+)?(?:quotation|sebut\s+harga)\b/i,
   /(?:请|請|麻烦|麻煩)?(?:发|發|给|給|出|做|准备|準備).{0,12}(?:报价|報價|报价单|報價單)|(?:给我|給我|我要|我想要|需要).{0,6}(?:报价|報價|报价单|報價單)/i,
+];
+
+const EDUCATION_FULFILMENT_OVERRIDE_PATTERNS = [
+  /\b(?:please|pls|kindly)\b[^.!?]{0,25}\b(?:send|prepare|issue|email|whatsapp|give|provide)\b[^.!?]{0,60}\b(?:quotation|quote)\b/i,
+  /\b(?:can|could|would)\s+you\s+(?:send|issue|email|whatsapp|give|provide)\b[^.!?]{0,60}\b(?:quotation|quote)\b/i,
+  /\b(?:i|we)\s+(?:need|want|would\s+like)\s+(?:a\s+)?(?:quotation|quote)\b/i,
+  /\b(?:can|could|may)\s+i\s+have\s+(?:a\s+)?(?:quotation|quote)\b/i,
+  /\b(?:saya\s+)?(?:nak|mahu|perlukan)\s+(?:quotation|sebut\s+harga)\b/i,
+  /\b(?:boleh\s+)?(?:hantar|bagi)\b[^.!?]{0,35}\b(?:saya\s+)?(?:quotation|sebut\s+harga)\b/i,
+  /(?:请|請|麻烦|麻煩).{0,8}(?:发|發|给|給|准备|準備).{0,12}(?:报价|報價|报价单|報價單)|(?:给我|給我|我要|我想要|需要).{0,6}(?:报价|報價|报价单|報價單)/i,
 ];
 
 const ROUGH_ESTIMATE_CONTEXT_PATTERNS = [
@@ -76,8 +87,14 @@ function clauseHasFormalQuotationRequest(clause) {
   // questions that the AI should answer first.
   if (!formal && naturalDirect && isRoughEstimateContext(clause)) return false;
 
-  if (!isQuotationEducationQuestion(clause)) return true;
-  return matchesAny(clause, EXPLICIT_QUOTE_REQUEST_PATTERNS) || naturalDirect;
+  // Process/education wording wins over ambiguous action verbs such as "buat quotation"
+  // or "怎么做报价". A real fulfilment request still wins when it is stated separately
+  // or explicitly in the same clause.
+  if (isQuotationEducationQuestion(clause)) {
+    return naturalDirect || matchesAny(clause, EDUCATION_FULFILMENT_OVERRIDE_PATTERNS);
+  }
+
+  return true;
 }
 
 function isFormalQuotationRequest(text) {
@@ -88,11 +105,12 @@ function isFormalQuotationRequest(text) {
   if (clauses.some(clauseHasFormalQuotationRequest)) return true;
 
   // Whole-message fallback exists only for a mixed education + fulfilment request
-  // that punctuation/clause splitting cannot isolate. Do not let it reclassify a
-  // rough estimate after clause-level logic intentionally kept that request AI-first.
+  // that punctuation/clause splitting cannot isolate. Keep pure process questions
+  // AI-first even when they contain verbs that can also be used as action requests.
   if (!isQuotationEducationQuestion(value)) return false;
-  if (matchesAny(value, NATURAL_DIRECT_QUOTE_REQUEST_PATTERNS) && !isRoughEstimateContext(value)) return true;
-  return matchesAny(value, EXPLICIT_QUOTE_REQUEST_PATTERNS) && !isRoughEstimateContext(value);
+  if (isRoughEstimateContext(value)) return false;
+  return matchesAny(value, NATURAL_DIRECT_QUOTE_REQUEST_PATTERNS) ||
+    matchesAny(value, EDUCATION_FULFILMENT_OVERRIDE_PATTERNS);
 }
 
 module.exports = {
@@ -103,6 +121,7 @@ module.exports = {
     FORMAL_QUOTE_PATTERNS,
     NATURAL_DIRECT_QUOTE_REQUEST_PATTERNS,
     EXPLICIT_QUOTE_REQUEST_PATTERNS,
+    EDUCATION_FULFILMENT_OVERRIDE_PATTERNS,
     ROUGH_ESTIMATE_CONTEXT_PATTERNS,
     quotationClauses,
     isRoughEstimateContext,
