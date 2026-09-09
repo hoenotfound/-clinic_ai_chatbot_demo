@@ -104,6 +104,47 @@ test("timing-only Malaysian replies can accept a marked AI measurement offer", (
   }
 });
 
+test("follow-up questions after a measurement offer are not mistaken for acceptance", () => {
+  const offer = {
+    role: "assistant",
+    content: "I can get the team to arrange a site measurement for you.",
+    measurementOffered: true,
+  };
+  for (const reply of [
+    "Can you explain how it works?",
+    "Boleh explain dulu macam mana proses dia?",
+    "可以先告诉我流程吗？",
+  ]) {
+    assert.equal(
+      measurementIntent.measurementOfferAccepted([offer, { role: "user", content: reply }]),
+      false,
+      reply
+    );
+  }
+});
+
+test("measurement education stays informational while explicit requests are recognized consistently", () => {
+  for (const question of [
+    "How does site measurement work?",
+    "Boleh explain dulu macam mana site measurement?",
+    "可以先告诉我上门量尺流程吗？",
+  ]) {
+    assert.equal(measurementIntent.isMeasurementEducationRequest(question), true, question);
+    assert.equal(measurementIntent.isExplicitMeasurementRequest(question), false, question);
+    const plan = buildRenovationIntakePlan([{ role: "user", content: question }], { isFirstMessage: true });
+    assert.equal(plan.bypass, false, question);
+  }
+
+  for (const request of [
+    "I need site measurement",
+    "Site measurement please",
+    "Saya nak site measurement",
+    "我想安排上门量尺",
+  ]) {
+    assert.equal(measurementIntent.isExplicitMeasurementRequest(request), true, request);
+  }
+});
+
 test("measurement-offer detection follows arrangement intent rather than a keyword mention", () => {
   assert.equal(
     intakeHelpers.isMeasurementOfferText("I can get the team to arrange a site measurement for you. Shall we do that?"),
@@ -134,6 +175,28 @@ test("soft decline does not immediately repeat the close or hand off", () => {
   assert.equal(plan.reply, null);
 });
 
+test("a new buying signal after a soft decline re-enables the site-measurement close", () => {
+  const messages = qualifiedConversation();
+  messages.push({
+    role: "assistant",
+    content: `${intakeHelpers.measurementCloseQuestion("en")} [[MEASUREMENT_OFFERED]]`,
+    measurementOffered: true,
+  });
+  messages.push({ role: "user", content: "I want to think about it first" });
+  messages.push({ role: "assistant", content: "No problem. We can keep looking at the project details first." });
+  messages.push({ role: "user", content: "Okay, I want to proceed now." });
+
+  const plan = buildRenovationIntakePlan(messages);
+
+  assert.equal(measurementIntent.measurementOfferDeclined(messages), true);
+  assert.equal(plan.state.strongBuyingIntent, true);
+  assert.equal(plan.state.measurementOfferSent, false);
+  assert.equal(plan.state.measurementOfferAccepted, false);
+  assert.match(plan.reply, /site measurement/i);
+  assert.match(plan.reply, /\[\[MEASUREMENT_OFFERED\]\]/);
+  assert.doesNotMatch(plan.reply, /\[\[HANDOFF\]\]/);
+});
+
 test("an affirmative-looking reply with a delay is not treated as acceptance", () => {
   const messages = qualifiedConversation();
   messages.push({ role: "assistant", content: intakeHelpers.measurementCloseQuestion("en") });
@@ -157,7 +220,7 @@ test("deterministic outage opening is conversational instead of the old three-fi
   assert.doesNotMatch(OPENING_MESSAGE, /Location\s*:/i);
 });
 
-test("lead state records contextual acceptance but not measurement education as booking intent", () => {
+test("lead state records contextual and explicit measurement intent but not measurement education", () => {
   const accepted = {
     messages: [
       { role: "user", content: "Kitchen cabinet 12ft in Puchong, budget RM10k." },
@@ -170,6 +233,13 @@ test("lead state records contextual acceptance but not measurement education as 
   assert.equal(accepted.lead.siteMeasurementIntent, true);
   assert.equal(accepted.lead.bookingIntent, true);
   assert.equal(accepted.lead.temperature, "hot");
+
+  for (const request of ["I need site measurement", "Site measurement please", "Saya nak site measurement", "我想安排上门量尺"]) {
+    const explicit = { messages: [{ role: "user", content: request }], lead: {} };
+    updateRenovationLead(explicit);
+    assert.equal(explicit.lead.siteMeasurementIntent, true, request);
+    assert.equal(explicit.lead.bookingIntent, true, request);
+  }
 
   const educational = {
     messages: [
