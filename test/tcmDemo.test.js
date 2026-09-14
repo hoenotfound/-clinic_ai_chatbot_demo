@@ -102,6 +102,20 @@ test("Chinese herbal medicine service enquiry is not mistaken for a medication i
   assert.doesNotMatch(reply, /\[\[HANDOFF\]\]/);
 });
 
+test("Malay ubat herba enquiry answers configured consultation price without handoff", () => {
+  const reply = tcmFallback([{ role: "user", content: "Ada ubat herba? Harga berapa?" }]);
+  assert.match(reply, /Chinese Herbal Medicine Consultation|herba/i);
+  assert.match(reply, /RM\s*50/);
+  assert.doesNotMatch(reply, /\[\[HANDOFF\]\]/);
+});
+
+test("practitioner consultation price enquiry stays in front-desk flow", () => {
+  const reply = tcmFallback([{ role: "user", content: "How much is the practitioner consultation?" }]);
+  assert.match(reply, /TCM Consultation/i);
+  assert.match(reply, /RM\s*50/);
+  assert.doesNotMatch(reply, /\[\[HANDOFF\]\]/);
+});
+
 test("herbal medicine plus existing medication still routes to practitioner", () => {
   const reply = tcmFallback([{ role: "user", content: "I take regular medication. Can I take Chinese herbs with it?" }]);
   assert.match(reply, /practitioner|TCM team/i);
