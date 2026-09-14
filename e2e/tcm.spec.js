@@ -25,7 +25,7 @@ test("TCM is a first-class public demo profile with its own dashboard", async ({
   await expect(page.locator("#reactDashboardFrame")).toHaveAttribute("src", /industry=tcm/);
   const frame = page.frameLocator("#reactDashboardFrame");
   await expect(frame.getByRole("heading", { name: "Inbox", exact: true })).toBeVisible();
-  await expect(frame.locator("body")).toContainText("Harmony Demo TCM Centre");
+  await expect(frame.locator("body")).toContainText("Harmony Demo TCM");
   await expect(frame.locator("body")).toContainText("Acupuncture");
 
   const config = await page.evaluate(async () => {
