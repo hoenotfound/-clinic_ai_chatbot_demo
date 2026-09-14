@@ -1,5 +1,6 @@
 const tcm = require("./tcmConfig");
 const { bookingRuleViolation } = require("./tcmKnowledge");
+const { hasTcmBookingIntent } = require("./tcmBookingIntent");
 
 const BOOKING_CONTEXT = /book|appointment|slot|available|come|visit|arrange|consultation|tempah|temujanji|datang|预约|預約|有空位|想来|想來|咨询|諮詢/i;
 
@@ -40,15 +41,20 @@ function requestedTime(text) {
 
 function enforceTcmBookingRules(messages) {
   const latest = latestUserText(messages);
-  if (!latest || !BOOKING_CONTEXT.test(latest)) return null;
-  const lang = languageFor(latest);
+  if (!latest) return null;
+
   const violation = bookingRuleViolation(latest);
+  const time = requestedTime(latest);
+  const hasBookingContext = BOOKING_CONTEXT.test(latest) || hasTcmBookingIntent(messages);
+  if (!hasBookingContext) return null;
+
+  const lang = languageFor(latest);
   if (violation?.type === "closed_day") {
     if (lang === "zh") return "我们星期日休息，所以星期日不能安排预约。星期六或平日哪一天比较方便？";
     if (lang === "ms") return "Pusat TCM tutup pada hari Ahad. Sabtu atau hari biasa lebih sesuai?";
     return "The TCM centre is closed on Sundays. Would Saturday or a weekday work better?";
   }
-  const time = requestedTime(latest);
+
   if (time !== null) {
     const { open, close } = configuredHours();
     if (time < open || time >= close) {
