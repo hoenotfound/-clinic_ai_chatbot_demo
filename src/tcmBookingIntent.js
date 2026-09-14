@@ -1,10 +1,10 @@
 const tcm = require("./tcmConfig");
 
-const BOOKING = /\bbook(?:ing)?\b|\bappointment\b|\bslot\b|tempah|temujanji|预约|預約|有空位|想来|想來/i;
+const BOOKING = /\bbook(?:ing)?\b|\bappointment\b|\bslot\b|can\s+i\s+come|want\s+to\s+visit|boleh\s+datang|nak\s+datang|mahu\s+datang|tempah|temujanji|预约|預約|有空位|可以来|可以來|想来|想來/i;
 const BRANCH = /petaling jaya|\bpj\b|kuala lumpur|\bkl\b|八打灵再也|八打靈再也|吉隆坡/i;
 const TIMING = /weekend|saturday|sunday|weekday|morning|afternoon|evening|night|sabtu|ahad|hari biasa|pagi|petang|malam|周末|週末|星期[一二三四五六日]|早上|上午|下午|晚上/i;
 const BROWSING = /just checking|checking first|compare first|considering|check my schedule|tengok dulu|fikir dulu|先了解|先看看|比较一下|比較一下|考虑一下|考慮一下/i;
-const PROCEEDING = /can\s*\??\s*$|boleh\s+(?:datang|book|tempah)|nak\s+datang|mahu\s+datang|可以吗|可以嗎|想来|想來|安排|预约|預約/i;
+const PROCEEDING = /can\s+i\s+come|can\s*\??\s*$|boleh\s+(?:datang|book|tempah)|nak\s+datang|mahu\s+datang|可以吗|可以嗎|可以来|可以來|想来|想來|安排|预约|預約/i;
 const PROMPT = /which branch|branch.*convenient|weekday|weekend|which day|what day|what time|preferred day|preferred time|cawangan|hari.*sesuai|masa.*sesuai|比较方便|比較方便|哪一天|预约|預約|appointment/i;
 
 function users(messages) {
