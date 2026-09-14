@@ -33,7 +33,11 @@ function hasHighPrioritySafetySignal(text) {
 }
 
 function mustOverrideScheduling(text) {
-  const herbInteraction = basePatterns.HERBAL_PATTERN.test(text) && basePatterns.MEDICATION_PATTERN.test(text);
+  const herbalServiceOnly = MALAY_HERBAL_SERVICE.test(text)
+    && !EXISTING_MEDICATION_CONTEXT.test(text);
+  const herbInteraction = basePatterns.HERBAL_PATTERN.test(text)
+    && basePatterns.MEDICATION_PATTERN.test(text)
+    && !herbalServiceOnly;
   return herbInteraction || [
     basePatterns.URGENT_PATTERN,
     basePatterns.COMPLAINT_PATTERN,
