@@ -12,7 +12,7 @@ function collectBrowserErrors(page) {
 }
 
 async function isolateCustomerMessageIp(page) {
-  await page.route("**/api/demo/sessions/*/messages", async (route) => {
+  await page.route("**/api/demo/sessions/*/message", async (route) => {
     const request = route.request();
     if (request.method() !== "POST") {
       await route.continue();
