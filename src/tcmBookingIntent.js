@@ -3,11 +3,22 @@ const tcm = require("./tcmConfig");
 const BOOKING = /\bbook(?:ing)?\b|\bappointment\b|\bslot\b|can\s+i\s+come|want\s+to\s+visit|boleh\s+datang|nak\s+datang|mahu\s+datang|tempah|temujanji|预约|預約|有空位|可以来|可以來|想来|想來/i;
 const BRANCH = /petaling jaya|\bpj\b|kuala lumpur|\bkl\b|八打灵再也|八打靈再也|吉隆坡/i;
 const CLOCK_TIME = /\b(?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s*(?:am|pm)\b/i;
-const TIMING = /weekend|saturday|sunday|weekday|morning|afternoon|evening|night|tomorrow|sabtu|ahad|hari biasa|pagi|petang|malam|esok|周末|週末|星期[一二三四五六日]|早上|上午|下午|晚上|明天|\b(?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s*(?:am|pm)\b/i;
+const TIMING = /weekend|weekday|monday|tuesday|wednesday|thursday|friday|saturday|sunday|morning|afternoon|evening|night|tomorrow|hari biasa|isnin|selasa|rabu|khamis|jumaat|sabtu|ahad|pagi|petang|malam|esok|周末|週末|星期[一二三四五六日]|周[一二三四五六日]|週[一二三四五六日]|早上|上午|下午|晚上|明天|\b(?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s*(?:am|pm)\b/i;
 const BROWSING = /just checking|checking first|compare first|considering|check my schedule|tengok dulu|fikir dulu|先了解|先看看|比较一下|比較一下|考虑一下|考慮一下/i;
 const NEGATIVE = /not interested|no longer interested|never ?mind|don['’]t want|do not want|not booking|cancel|no thanks|tak berminat|tidak berminat|tak nak|tak jadi|batal|不要了|不想做|没兴趣|沒興趣|算了|取消|不预约|不預約/i;
 const PROCEEDING = /can\s+i\s+come|can\s*\??\s*$|boleh\s+(?:datang|book|tempah)|nak\s+datang|mahu\s+datang|可以吗|可以嗎|可以来|可以來|想来|想來|安排|预约|預約/i;
+const SERVICE_SCHEDULING_REQUEST = /(?:can|could)\s+i\s+(?:do|have|get)|boleh\s+(?:saya\s+)?(?:buat|ambil)|(?:nak|mahu)\s+(?:buat|ambil)|可以.{0,20}(?:吗|嗎)|能.{0,20}(?:吗|嗎)/i;
 const PROMPT = /which branch|branch.*convenient|weekday|weekend|which day|what day|what time|preferred day|preferred time|tell me.*branch|branch.*(?:day|time)|arrange (?:a )?visit|cawangan|hari.*sesuai|masa.*sesuai|beritahu.*(?:branch|cawangan)|比较方便|比較方便|哪一天|告诉我.*branch|告訴我.*branch|日期|时段|時段|预约|預約|appointment/i;
+
+const DAY_PATTERNS = [
+  ["Monday", /monday|isnin|星期一|周一|週一/i],
+  ["Tuesday", /tuesday|selasa|星期二|周二|週二/i],
+  ["Wednesday", /wednesday|rabu|星期三|周三|週三/i],
+  ["Thursday", /thursday|khamis|星期四|周四|週四/i],
+  ["Friday", /friday|jumaat|星期五|周五|週五/i],
+  ["Saturday", /saturday|sabtu|星期六|周六|週六/i],
+  ["Sunday", /sunday|ahad|星期日|周日|週日/i],
+];
 
 function users(messages) {
   return (messages || []).filter((message) => message?.role === "user");
@@ -60,10 +71,13 @@ function timingFromText(text) {
   const clock = clockTimeFromText(value);
   const part = /morning|pagi|早上|上午/i.test(value) ? "morning" : /afternoon|petang|下午/i.test(value) ? "afternoon" : /evening|night|malam|晚上/i.test(value) ? "evening" : null;
   const suffix = clock || part;
-  if (/saturday|sabtu|星期六|周六|週六/i.test(value)) return suffix ? `Saturday${clock ? ", " : " "}${suffix}` : "Saturday";
-  if (/sunday|ahad|星期日|周日|週日/i.test(value)) return suffix ? `Sunday${clock ? ", " : " "}${suffix}` : "Sunday";
-  if (/weekday|hari biasa|平日|工作日/i.test(value)) return suffix ? `Weekday${clock ? ", " : ", "}${suffix}` : "Weekday";
-  if (/weekend|周末|週末/i.test(value)) return suffix ? `Weekend${clock ? ", " : ", "}${suffix}` : "Weekend";
+
+  for (const [day, pattern] of DAY_PATTERNS) {
+    if (pattern.test(value)) return suffix ? `${day}${clock ? ", " : " "}${suffix}` : day;
+  }
+
+  if (/weekday|hari biasa|平日|工作日/i.test(value)) return suffix ? `Weekday, ${suffix}` : "Weekday";
+  if (/weekend|周末|週末/i.test(value)) return suffix ? `Weekend, ${suffix}` : "Weekend";
   if (/tomorrow|esok|明天/i.test(value)) return suffix ? `Tomorrow${clock ? ", " : " "}${suffix}` : "Tomorrow";
   if (clock) return clock;
   if (part) return part[0].toUpperCase() + part.slice(1);
@@ -89,6 +103,10 @@ function previousAssistantPrompted(messages) {
   return false;
 }
 
+function hasDirectServiceSchedulingRequest(text) {
+  return Boolean(serviceForText(text)) && TIMING.test(String(text || "")) && SERVICE_SCHEDULING_REQUEST.test(String(text || ""));
+}
+
 function hasTcmBookingIntent(messages) {
   const active = activeMessages(messages);
   const customerMessages = users(active);
@@ -96,9 +114,27 @@ function hasTcmBookingIntent(messages) {
   const all = customerMessages.map((message) => String(message.content || "")).join(" \n");
   if (!latest || BROWSING.test(latest)) return false;
   if (BOOKING.test(all)) return true;
+  if (hasDirectServiceSchedulingRequest(latest)) return true;
   if (!recentService(active) || !branchFromMessages(active) || !timingFromMessages(active)) return false;
   if (!BRANCH.test(latest) && !TIMING.test(latest)) return false;
   return PROCEEDING.test(latest) || previousAssistantPrompted(active);
 }
 
-module.exports = { BOOKING, BRANCH, TIMING, CLOCK_TIME, BROWSING, NEGATIVE, serviceForText, recentService, branchFromMessages, clockTimeFromText, timingFromText, timingFromMessages, previousAssistantPrompted, hasTcmBookingIntent };
+module.exports = {
+  BOOKING,
+  BRANCH,
+  TIMING,
+  CLOCK_TIME,
+  BROWSING,
+  NEGATIVE,
+  SERVICE_SCHEDULING_REQUEST,
+  serviceForText,
+  recentService,
+  branchFromMessages,
+  clockTimeFromText,
+  timingFromText,
+  timingFromMessages,
+  previousAssistantPrompted,
+  hasDirectServiceSchedulingRequest,
+  hasTcmBookingIntent,
+};
