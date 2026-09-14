@@ -14,6 +14,14 @@ test("TCM pipeline uses TCM campaign and service-derived live value", () => {
   assert.match(pipeline, /lead\.concern/);
 });
 
+test("TCM concern is carried into inbox and lead details", () => {
+  const inbox = source("portal-react/src/pages/Inbox.jsx");
+  const pipeline = source("portal-react/src/pages/Pipeline.jsx");
+  assert.match(inbox, /concern: live\.lead\?\.concern \|\| null/);
+  assert.match(inbox, /\["Concern", contact\.lead\.concern\]/);
+  assert.match(pipeline, /\["Concern", lead\.concern\]/);
+});
+
 test("shared lead card uses active industry terminology", () => {
   const card = source("portal-react/src/components/pipeline/LeadCard.jsx");
   assert.match(card, /industryProfile\.terms\.service/);
