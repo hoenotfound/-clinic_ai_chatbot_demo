@@ -49,7 +49,7 @@ const channelMeta = {
   facebook: { label: "Messenger", theme: "facebook-theme", status: "Active now", caption: "Messenger customer experience" },
 };
 
-const VALID_INDUSTRIES = new Set(["clinic", "renovation"]);
+const VALID_INDUSTRIES = new Set(["clinic", "tcm", "renovation"]);
 const FALLBACK_INDUSTRIES = [
   {
     key: "clinic",
@@ -58,6 +58,14 @@ const FALLBACK_INDUSTRIES = [
     description: "Treatment enquiries, pricing, appointment intent, multilingual replies and human takeover.",
     highlights: ["Treatment enquiries", "Appointment intent", "Patient handoff"],
     icon: "clinic",
+  },
+  {
+    key: "tcm",
+    label: "Traditional Chinese Medicine (TCM)",
+    eyebrow: "CONSULTATIONS & TCM SERVICES",
+    description: "TCM service enquiries, pricing, appointment intent, multilingual replies and practitioner handoff.",
+    highlights: ["TCM enquiries", "Appointment intent", "Practitioner handoff"],
+    icon: "tcm",
   },
   {
     key: "renovation",
@@ -72,6 +80,7 @@ const FALLBACK_INDUSTRIES = [
 function normalizeIndustry(value) {
   const key = String(value || "").trim().toLowerCase();
   if (["renovation", "home-renovation", "carpentry"].includes(key)) return "renovation";
+  if (["tcm", "traditional-chinese-medicine", "traditional chinese medicine", "chinese-medicine"].includes(key)) return "tcm";
   return key === "clinic" ? "clinic" : null;
 }
 
@@ -197,7 +206,9 @@ async function loadIndustryOptions() {
 }
 
 function industryIcon(key) {
-  return key === "renovation" ? "⌂" : "+";
+  if (key === "renovation") return "⌂";
+  if (key === "tcm") return "中";
+  return "+";
 }
 
 function createIndustryCard(option, currentKey, choose) {
@@ -320,6 +331,7 @@ function clearSessionForIndustrySwitch() {
   try {
     sessionStorage.removeItem("clinicDemoSessionId");
     sessionStorage.removeItem("demoSessionId:clinic");
+    sessionStorage.removeItem("demoSessionId:tcm");
     sessionStorage.removeItem("demoSessionId:renovation");
     sessionStorage.removeItem("clinicDemoAcquisition");
   } catch {}
@@ -690,7 +702,11 @@ async function sendCustomerMessage(rawMessage) {
     } else if (state.session.needsAttention) {
       showToast(`The AI requested staff assistance. Open ${profileLabels().dashboard} to see the handoff.`);
     } else if (hasHighIntent(state.session.lead) && !state.hasViewedDashboard) {
-      const prefix = state.config?.industryKey === "clinic" ? "Booking intent detected." : "High-intent renovation enquiry detected.";
+      const prefix = state.config?.industryKey === "clinic"
+        ? "Booking intent detected."
+        : state.config?.industryKey === "tcm"
+          ? "TCM appointment intent detected."
+          : "High-intent renovation enquiry detected.";
       showToast(`${prefix} Open ${profileLabels().dashboard} to see what your team would see.`);
     }
   } catch (error) {
