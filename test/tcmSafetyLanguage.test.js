@@ -24,6 +24,12 @@ test("Malay existing medication plus herbs still routes to practitioner", () => 
   assert.match(reply || "", /\[\[HANDOFF\]\]/);
 });
 
+test("Malay herbal service wording cannot suppress a higher-priority safety handoff", () => {
+  const reply = enforceTcmSafetyRules([{ role: "user", content: "Saya sesak nafas, ada ubat herba?" }]);
+  assert.match(reply || "", /segera|perubatan|rawatan/i);
+  assert.match(reply || "", /\[\[HANDOFF\]\]/);
+});
+
 test("Malay request to speak with TCM practitioner routes to human takeover", () => {
   const reply = enforceTcmSafetyRules([{ role: "user", content: "Boleh saya cakap dengan pengamal TCM?" }]);
   assert.match(reply || "", /team TCM/i);
