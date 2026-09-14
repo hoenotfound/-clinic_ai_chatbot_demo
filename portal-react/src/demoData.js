@@ -1,8 +1,9 @@
 import * as clinic from "./clinicDemoData";
+import * as tcmData from "./tcmDemoData";
 import * as renovation from "./renovationDemoData";
-import { isRenovationDemo } from "./config/demoIndustry";
+import { isRenovationDemo, isTcmDemo } from "./config/demoIndustry";
 
-const active = isRenovationDemo ? renovation : clinic;
+const active = isRenovationDemo ? renovation : isTcmDemo ? tcmData : clinic;
 
 function renovationDisplayCopy(value) {
   if (!isRenovationDemo) return value;
