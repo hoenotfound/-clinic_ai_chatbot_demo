@@ -2,12 +2,17 @@ const { test, expect } = require("@playwright/test");
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test("TCM is a first-class public demo profile with its own dashboard", async ({ page }) => {
-  const browserErrors = [];
-  page.on("pageerror", (error) => browserErrors.push(error.message));
+function collectBrowserErrors(page) {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
-    if (message.type() === "error") browserErrors.push(message.text());
+    if (message.type() === "error") errors.push(message.text());
   });
+  return errors;
+}
+
+test("TCM is a first-class public demo profile with its own dashboard", async ({ page }) => {
+  const browserErrors = collectBrowserErrors(page);
 
   await page.goto("/");
   const picker = page.locator("[data-industry-picker]");
@@ -37,6 +42,53 @@ test("TCM is a first-class public demo profile with its own dashboard", async ({
   expect(config.services.some((service) => service.name === "Acupuncture")).toBe(true);
   expect(config.services.some((service) => /HIFU|Pico/i.test(service.name))).toBe(false);
   expect(config.availableIndustries.map((item) => item.key)).toEqual(["clinic", "tcm", "renovation"]);
+
+  expect(browserErrors).toEqual([]);
+});
+
+test("TCM live journey turns a prompted branch and timing reply into an appointment lead", async ({ page }) => {
+  const browserErrors = collectBrowserErrors(page);
+  await page.goto("/?industry=tcm");
+  await expect(page.locator(".experience-status strong")).toHaveText("Harmony Demo TCM Centre");
+
+  const input = page.locator("#customerInput");
+  const send = page.getByRole("button", { name: "Send message" });
+
+  await input.fill("请问针灸一次多少钱？");
+  await send.click();
+  await expect(page.locator("#messages")).toContainText("RM 80");
+  await expect(page.locator("#messages")).toContainText(/branch|日期|时段/i);
+
+  await page.waitForTimeout(1000);
+  await input.fill("KL，星期六下午可以吗？");
+  await send.click();
+  await expect(page.locator("#messages")).toContainText(/TCM team|确认实际|available time/i);
+
+  const live = await page.evaluate(async () => {
+    const id = sessionStorage.getItem("demoSessionId:tcm");
+    const response = await fetch(`/api/demo/sessions/${encodeURIComponent(id)}`);
+    return (await response.json()).session;
+  });
+  expect(live.lead.bookingIntent).toBe(true);
+  expect(live.lead.temperature).toBe("hot");
+  expect(live.lead.interests).toContain("Acupuncture");
+  expect(live.lead.preferredBranch).toBe("Kuala Lumpur");
+  expect(live.lead.preferredTiming).toBe("Saturday afternoon");
+  expect(live.lead.estimatedValue).toBe(80);
+  expect(live.lead.summary).toMatch(/Appointment intent detected/i);
+  expect(live.lead.summary).not.toMatch(/clinic visit|specific treatment/i);
+
+  await page.getByRole("tab", { name: /TCM dashboard/i }).click();
+  const frame = page.frameLocator("#reactDashboardFrame");
+  await expect(frame.getByRole("heading", { name: "Inbox", exact: true })).toBeVisible();
+  await frame.getByRole("link", { name: "Pipeline" }).click();
+  await expect(frame.getByRole("heading", { name: "Lead Pipeline" })).toBeVisible();
+  const liveCard = frame.getByRole("button", { name: /Demo Patient/ }).first();
+  await expect(liveCard).toContainText("Hot");
+  await expect(liveCard).toContainText("Appointment Requested");
+  await expect(liveCard).toContainText("Acupuncture");
+  await expect(liveCard).toContainText("Kuala Lumpur");
+  await expect(liveCard).toContainText("RM 80");
 
   expect(browserErrors).toEqual([]);
 });
