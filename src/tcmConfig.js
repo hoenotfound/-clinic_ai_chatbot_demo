@@ -21,19 +21,19 @@ const tcmConfig = {
     { name: "Petaling Jaya", phone: "Demo line — not connected", address: "Petaling Jaya, Selangor", whatsapp: null },
   ],
   services: [
-    { name: "TCM Consultation", duration: "30–45 mins", priceRange: "From RM 50", price: "From RM 50", description: "Consultation with a TCM practitioner before personalised advice.", aliases: ["tcm consultation", "consultation", "中医问诊", "中醫問診", "看中医", "看中醫"] },
+    { name: "TCM Consultation", duration: "30–45 mins", priceRange: "From RM 50", price: "From RM 50", description: "Consultation with a TCM practitioner before personalised advice.", aliases: ["tcm consultation", "consultation", "practitioner consultation", "pengamal tcm", "中医问诊", "中醫問診", "中医师咨询", "中醫師諮詢", "看中医", "看中醫"] },
     { name: "Acupuncture", duration: "30–45 mins", priceRange: "From RM 80", price: "From RM 80", description: "Practitioner-led acupuncture service. Personal suitability is confirmed by the practitioner.", aliases: ["acupuncture", "针灸", "針灸", "akupunktur"] },
     { name: "Tuina", duration: "30–45 mins", priceRange: "From RM 90", price: "From RM 90", description: "Practitioner-led TCM bodywork service.", aliases: ["tuina", "tui na", "推拿", "中医推拿", "中醫推拿"] },
     { name: "Cupping", duration: "20–30 mins", priceRange: "From RM 60", price: "From RM 60", description: "Practitioner-led cupping service.", aliases: ["cupping", "拔罐", "拔火罐"] },
     { name: "Gua Sha", duration: "20–30 mins", priceRange: "From RM 60", price: "From RM 60", description: "Practitioner-led Gua Sha service.", aliases: ["gua sha", "guasha", "刮痧"] },
-    { name: "Chinese Herbal Medicine Consultation", duration: "30–45 mins", priceRange: "From RM 50", price: "From RM 50", pricingNote: "Herbal medicine cost is confirmed by the practitioner based on the actual prescription.", description: "Practitioner consultation for customers asking about Chinese herbal medicine.", aliases: ["chinese herbs", "herbal medicine", "tcm herbs", "中药", "中藥", "中药调理", "中藥調理"] },
+    { name: "Chinese Herbal Medicine Consultation", duration: "30–45 mins", priceRange: "From RM 50", price: "From RM 50", pricingNote: "Herbal medicine cost is confirmed by the practitioner based on the actual prescription.", description: "Practitioner consultation for customers asking about Chinese herbal medicine.", aliases: ["chinese herbs", "herbal medicine", "tcm herbs", "herba", "ubat herba", "herba cina", "中药", "中藥", "中药调理", "中藥調理"] },
   ],
   serviceAliases: [
     { alias: "针灸 / 針灸 / acupuncture", officialService: "Acupuncture" },
     { alias: "推拿 / Tui Na", officialService: "Tuina" },
     { alias: "拔罐 / cupping", officialService: "Cupping" },
     { alias: "刮痧 / gua sha", officialService: "Gua Sha" },
-    { alias: "中药 / 中藥 / Chinese herbs", officialService: "Chinese Herbal Medicine Consultation" },
+    { alias: "中药 / 中藥 / Chinese herbs / ubat herba", officialService: "Chinese Herbal Medicine Consultation" },
   ],
   faqs: [
     { q: "Do I need a consultation first?", a: "For personalised treatment advice, the practitioner should understand your concern first." },
