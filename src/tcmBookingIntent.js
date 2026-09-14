@@ -101,4 +101,4 @@ function hasTcmBookingIntent(messages) {
   return PROCEEDING.test(latest) || previousAssistantPrompted(active);
 }
 
-module.exports = { BOOKING, BRANCH, TIMING, CLOCK_TIME, BROWSING, NEGATIVE, serviceForText, recentService, branchFromMessages, clockTimeFromText, timingFromText, timingFromMessages, hasTcmBookingIntent };
+module.exports = { BOOKING, BRANCH, TIMING, CLOCK_TIME, BROWSING, NEGATIVE, serviceForText, recentService, branchFromMessages, clockTimeFromText, timingFromText, timingFromMessages, previousAssistantPrompted, hasTcmBookingIntent };
