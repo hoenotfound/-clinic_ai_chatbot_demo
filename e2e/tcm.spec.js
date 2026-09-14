@@ -1,9 +1,6 @@
 const { test, expect } = require("@playwright/test");
 
-test.use({
-  storageState: { cookies: [], origins: [] },
-  extraHTTPHeaders: { "x-forwarded-for": "203.0.113.57" },
-});
+test.use({ storageState: { cookies: [], origins: [] } });
 
 function collectBrowserErrors(page) {
   const errors = [];
@@ -12,6 +9,22 @@ function collectBrowserErrors(page) {
     if (message.type() === "error") errors.push(message.text());
   });
   return errors;
+}
+
+async function isolateCustomerMessageIp(page) {
+  await page.route("**/api/demo/sessions/*/messages", async (route) => {
+    const request = route.request();
+    if (request.method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    await route.continue({
+      headers: {
+        ...request.headers(),
+        "x-forwarded-for": "203.0.113.57",
+      },
+    });
+  });
 }
 
 test("TCM is a first-class public demo profile with its own dashboard", async ({ page }) => {
@@ -51,6 +64,7 @@ test("TCM is a first-class public demo profile with its own dashboard", async ({
 
 test("TCM live journey accepts the exact public-tour branch and timing phrase", async ({ page }) => {
   const browserErrors = collectBrowserErrors(page);
+  await isolateCustomerMessageIp(page);
   await page.goto("/?industry=tcm");
   await expect(page.locator(".experience-status strong")).toHaveText("Harmony Demo TCM Centre");
 
