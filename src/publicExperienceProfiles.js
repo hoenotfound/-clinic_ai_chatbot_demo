@@ -76,6 +76,83 @@ const profiles = {
     acquisitionHelper: "This source follows the live visitor into the Clinic Dashboard.",
   },
 
+  tcm: {
+    title: "AI TCM Receptionist Demo | DA Smarketing",
+    metaDescription: "Try DA Smarketing's live AI TCM receptionist demo across WhatsApp, Instagram and Messenger, from first enquiry to service qualification, appointment intent and practitioner handoff.",
+    badge: "LIVE AI TCM RECEPTIONIST DEMO",
+    hero: {
+      headlinePrefix: "Turn every TCM enquiry into a ",
+      headlineAccent: "qualified appointment lead.",
+      copy: "Try the same journey a TCM customer would experience, then open the TCM Dashboard to see how the AI records the service interest, branch, timing and handoff context for your team.",
+      footnotes: ["Fictional sample TCM centre", "No real patient data"],
+      shortBusinessName: "Harmony Demo TCM",
+      assistantStatus: "AI receptionist online",
+      messages: [
+        "针灸多少钱？最近肩颈有点紧。",
+        "Acupuncture 从 RM 80 起。针对肩颈紧绷这类情况，针灸和推拿都是这里常见会讨论的服务方向。",
+        "KL，星期六下午可以吗？",
+      ],
+      intentLabel: "APPOINTMENT INTENT DETECTED",
+      leadSummary: "Hot lead · Acupuncture · KL · Saturday",
+    },
+    section: {
+      title: "Try it as a TCM patient. See what your team gets.",
+      copy: "Ask a normal TCM service, price or appointment question. The AI answers first, keeps the conversation natural and hands personalised medical judgement to the practitioner when needed.",
+    },
+    view: {
+      customerTab: "Patient View",
+      dashboardTab: "TCM Dashboard",
+      dashboardHint: "See the same enquiry from your team side",
+    },
+    tour: {
+      startStatus: "Start with a TCM enquiry",
+      firstHint: "Try a service, price or concern question",
+      intentTitle: "Show appointment intent",
+      intentHint: "Mention a branch or preferred day",
+      dashboardTitle: "Open TCM Dashboard",
+      staffHint: "Continue as TCM staff",
+      afterQuestion: "Now try “Saturday afternoon in KL?”",
+      intentDetected: "Appointment intent detected — open TCM Dashboard",
+    },
+    chat: {
+      businessName: "Harmony Demo TCM Centre",
+      emptyText: "Start the conversation as if you were messaging a TCM centre about a service, price, concern or appointment.",
+      emptyBadge: "Interactive fictional TCM centre",
+      privacy: "Demo only — please don’t enter real medical records, medication details or sensitive personal data.",
+      suggestionHeading: "Use a sample enquiry",
+    },
+    suggestions: [
+      { kind: "Price", label: "针灸多少钱？", message: "请问针灸一次多少钱？" },
+      { kind: "Concern", label: "肩颈很紧", message: "最近肩颈一直很紧，有什么服务可以了解？" },
+      { kind: "BM", label: "Tanya pasal akupunktur", message: "Hi, akupunktur harga berapa? Saya biasanya free Sabtu petang di KL." },
+      { kind: "Handoff", label: "Speak to a practitioner", message: "Can I speak to a TCM practitioner?" },
+    ],
+    capture: {
+      rows: [["TCM Service", "Acupuncture"], ["Branch", "KL"], ["Timing", "Saturday afternoon"], ["Intent", "Appointment"]],
+      note: "Switch to TCM Dashboard to see the service interest and appointment signals update with the conversation.",
+    },
+    workflow: [
+      ["Patient enquiry", "Service, price, concern or appointment question"],
+      ["AI conversation", "Answers routine front-desk questions in English, BM or Chinese"],
+      ["Qualified lead", "Service interest, branch, timing and appointment intent"],
+      ["Practitioner / staff takeover", "The team continues with the same conversation context"],
+    ],
+    capabilities: [
+      ["Answer routine TCM enquiries naturally.", "Use the centre's configured services, prices, branches and FAQs without turning every chat into a questionnaire.", ["English, BM and Chinese", "TCM-specific service knowledge"]],
+      ["Keep medical judgement with the practitioner.", "General service information stays in chat, while diagnosis, personalised suitability and medicine-interaction questions move to the team.", ["Safety-aware handoff", "Conversation summary"]],
+      ["Turn appointment intent into clear sales context.", "Remember branch and timing preferences, then hand the enquiry to staff when real availability needs to be confirmed.", ["Appointment intent", "Human takeover with context"]],
+    ],
+    sales: {
+      kicker: "AI AUTOMATION FOR TCM CENTRES",
+      headingPrefix: "Ready to build your ",
+      headingAccent: "AI TCM front desk",
+      copy: "We’ll customise the AI around your TCM services, prices, branches, FAQs, appointment flow, safety rules and practitioner handoff process.",
+      trust: ["WhatsApp · Instagram · Messenger", "TCM-specific knowledge", "Human handoff + lead tracking"],
+      footer: "Talk directly with DA Smarketing about your TCM enquiry workflow.",
+    },
+    acquisitionHelper: "This source follows the live visitor into the TCM Dashboard.",
+  },
+
   renovation: {
     title: "AI Renovation Chatbot Demo | DA Smarketing",
     metaDescription: "Try DA Smarketing's live AI renovation sales chatbot across WhatsApp, Instagram and Messenger, from a natural cabinet enquiry to qualification, site-measurement intent and human takeover.",
