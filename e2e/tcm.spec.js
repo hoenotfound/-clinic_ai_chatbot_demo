@@ -46,7 +46,7 @@ test("TCM is a first-class public demo profile with its own dashboard", async ({
   expect(browserErrors).toEqual([]);
 });
 
-test("TCM live journey turns a prompted branch and timing reply into an appointment lead", async ({ page }) => {
+test("TCM live journey accepts the exact public-tour branch and timing phrase", async ({ page }) => {
   const browserErrors = collectBrowserErrors(page);
   await page.goto("/?industry=tcm");
   await expect(page.locator(".experience-status strong")).toHaveText("Harmony Demo TCM Centre");
@@ -60,9 +60,9 @@ test("TCM live journey turns a prompted branch and timing reply into an appointm
   await expect(page.locator("#messages")).toContainText(/branch|日期|时段/i);
 
   await page.waitForTimeout(1000);
-  await input.fill("KL，星期六下午可以吗？");
+  await input.fill("Saturday afternoon in KL?");
   await send.click();
-  await expect(page.locator("#messages")).toContainText(/TCM team|确认实际|available time/i);
+  await expect(page.locator("#messages")).toContainText(/TCM team|confirm the actual|available time/i);
 
   const live = await page.evaluate(async () => {
     const id = sessionStorage.getItem("demoSessionId:tcm");
