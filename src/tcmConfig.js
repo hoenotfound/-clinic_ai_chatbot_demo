@@ -4,7 +4,7 @@ const tcmConfig = {
   aiAssistantName: "Jia",
   assistantName: "Jia",
   location: "Kuala Lumpur, Malaysia",
-  introMessage: "Hi, I'm Jia from Harmony Demo TCM Centre! 😊",
+  introMessage: "Jia · Harmony Demo TCM Centre 😊",
   consultation: "Initial consultation with our TCM practitioner team",
   hours: {
     general: "Monday – Saturday, 10:00 AM – 7:00 PM",
@@ -26,7 +26,7 @@ const tcmConfig = {
     { name: "Tuina", duration: "30–45 mins", priceRange: "From RM 90", price: "From RM 90", description: "Practitioner-led TCM bodywork service.", aliases: ["tuina", "tui na", "推拿", "中医推拿", "中醫推拿"] },
     { name: "Cupping", duration: "20–30 mins", priceRange: "From RM 60", price: "From RM 60", description: "Practitioner-led cupping service.", aliases: ["cupping", "拔罐", "拔火罐"] },
     { name: "Gua Sha", duration: "20–30 mins", priceRange: "From RM 60", price: "From RM 60", description: "Practitioner-led Gua Sha service.", aliases: ["gua sha", "guasha", "刮痧"] },
-    { name: "Chinese Herbal Medicine Consultation", duration: "30–45 mins", priceRange: "Consultation from RM 50; herbal medicine pricing depends on the practitioner", price: "Consultation from RM 50; herbal medicine pricing depends on the practitioner", description: "Practitioner consultation for customers asking about Chinese herbal medicine.", aliases: ["chinese herbs", "herbal medicine", "tcm herbs", "中药", "中藥", "中药调理", "中藥調理"] },
+    { name: "Chinese Herbal Medicine Consultation", duration: "30–45 mins", priceRange: "From RM 50", price: "From RM 50", pricingNote: "Herbal medicine cost is confirmed by the practitioner based on the actual prescription.", description: "Practitioner consultation for customers asking about Chinese herbal medicine.", aliases: ["chinese herbs", "herbal medicine", "tcm herbs", "中药", "中藥", "中药调理", "中藥調理"] },
   ],
   serviceAliases: [
     { alias: "针灸 / 針灸 / acupuncture", officialService: "Acupuncture" },
@@ -46,7 +46,7 @@ const tcmConfig = {
   sop: "Stay within front-desk scope. Personal medical judgement belongs to the practitioner. Do not create real appointments, payments or prescriptions in the demo.",
   closingPlaybook: "Be useful first. Move genuinely interested customers toward practitioner consultation or an appointment. Never invent availability.",
   escalation: {
-    handoffNote: "Demo staff takeover is shown inside the Clinic Dashboard.",
+    handoffNote: "Demo staff takeover is shown inside the TCM Dashboard.",
     handoffMessage: "For this one, it is better for our TCM practitioner or team to advise you directly. I'll pass the conversation to them here.",
     outOfScopeTriggers: ["Personalised medical advice or diagnosis", "Herbal prescriptions or medicine interaction questions", "Urgent symptoms", "Complaints", "Explicit requests for a practitioner or human staff member"],
   },
