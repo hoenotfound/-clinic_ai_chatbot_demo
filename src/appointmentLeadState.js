@@ -20,20 +20,23 @@ function startingValue(serviceName) {
 function updateAppointmentLead(session) {
   const messages = session.messages || [];
   const service = recentService(messages);
-  const bookingIntent = hasTcmBookingIntent(messages);
+  const reducedInterest = Boolean(session.lead?.reducedInterest);
+  const bookingIntent = !reducedInterest && hasTcmBookingIntent(messages);
   const preferredBranch = branchFromMessages(messages);
   const preferredTiming = timingFromMessages(messages);
   const interests = service ? [service.name] : (session.lead?.interests || []);
   const concern = concernFromMessages(messages) || session.lead?.concern || null;
   const value = interests.length ? startingValue(interests[0]) : 0;
   const context = [preferredBranch, preferredTiming].filter(Boolean).join(" · ");
-  const summary = bookingIntent
-    ? `${interests.length ? `Interested in ${interests.join(" and ")}` : "Interested in a visit"}${concern ? ` for ${concern}` : ""}${context ? ` · ${context}` : ""}. Appointment intent detected and ready for team follow-up.`
-    : interests.length
-      ? `Interested in ${interests.join(" and ")}${concern ? ` for ${concern}` : ""}. No appointment intent detected yet.`
-      : concern
-        ? `Asked about ${concern}. No service or appointment intent has been confirmed yet.`
-        : "Early-stage enquiry. No specific service or appointment intent has been detected yet.";
+  const summary = reducedInterest
+    ? `${interests.length ? `Previously asked about ${interests.join(" and ")}` : "The visitor enquired about TCM services"}, but is not proceeding with an appointment right now.`
+    : bookingIntent
+      ? `${interests.length ? `Interested in ${interests.join(" and ")}` : "Interested in a visit"}${concern ? ` for ${concern}` : ""}${context ? ` · ${context}` : ""}. Appointment intent detected and ready for team follow-up.`
+      : interests.length
+        ? `Interested in ${interests.join(" and ")}${concern ? ` for ${concern}` : ""}. No appointment intent detected yet.`
+        : concern
+          ? `Asked about ${concern}. No service or appointment intent has been confirmed yet.`
+          : "Early-stage enquiry. No specific service or appointment intent has been detected yet.";
 
   session.lead = {
     ...session.lead,
@@ -43,7 +46,7 @@ function updateAppointmentLead(session) {
     preferredBranch,
     preferredTiming,
     estimatedValue: value,
-    temperature: bookingIntent ? "hot" : interests.length || concern ? "warm" : "cold",
+    temperature: reducedInterest ? "cold" : bookingIntent ? "hot" : interests.length || concern ? "warm" : "cold",
     summary,
   };
   return session.lead;
