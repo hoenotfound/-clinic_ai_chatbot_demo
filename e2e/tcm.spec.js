@@ -1,6 +1,9 @@
 const { test, expect } = require("@playwright/test");
 
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({
+  storageState: { cookies: [], origins: [] },
+  extraHTTPHeaders: { "x-forwarded-for": "203.0.113.57" },
+});
 
 function collectBrowserErrors(page) {
   const errors = [];
