@@ -55,7 +55,7 @@ export default function LeadCard({ lead, now, noReplyHours, onOpen, onDragStart 
           <LiveField label="Stage" value={liveStage} />
           <LiveField label={industryProfile.terms.service} value={lead.treatment_interest || "Detecting…"} />
           <LiveField label={industryProfile.terms.location} value={lead.branch_name || "Not selected"} />
-          <p className="col-span-2 mt-1 text-[9px] leading-4 text-[var(--color-text-muted)]">Watch these fields change as the prospect sends price, {industryProfile.terms.service.toLowerCase()} and appointment messages.</p>
+          <p className="col-span-2 mt-1 text-[9px] leading-4 text-[var(--color-text-muted)]">Watch these fields change as the prospect sends price, {industryProfile.terms.service.toLowerCase()} and {industryProfile.terms.appointment.toLowerCase()} messages.</p>
         </div>
       )}
 
