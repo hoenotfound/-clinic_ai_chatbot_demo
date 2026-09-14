@@ -92,7 +92,7 @@ function tcmProfile() {
   const { buildTcmFallbackReply } = require("./tcmFallback");
   const { buildTcmConcernFallback } = require("./tcmConcernFallback");
   const { enforceTcmBookingRules } = require("./tcmBookingRules");
-  const { enforceTcmSafetyRules } = require("./tcmSafetyRules");
+  const { enforceTcmSafetyRules } = require("./tcmSafetyContext");
   const { concernGuidanceForPrompt, bookingRulesForPrompt } = require("./tcmKnowledge");
 
   return {
