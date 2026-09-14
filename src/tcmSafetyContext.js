@@ -1,4 +1,5 @@
 const { enforceTcmSafetyRules: baseSafetyRules, _test: basePatterns } = require("./tcmSafetyRules");
+const { hasDirectServiceSchedulingRequest } = require("./tcmBookingIntent");
 
 const EXPLICIT_HUMAN_REQUEST = /(?:can|could|may)\s+i\s+(?:speak|talk|chat)\s+(?:to|with)\s+(?:a\s+)?(?:human|staff|practitioner|doctor)|(?:i\s+)?(?:want|need)\s+(?:to\s+)?(?:speak|talk|chat)\s+(?:to|with)\s+(?:a\s+)?(?:human|staff|practitioner|doctor)|(?:boleh|nak|mahu)\s+(?:saya\s+)?(?:cakap|bercakap|jumpa|berjumpa)\s+(?:dengan\s+)?(?:pengamal(?:\s+TCM)?|doktor|staff|orang)|(?:nak|mahu)\s+(?:jumpa|cakap\s+dengan)\s+(?:pengamal(?:\s+TCM)?|doktor|staff)|真人|转人工|轉人工|找医师|找醫師|找医生|找醫生|想找中医师|想找中醫師|想跟中医师聊|想跟中醫師聊/i;
 const MALAY_HERBAL_SERVICE = /(?:ada|sediakan|buat|harga|berapa|nak tahu|tanya).{0,24}(?:ubat\s+herba|herba)|(?:ubat\s+herba|herba).{0,24}(?:ada|harga|berapa|service|rawatan)/i;
@@ -31,6 +32,16 @@ function hasHighPrioritySafetySignal(text) {
   ].some((pattern) => pattern.test(text));
 }
 
+function mustOverrideScheduling(text) {
+  const herbInteraction = basePatterns.HERBAL_PATTERN.test(text) && basePatterns.MEDICATION_PATTERN.test(text);
+  return herbInteraction || [
+    basePatterns.URGENT_PATTERN,
+    basePatterns.COMPLAINT_PATTERN,
+    basePatterns.PREGNANCY_PATTERN,
+    basePatterns.POST_TREATMENT_PATTERN,
+  ].some((pattern) => pattern.test(text));
+}
+
 function enforceTcmSafetyRules(messages) {
   const latest = latestUserText(messages);
   if (!latest) return null;
@@ -39,6 +50,9 @@ function enforceTcmSafetyRules(messages) {
 
   const baseReply = baseSafetyRules(messages);
   if (!baseReply) return null;
+
+  if (mustOverrideScheduling(latest)) return baseReply;
+  if (hasDirectServiceSchedulingRequest(latest)) return null;
   if (hasHighPrioritySafetySignal(latest)) return baseReply;
 
   const benignMalayHerbalService = MALAY_HERBAL_SERVICE.test(latest)
@@ -57,5 +71,6 @@ module.exports = {
     EXISTING_MEDICATION_CONTEXT,
     PRACTITIONER_INFO_QUERY,
     hasHighPrioritySafetySignal,
+    mustOverrideScheduling,
   },
 };
