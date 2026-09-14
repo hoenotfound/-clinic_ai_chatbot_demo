@@ -26,7 +26,9 @@ test("shared lead card uses active industry terminology", () => {
   const card = source("portal-react/src/components/pipeline/LeadCard.jsx");
   assert.match(card, /industryProfile\.terms\.service/);
   assert.match(card, /industryProfile\.terms\.location/);
+  assert.match(card, /industryProfile\.terms\.appointment\.toLowerCase\(\)/);
   assert.doesNotMatch(card, />Treatment<\/LiveField>/);
+  assert.doesNotMatch(card, /and appointment messages\./);
 });
 
 test("TCM configuration uses neutral greeting and TCM dashboard handoff wording", () => {
