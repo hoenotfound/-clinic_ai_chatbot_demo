@@ -7,7 +7,7 @@ process.env.DEMO_INDUSTRY = "clinic";
 const industry = require("../src/industryProfile");
 const ai = require("../src/aiService");
 const state = require("../src/demoState");
-const { enforceTcmSafetyRules } = require("../src/tcmSafetyRules");
+const { enforceTcmSafetyRules } = require("../src/tcmSafetyContext");
 
 function tcmFallback(messages) {
   return industry.runWithIndustry("tcm", () => ai.getFallbackReply(messages));
@@ -55,9 +55,32 @@ test("TCM booking flow remembers branch and timing then hands off", () => {
   assert.match(reply, /\[\[HANDOFF\]\]/);
 });
 
+test("public tour phrase Saturday afternoon in KL becomes appointment intent after scheduling prompt", () => {
+  const messages = [
+    { role: "user", content: "How much is acupuncture?" },
+    { role: "assistant", content: "If you'd like to arrange a visit, tell me the branch and day/time that suit you." },
+    { role: "user", content: "Saturday afternoon in KL?" },
+  ];
+  const reply = tcmFallback(messages);
+  assert.match(reply, /Kuala Lumpur/i);
+  assert.match(reply, /Saturday afternoon/i);
+  assert.match(reply, /\[\[HANDOFF\]\]/);
+});
+
 test("TCM Sunday booking request stays within configured opening days", () => {
   const reply = tcmFallback([{ role: "user", content: "Can I book acupuncture in KL on Sunday?" }]);
   assert.match(reply, /Sunday/i);
+  assert.doesNotMatch(reply, /\[\[HANDOFF\]\]/);
+});
+
+test("contextual Sunday reply after a booking prompt still enforces closed day", () => {
+  const messages = [
+    { role: "user", content: "I want acupuncture." },
+    { role: "assistant", content: "Tell me the branch and day/time that suit you." },
+    { role: "user", content: "KL, Sunday can?" },
+  ];
+  const reply = tcmFallback(messages);
+  assert.match(reply, /closed on Sundays|Sunday/i);
   assert.doesNotMatch(reply, /\[\[HANDOFF\]\]/);
 });
 
@@ -108,6 +131,24 @@ test("TCM lead state promotes prompted branch and timing response to appointment
       assert.equal(session.lead.estimatedValue, 80);
       assert.match(session.lead.summary, /Appointment intent detected/i);
       assert.doesNotMatch(session.lead.summary, /clinic visit|specific treatment/i);
+    });
+  } finally {
+    state.limits.minMessageIntervalMs = previousInterval;
+  }
+});
+
+test("TCM lead stores exact AM/PM timing in appointment context", () => {
+  const previousInterval = state.limits.minMessageIntervalMs;
+  state.limits.minMessageIntervalMs = 0;
+  try {
+    industry.runWithIndustry("tcm", () => {
+      const session = state.createSession({ ip: `tcm-clock-${Date.now()}` });
+      state.addCustomerMessage(session, "I want acupuncture.");
+      state.addAssistantMessage(session, "Which branch and preferred day or time suit you?");
+      state.addCustomerMessage(session, "KL, Saturday at 3pm can?");
+      assert.equal(session.lead.bookingIntent, true);
+      assert.equal(session.lead.preferredBranch, "Kuala Lumpur");
+      assert.equal(session.lead.preferredTiming, "Saturday, 3:00 PM");
     });
   } finally {
     state.limits.minMessageIntervalMs = previousInterval;
