@@ -6,6 +6,8 @@ process.env.DEMO_INDUSTRY = "clinic";
 
 const industry = require("../src/industryProfile");
 const ai = require("../src/aiService");
+const state = require("../src/demoState");
+const { enforceTcmSafetyRules } = require("../src/tcmSafetyRules");
 
 function tcmFallback(messages) {
   return industry.runWithIndustry("tcm", () => ai.getFallbackReply(messages));
@@ -31,6 +33,13 @@ test("TCM concern fallback remains practitioner-led", () => {
   const reply = tcmFallback([{ role: "user", content: "最近肩颈一直很紧，有什么服务可以了解？" }]);
   assert.match(reply, /Acupuncture|Tuina/);
   assert.match(reply, /中医师|practitioner|pengamal/i);
+});
+
+test("TCM compound concern and price question answers both parts", () => {
+  const reply = tcmFallback([{ role: "user", content: "最近肩颈很紧，针灸多少钱？" }]);
+  assert.match(reply, /RM\s*80/);
+  assert.match(reply, /Acupuncture/);
+  assert.match(reply, /Tuina|中医师/i);
 });
 
 test("TCM booking flow remembers branch and timing then hands off", () => {
@@ -62,6 +71,74 @@ test("TCM normal service enquiry does not unnecessarily trigger handoff", () => 
   const reply = tcmFallback([{ role: "user", content: "Do you provide cupping?" }]);
   assert.match(reply, /Cupping/i);
   assert.doesNotMatch(reply, /\[\[HANDOFF\]\]/);
+});
+
+test("Chinese herbal medicine service enquiry is not mistaken for a medication interaction", () => {
+  const reply = tcmFallback([{ role: "user", content: "Do you provide Chinese herbal medicine?" }]);
+  assert.match(reply, /Chinese Herbal Medicine Consultation|herbal/i);
+  assert.doesNotMatch(reply, /\[\[HANDOFF\]\]/);
+});
+
+test("herbal medicine plus existing medication still routes to practitioner", () => {
+  const reply = tcmFallback([{ role: "user", content: "I take regular medication. Can I take Chinese herbs with it?" }]);
+  assert.match(reply, /practitioner|TCM team/i);
+  assert.match(reply, /\[\[HANDOFF\]\]/);
+});
+
+test("booking phrase can I take the 3pm slot is not treated as medical suitability", () => {
+  const safety = enforceTcmSafetyRules([{ role: "user", content: "Can I take the 3pm slot?" }]);
+  assert.equal(safety, null);
+  const reply = tcmFallback([{ role: "user", content: "Can I take the 3pm slot?" }]);
+  assert.doesNotMatch(reply, /personalised advice/i);
+});
+
+test("TCM lead state promotes prompted branch and timing response to appointment intent", () => {
+  const previousInterval = state.limits.minMessageIntervalMs;
+  state.limits.minMessageIntervalMs = 0;
+  try {
+    industry.runWithIndustry("tcm", () => {
+      const session = state.createSession({ ip: `tcm-intent-${Date.now()}` });
+      state.addCustomerMessage(session, "I want acupuncture.");
+      state.addAssistantMessage(session, "Sure. Which branch and preferred day or time suit you?");
+      state.addCustomerMessage(session, "KL, Saturday afternoon can?");
+      assert.equal(session.lead.bookingIntent, true);
+      assert.equal(session.lead.temperature, "hot");
+      assert.equal(session.lead.preferredBranch, "Kuala Lumpur");
+      assert.equal(session.lead.preferredTiming, "Saturday afternoon");
+      assert.equal(session.lead.estimatedValue, 80);
+      assert.match(session.lead.summary, /Appointment intent detected/i);
+      assert.doesNotMatch(session.lead.summary, /clinic visit|specific treatment/i);
+    });
+  } finally {
+    state.limits.minMessageIntervalMs = previousInterval;
+  }
+});
+
+test("TCM branch and timing browsing response does not become appointment intent", () => {
+  const previousInterval = state.limits.minMessageIntervalMs;
+  state.limits.minMessageIntervalMs = 0;
+  try {
+    industry.runWithIndustry("tcm", () => {
+      const session = state.createSession({ ip: `tcm-browse-${Date.now()}` });
+      state.addCustomerMessage(session, "How much is acupuncture?");
+      state.addAssistantMessage(session, "If you'd like to arrange a visit, tell me the branch and day/time that suit you.");
+      state.addCustomerMessage(session, "KL, Saturday afternoon, just checking first.");
+      assert.equal(session.lead.bookingIntent, false);
+      assert.notEqual(session.lead.temperature, "hot");
+    });
+  } finally {
+    state.limits.minMessageIntervalMs = previousInterval;
+  }
+});
+
+test("TCM lead stores customer-stated concern separately from service", () => {
+  industry.runWithIndustry("tcm", () => {
+    const session = state.createSession({ ip: `tcm-concern-${Date.now()}` });
+    state.addCustomerMessage(session, "最近肩颈很紧，想了解针灸。");
+    assert.match(session.lead.concern || "", /shoulder|neck/i);
+    assert.deepEqual(session.lead.interests, ["Acupuncture"]);
+    assert.equal(session.lead.estimatedValue, 80);
+  });
 });
 
 test("TCM prompt uses only TCM service inventory", () => {
