@@ -2,13 +2,26 @@ const tcm = require("./tcmConfig");
 
 const BOOKING = /\bbook(?:ing)?\b|\bappointment\b|\bslot\b|can\s+i\s+come|want\s+to\s+visit|boleh\s+datang|nak\s+datang|mahu\s+datang|tempah|temujanji|预约|預約|有空位|可以来|可以來|想来|想來/i;
 const BRANCH = /petaling jaya|\bpj\b|kuala lumpur|\bkl\b|八打灵再也|八打靈再也|吉隆坡/i;
-const TIMING = /weekend|saturday|sunday|weekday|morning|afternoon|evening|night|sabtu|ahad|hari biasa|pagi|petang|malam|周末|週末|星期[一二三四五六日]|早上|上午|下午|晚上/i;
+const TIMING = /weekend|saturday|sunday|weekday|morning|afternoon|evening|night|tomorrow|sabtu|ahad|hari biasa|pagi|petang|malam|esok|周末|週末|星期[一二三四五六日]|早上|上午|下午|晚上|明天/i;
 const BROWSING = /just checking|checking first|compare first|considering|check my schedule|tengok dulu|fikir dulu|先了解|先看看|比较一下|比較一下|考虑一下|考慮一下/i;
+const NEGATIVE = /not interested|no longer interested|never ?mind|don['’]t want|do not want|not booking|cancel|no thanks|tak berminat|tidak berminat|tak nak|tak jadi|batal|不要了|不想做|没兴趣|沒興趣|算了|取消|不预约|不預約/i;
 const PROCEEDING = /can\s+i\s+come|can\s*\??\s*$|boleh\s+(?:datang|book|tempah)|nak\s+datang|mahu\s+datang|可以吗|可以嗎|可以来|可以來|想来|想來|安排|预约|預約/i;
 const PROMPT = /which branch|branch.*convenient|weekday|weekend|which day|what day|what time|preferred day|preferred time|cawangan|hari.*sesuai|masa.*sesuai|比较方便|比較方便|哪一天|预约|預約|appointment/i;
 
 function users(messages) {
   return (messages || []).filter((message) => message?.role === "user");
+}
+
+function activeMessages(messages) {
+  const items = messages || [];
+  let lastNegative = -1;
+  for (let i = items.length - 1; i >= 0; i -= 1) {
+    if (items[i]?.role === "user" && NEGATIVE.test(String(items[i].content || ""))) {
+      lastNegative = i;
+      break;
+    }
+  }
+  return lastNegative >= 0 ? items.slice(lastNegative + 1) : items;
 }
 
 function serviceForText(text) {
@@ -40,6 +53,7 @@ function timingFromText(text) {
   if (/sunday|ahad|星期日|周日|週日/i.test(value)) return part ? `Sunday ${part}` : "Sunday";
   if (/weekday|hari biasa|平日|工作日/i.test(value)) return part ? `Weekday, ${part}` : "Weekday";
   if (/weekend|周末|週末/i.test(value)) return part ? `Weekend, ${part}` : "Weekend";
+  if (/tomorrow|esok|明天/i.test(value)) return part ? `Tomorrow ${part}` : "Tomorrow";
   if (part) return part[0].toUpperCase() + part.slice(1);
   return null;
 }
@@ -64,14 +78,15 @@ function previousAssistantPrompted(messages) {
 }
 
 function hasTcmBookingIntent(messages) {
-  const customerMessages = users(messages);
+  const active = activeMessages(messages);
+  const customerMessages = users(active);
   const latest = String(customerMessages.at(-1)?.content || "");
   const all = customerMessages.map((message) => String(message.content || "")).join(" \n");
-  if (BOOKING.test(all)) return true;
   if (!latest || BROWSING.test(latest)) return false;
-  if (!recentService(messages) || !branchFromMessages(messages) || !timingFromMessages(messages)) return false;
+  if (BOOKING.test(all)) return true;
+  if (!recentService(active) || !branchFromMessages(active) || !timingFromMessages(active)) return false;
   if (!BRANCH.test(latest) && !TIMING.test(latest)) return false;
-  return PROCEEDING.test(latest) || previousAssistantPrompted(messages);
+  return PROCEEDING.test(latest) || previousAssistantPrompted(active);
 }
 
-module.exports = { BOOKING, BRANCH, TIMING, BROWSING, serviceForText, recentService, branchFromMessages, timingFromText, timingFromMessages, hasTcmBookingIntent };
+module.exports = { BOOKING, BRANCH, TIMING, BROWSING, NEGATIVE, serviceForText, recentService, branchFromMessages, timingFromText, timingFromMessages, hasTcmBookingIntent };
