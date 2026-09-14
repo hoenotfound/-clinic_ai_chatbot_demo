@@ -1,11 +1,18 @@
 const tcm = require("./tcmConfig");
+const {
+  BOOKING,
+  BRANCH,
+  TIMING,
+  hasTcmBookingIntent,
+  branchFromMessages,
+  timingFromMessages,
+  serviceForText,
+  recentService,
+} = require("./tcmBookingIntent");
 
 const PRICE_PATTERN = /\bprice\b|how much|\bcost\b|harga|berapa|多少钱|多少錢|价格|價格|价钱|價錢|收费|收費/i;
-const BOOKING_PATTERN = /\bbook(?:ing)?\b|appointment|slot|available|can i come|want to visit|arrange|tempah|temujanji|boleh datang|nak datang|预约|預約|有空位|可以来|可以來|想来|想來/i;
 const HOURS_PATTERN = /opening hours?|business hours?|what time.*open|what time.*close|营业时间|營業時間|几点开|幾點開|waktu operasi/i;
 const LOCATION_PATTERN = /where are you|location|address|branch|cawangan|alamat|在哪里|在哪裡|地址|分行/i;
-const TIMING_PATTERN = /weekend|saturday|sunday|weekday|monday|tuesday|wednesday|thursday|friday|morning|afternoon|evening|night|tomorrow|sabtu|ahad|hari biasa|pagi|petang|malam|esok|周末|週末|星期[一二三四五六日]|早上|上午|下午|晚上|明天/i;
-const BRANCH_PATTERN = /petaling jaya|\bpj\b|kuala lumpur|\bkl\b|bukit bintang|八打灵再也|八打靈再也|吉隆坡/i;
 
 function userMessages(messages) {
   return (messages || []).filter((message) => message?.role === "user");
@@ -21,63 +28,33 @@ function languageFor(text) {
   return "en";
 }
 
-function serviceFor(text) {
-  const lower = String(text || "").toLowerCase();
-  return tcm.services.find((service) =>
-    [service.name, ...(service.aliases || [])].some((term) => lower.includes(String(term).toLowerCase()))
-  ) || null;
-}
-
-function recentService(messages) {
-  for (const message of [...userMessages(messages)].reverse()) {
-    const service = serviceFor(message.content);
-    if (service) return service;
-  }
-  return null;
-}
-
-function branchFor(messages) {
-  for (const message of [...userMessages(messages)].reverse()) {
-    const text = String(message.content || "").toLowerCase();
-    if (!BRANCH_PATTERN.test(text)) continue;
-    if (/petaling jaya|\bpj\b|八打灵再也|八打靈再也/i.test(text)) return "Petaling Jaya";
-    if (/kuala lumpur|\bkl\b|bukit bintang|吉隆坡/i.test(text)) return "Kuala Lumpur";
-  }
-  return null;
-}
-
-function timingFor(messages) {
-  for (const message of [...userMessages(messages)].reverse()) {
-    const text = String(message.content || "");
-    if (!TIMING_PATTERN.test(text)) continue;
-    const lower = text.toLowerCase();
-    if (/saturday|sabtu|星期六|周六|週六/i.test(lower)) return /afternoon|petang|下午/i.test(lower) ? "Saturday afternoon" : "Saturday";
-    if (/sunday|ahad|星期日|周日|週日/i.test(lower)) return "Sunday";
-    if (/weekday|hari biasa|平日|工作日/i.test(lower)) return "Weekday";
-    if (/weekend|周末|週末/i.test(lower)) return "Weekend";
-    if (/morning|pagi|早上|上午/i.test(lower)) return "Morning";
-    if (/afternoon|petang|下午/i.test(lower)) return "Afternoon";
-    if (/evening|night|malam|晚上/i.test(lower)) return "Evening";
-    if (/tomorrow|esok|明天/i.test(lower)) return "Tomorrow";
-  }
-  return null;
-}
-
-function priceText(service) {
-  return String(service?.priceRange || "").trim();
+function pricingNote(service, lang) {
+  if (!service?.pricingNote) return "";
+  if (lang === "zh") return " 中药费用会由中医师根据实际处方确认。";
+  if (lang === "ms") return " Kos herba akan disahkan oleh pengamal TCM berdasarkan preskripsi sebenar.";
+  return " Herbal medicine cost is confirmed by the practitioner based on the actual prescription.";
 }
 
 function priceReply(service, lang) {
   if (!service) return null;
-  const price = priceText(service);
-  if (lang === "zh") return `${service.name} ${/^From\s+/i.test(price) ? `从 ${price.replace(/^From\s+/i, "")} 起` : `价格是 ${price}`}。`;
-  if (lang === "ms") return `${service.name} ${/^From\s+/i.test(price) ? `bermula dari ${price.replace(/^From\s+/i, "")}` : `berharga ${price}`}.`;
-  return `${service.name} ${/^From\s+/i.test(price) ? `starts from ${price.replace(/^From\s+/i, "")}` : `is ${price}`}.`;
+  const price = String(service.priceRange || "").trim();
+  const base = lang === "zh"
+    ? `${service.name} ${/^From\s+/i.test(price) ? `从 ${price.replace(/^From\s+/i, "")} 起` : `价格是 ${price}`}。`
+    : lang === "ms"
+      ? `${service.name} ${/^From\s+/i.test(price) ? `bermula dari ${price.replace(/^From\s+/i, "")}` : `berharga ${price}`}.`
+      : `${service.name} ${/^From\s+/i.test(price) ? `starts from ${price.replace(/^From\s+/i, "")}` : `is ${price}`}.`;
+  return `${base}${pricingNote(service, lang)}`;
+}
+
+function schedulingInvite(lang) {
+  if (lang === "zh") return "如果你想安排时间，可以告诉我比较方便的 branch 和日期/时段。";
+  if (lang === "ms") return "Kalau nak arrange appointment, boleh beritahu branch dan hari/masa yang lebih sesuai.";
+  return "If you'd like to arrange a visit, tell me the branch and day/time that suit you.";
 }
 
 function bookingReply(messages, service, lang) {
-  const branch = branchFor(messages);
-  const timing = timingFor(messages);
+  const branch = branchFromMessages(messages);
+  const timing = timingFromMessages(messages);
   if (!branch) {
     if (lang === "zh") return "可以。你比较方便 Kuala Lumpur 还是 Petaling Jaya branch？";
     if (lang === "ms") return "Boleh. Branch mana lebih convenient untuk anda, Kuala Lumpur atau Petaling Jaya?";
@@ -94,6 +71,15 @@ function bookingReply(messages, service, lang) {
   return `Got it: ${summary}. I’ll pass these details to the TCM team so they can confirm the actual available time. [[HANDOFF]]`;
 }
 
+function preferenceReply(messages, service, lang) {
+  const branch = branchFromMessages(messages);
+  const timing = timingFromMessages(messages);
+  const summary = [service?.name, branch, timing].filter(Boolean).join(" · ");
+  if (lang === "zh") return `${summary ? `我先记下 ${summary}。` : ""}如果你决定要预约，再告诉我，我可以继续帮你整理预约资料。`;
+  if (lang === "ms") return `${summary ? `Saya catat dulu ${summary}. ` : ""}Kalau anda decide nak book nanti, beritahu saya dan saya boleh bantu sambung proses appointment.`;
+  return `${summary ? `I've noted ${summary}. ` : ""}If you decide to book, tell me and I can continue the appointment flow.`;
+}
+
 function serviceReply(service, lang) {
   if (lang === "zh") return `${service.name} 是这里提供的 TCM service 之一。具体是否适合个人情况，需要由中医师进一步了解后判断。`;
   if (lang === "ms") return `${service.name} ialah salah satu service TCM yang disediakan. Pengamal TCM akan tentukan kesesuaian berdasarkan keadaan individu.`;
@@ -104,7 +90,7 @@ function buildTcmFallbackReply(messages) {
   const latest = latestUserText(messages);
   if (!latest) return "How can I help with your TCM enquiry?";
   const lang = languageFor(latest);
-  const service = serviceFor(latest) || recentService(messages);
+  const service = serviceForText(latest) || recentService(messages);
 
   if (HOURS_PATTERN.test(latest)) {
     if (lang === "zh") return `营业时间是 ${tcm.hours.general}。${tcm.hours.closed}。`;
@@ -112,7 +98,7 @@ function buildTcmFallbackReply(messages) {
     return `Our hours are ${tcm.hours.general}. ${tcm.hours.closed}.`;
   }
 
-  if (LOCATION_PATTERN.test(latest) && !BOOKING_PATTERN.test(latest)) {
+  if (LOCATION_PATTERN.test(latest) && !BOOKING.test(latest)) {
     const names = tcm.branches.map((branch) => branch.name).join(" and ");
     if (lang === "zh") return `目前有 ${names} 两个 branch。你比较方便哪一个？`;
     if (lang === "ms") return `Ada branch di ${names}. Yang mana lebih convenient untuk anda?`;
@@ -121,14 +107,14 @@ function buildTcmFallbackReply(messages) {
 
   if (PRICE_PATTERN.test(latest) && service) {
     const price = priceReply(service, lang);
-    if (BOOKING_PATTERN.test(latest) || TIMING_PATTERN.test(latest) || BRANCH_PATTERN.test(latest)) {
-      return `${price} ${bookingReply(messages, service, lang)}`;
-    }
-    return price;
+    if (hasTcmBookingIntent(messages)) return `${price} ${bookingReply(messages, service, lang)}`;
+    return `${price} ${schedulingInvite(lang)}`;
   }
 
-  if (BOOKING_PATTERN.test(latest) || (branchFor(messages) && TIMING_PATTERN.test(latest))) {
-    return bookingReply(messages, service, lang);
+  if (hasTcmBookingIntent(messages)) return bookingReply(messages, service, lang);
+
+  if ((BRANCH.test(latest) || TIMING.test(latest)) && (branchFromMessages(messages) || timingFromMessages(messages))) {
+    return preferenceReply(messages, service, lang);
   }
 
   if (service) return serviceReply(service, lang);
@@ -138,4 +124,4 @@ function buildTcmFallbackReply(messages) {
   return "What would you like to know? I can help with TCM services, prices, branches or appointment enquiries.";
 }
 
-module.exports = { buildTcmFallbackReply };
+module.exports = { buildTcmFallbackReply, _test: { priceReply, schedulingInvite } };
