@@ -1,0 +1,51 @@
+const { enforceTcmSafetyRules: baseSafetyRules } = require("./tcmSafetyRules");
+
+const EXPLICIT_HUMAN_REQUEST = /(?:can|could|may)\s+i\s+(?:speak|talk|chat)\s+(?:to|with)\s+(?:a\s+)?(?:human|staff|practitioner|doctor)|(?:i\s+)?(?:want|need)\s+(?:to\s+)?(?:speak|talk|chat)\s+(?:to|with)\s+(?:a\s+)?(?:human|staff|practitioner|doctor)|(?:boleh|nak|mahu)\s+(?:saya\s+)?(?:cakap|bercakap|jumpa|berjumpa)\s+(?:dengan\s+)?(?:pengamal(?:\s+TCM)?|doktor|staff|orang)|(?:nak|mahu)\s+(?:jumpa|cakap\s+dengan)\s+(?:pengamal(?:\s+TCM)?|doktor|staff)|真人|转人工|轉人工|找医师|找醫師|找医生|找醫生|想找中医师|想找中醫師|想跟中医师聊|想跟中醫師聊/i;
+const MALAY_HERBAL_SERVICE = /(?:ada|sediakan|buat|harga|berapa|nak tahu|tanya).{0,24}(?:ubat\s+herba|herba)|(?:ubat\s+herba|herba).{0,24}(?:ada|harga|berapa|service|rawatan)/i;
+const EXISTING_MEDICATION_CONTEXT = /ubat\s+cair\s+darah|ubat\s+darah|ubat\s+preskripsi|ubat\s+doktor|(?:sedang|tengah)\s+(?:makan|ambil)\s+ubat|saya\s+(?:makan|ambil)\s+ubat|campur|sekali\s+dengan/i;
+const HIGH_RISK_CONTEXT = /hamil|menyusu|sesuai\s+(?:untuk\s+)?saya|selamat\s+untuk\s+saya|selepas\s+rawatan|lepas\s+rawatan/i;
+const PRACTITIONER_INFO_QUERY = /(?:how much|price|cost|fee|hours?|available).{0,40}(?:practitioner|doctor)|(?:practitioner|doctor).{0,40}(?:price|cost|fee|hours?|available)|(?:中医师|中醫師|医生|醫生).{0,20}(?:多少钱|多少錢|价格|價格|收费|收費|几点|幾點)|(?:多少钱|多少錢|价格|價格|收费|收費).{0,20}(?:中医师|中醫師|医生|醫生)/i;
+
+function latestUserText(messages) {
+  return String((messages || []).filter((message) => message?.role === "user").at(-1)?.content || "").trim();
+}
+
+function languageFor(text) {
+  if (/\p{Script=Han}/u.test(text)) return "zh";
+  if (/\b(saya|boleh|nak|mahu|pengamal|doktor)\b/i.test(text)) return "ms";
+  return "en";
+}
+
+function humanReply(lang) {
+  if (lang === "zh") return "可以，我帮你把这个对话转给 TCM team，让他们直接继续跟你聊。 [[HANDOFF]]";
+  if (lang === "ms") return "Boleh, saya pass conversation ini kepada team TCM supaya mereka boleh sambung dengan anda di sini. [[HANDOFF]]";
+  return "Sure, I’ll pass this conversation to the TCM team so they can continue with you here. [[HANDOFF]]";
+}
+
+function enforceTcmSafetyRules(messages) {
+  const latest = latestUserText(messages);
+  if (!latest) return null;
+
+  if (EXPLICIT_HUMAN_REQUEST.test(latest)) return humanReply(languageFor(latest));
+
+  const baseReply = baseSafetyRules(messages);
+  if (!baseReply) return null;
+
+  const benignMalayHerbalService = MALAY_HERBAL_SERVICE.test(latest)
+    && !EXISTING_MEDICATION_CONTEXT.test(latest)
+    && !HIGH_RISK_CONTEXT.test(latest);
+  if (benignMalayHerbalService) return null;
+
+  if (PRACTITIONER_INFO_QUERY.test(latest)) return null;
+  return baseReply;
+}
+
+module.exports = {
+  enforceTcmSafetyRules,
+  _test: {
+    EXPLICIT_HUMAN_REQUEST,
+    MALAY_HERBAL_SERVICE,
+    EXISTING_MEDICATION_CONTEXT,
+    PRACTITIONER_INFO_QUERY,
+  },
+};
