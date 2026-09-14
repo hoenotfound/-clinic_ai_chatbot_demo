@@ -9,14 +9,16 @@ function nonNegativeIntEnv(name, fallback) {
 }
 
 function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
-  const requestTimeoutMs = positiveIntEnv("AI_REQUEST_TIMEOUT_MS", 4500);
-  const primaryTimeoutMs = positiveIntEnv("GEMINI_ATTEMPT_TIMEOUT_MS", 6000);
-  const fallbackTimeoutMs = positiveIntEnv("GEMINI_FALLBACK_ATTEMPT_TIMEOUT_MS", 4500);
-  const failoverBudgetMs = positiveIntEnv("GEMINI_FAILOVER_BUDGET_MS", 16000);
+  const primaryTimeoutMs = positiveIntEnv("GEMINI_ATTEMPT_TIMEOUT_MS", 8000);
+  const fallbackTimeoutMs = positiveIntEnv("GEMINI_FALLBACK_ATTEMPT_TIMEOUT_MS", 5000);
+  const failoverBudgetMs = positiveIntEnv("GEMINI_FAILOVER_BUDGET_MS", 15000);
+  const fallbackReserveMs = positiveIntEnv("GEMINI_FALLBACK_RESERVE_MS", 5500);
   const compatibilityRetryDelayMs = nonNegativeIntEnv("GEMINI_RETRY_DELAY_MS", 0);
   const keyCooldownMs = positiveIntEnv("GEMINI_KEY_COOLDOWN_MS", 60000);
   const quotaCooldownMs = positiveIntEnv("GEMINI_QUOTA_COOLDOWN_MS", 15 * 60_000);
   const modelCooldownMs = positiveIntEnv("GEMINI_MODEL_COOLDOWN_MS", 60000);
+  const timeoutModelCooldownMs = positiveIntEnv("GEMINI_TIMEOUT_MODEL_COOLDOWN_MS", 30000);
+  const timeoutStreakThreshold = positiveIntEnv("GEMINI_TIMEOUT_STREAK_THRESHOLD", 2);
 
   const keyCooldowns = new Map();
   const routeCooldowns = new Map();
@@ -141,6 +143,14 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
     return ["timeout", "rate_limit", "quota", "unavailable", "model_not_found", "server", "conflict", "other"].includes(classify(error));
   }
 
+  function isThinkingCompatibilityError(error) {
+    const status = Number(error?.statusCode) || 0;
+    const apiStatus = String(error?.apiStatus || "").toUpperCase();
+    if (status !== 400 || (apiStatus && apiStatus !== "INVALID_ARGUMENT")) return false;
+    const message = `${String(error?.message || "")} ${JSON.stringify(error?.apiDetails || [])}`.toLowerCase();
+    return /thinking.?config|thinking.?level|thinking.?budget|generation.?config[^]{0,120}thinking/.test(message);
+  }
+
   function activeCooldown(map, key) {
     const entry = map.get(key);
     if (!entry) return null;
@@ -181,18 +191,17 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
     const route = routeKey(key, model);
 
     if (type === "timeout") {
-      const streak = (timeoutStreaks.get(route) || 0) + 1;
-      if (streak >= 2) {
-        routeCooldowns.set(route, { reason: type, until: Date.now() + keyCooldownMs });
-        timeoutStreaks.delete(route);
+      const streak = (timeoutStreaks.get(model) || 0) + 1;
+      if (streak >= timeoutStreakThreshold) {
+        modelCooldowns.set(model, { reason: type, until: Date.now() + timeoutModelCooldownMs });
+        timeoutStreaks.delete(model);
         opsStats.recordCounter("gemini_timeout_cooldowns");
       } else {
-        timeoutStreaks.set(route, streak);
+        timeoutStreaks.set(model, streak);
       }
       return type;
     }
 
-    timeoutStreaks.delete(route);
     if (type === "quota") {
       routeCooldowns.set(route, { reason: type, until: Date.now() + quotaCooldownMs });
     } else if (type === "rate_limit") {
@@ -240,8 +249,7 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
       if (firstTiming.budgetLimited && error?.code === "AI_REQUEST_TIMEOUT") throw failoverBudgetError();
       if (Number.isFinite(deadline) && remainingBudgetMs(deadline) <= 0) throw failoverBudgetError();
       const hasThinking = Boolean(body.generationConfig?.thinkingConfig);
-      const invalidArgument = error.statusCode === 400 && (error.apiStatus === "INVALID_ARGUMENT" || /invalid argument/i.test(error.message));
-      if (!hasThinking || !invalidArgument) throw error;
+      if (!hasThinking || !isThinkingCompatibilityError(error)) throw error;
       console.warn(`${label} rejected thinkingConfig for ${model}; retrying once without thinkingConfig.`);
       opsStats.recordCounter("gemini_retries");
       opsStats.recordCounter("gemini_compatibility_retries");
@@ -263,7 +271,7 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
       opsStats.recordGeminiFailure({ ...telemetry, error });
       throw error;
     }
-    timeoutStreaks.delete(routeKey(key, model));
+    timeoutStreaks.delete(model);
     opsStats.recordGeminiSuccess({ ...telemetry, usageMetadata: data?.usageMetadata || {} });
     return text;
   }
@@ -342,19 +350,27 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
     const model = String(process.env.GEMINI_MODEL || "gemini-3.6-flash").trim();
     const fallbackModel = String(process.env.GEMINI_FALLBACK_MODEL || "gemini-3.5-flash-lite").trim();
     const deadline = Date.now() + failoverBudgetMs;
+    const hasFallbackModel = Boolean(fallbackModel && fallbackModel !== model);
+    const primaryDeadline = hasFallbackModel
+      ? Math.max(Date.now() + 1, deadline - Math.min(fallbackReserveMs, Math.max(0, failoverBudgetMs - 1)))
+      : deadline;
 
     try {
-      return await tryPrimary(messages, isFirstMessage, keys, model, deadline, { switchModelOnTimeout: true });
+      return await tryPrimary(messages, isFirstMessage, keys, model, primaryDeadline, { switchModelOnTimeout: true });
     } catch (error) {
-      if (isFailoverBudgetError(error) || remainingBudgetMs(deadline) <= 0) {
+      if (remainingBudgetMs(deadline) <= 0) {
         console.warn("Gemini total failover time exhausted after primary attempts; using conversation-aware deterministic fallback.");
         opsStats.recordDeterministicFallback("primary_failover_budget_exhausted");
         return fallbackReply();
       }
-      console.warn(`Primary Gemini path unavailable [${classify(error)}]: ${error.message}`);
+      if (isFailoverBudgetError(error) && hasFallbackModel) {
+        console.warn(`Primary Gemini time reserve exhausted; preserving ${remainingBudgetMs(deadline)}ms for the fallback model.`);
+      } else {
+        console.warn(`Primary Gemini path unavailable [${classify(error)}]: ${error.message}`);
+      }
     }
 
-    if (fallbackModel && fallbackModel !== model && remainingBudgetMs(deadline) > 0) {
+    if (hasFallbackModel && remainingBudgetMs(deadline) > 0) {
       opsStats.recordCounter("gemini_fallback_model_uses");
       try {
         return await tryFallback(messages, isFirstMessage, keys, fallbackModel, deadline, { switchModelOnTimeout: true });
@@ -380,6 +396,7 @@ function createGeminiFailover({ buildPrompt, opsStats, fetchJson }) {
     buildRequest,
     classify,
     isRetryable,
+    isThinkingCompatibilityError,
     isFailoverBudgetError,
     remainingBudgetMs,
     requestTimeout,

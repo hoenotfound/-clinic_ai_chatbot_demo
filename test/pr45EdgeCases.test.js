@@ -218,7 +218,7 @@ test("genuine renovation rejection stops deterministic qualification while repla
   assert.doesNotMatch(replacementReply, /leave the renovation enquiry here/i);
 });
 
-test("a Gemini route is cooled only after repeated timeouts, then skipped on the next message", async () => {
+test("repeated Gemini timeouts cool the model without poisoning individual key routes", async () => {
   const calls = [];
   const counters = {};
   const opsStats = {
@@ -235,16 +235,10 @@ test("a Gemini route is cooled only after repeated timeouts, then skipped on the
   const fetchJson = async (_url, options) => {
     const key = options.headers["x-goog-api-key"];
     calls.push(key);
-    if (key === "key-one") {
-      const error = new Error("Timed out");
-      error.code = "AI_REQUEST_TIMEOUT";
-      error.statusCode = 408;
-      throw error;
-    }
-    return {
-      candidates: [{ content: { parts: [{ text: "healthy reply" }] } }],
-      usageMetadata: {},
-    };
+    const error = new Error("Timed out");
+    error.code = "AI_REQUEST_TIMEOUT";
+    error.statusCode = 408;
+    throw error;
   };
 
   const failover = createGeminiFailover({
@@ -255,14 +249,27 @@ test("a Gemini route is cooled only after repeated timeouts, then skipped on the
   const messages = [{ role: "user", content: "hello" }];
   const keys = ["key-one", "key-two"];
   const model = "gemini-2.5-flash";
+  const options = { switchModelOnTimeout: true };
 
-  assert.equal(await failover.tryPrimary(messages, false, keys, model), "healthy reply");
+  await assert.rejects(
+    () => failover.tryPrimary(messages, false, keys, model, null, options),
+    (error) => error?.code === "AI_REQUEST_TIMEOUT"
+  );
   assert.equal(failover.keyCooldown("key-one", model), null);
+  assert.equal(failover.modelCooldown(model), null);
 
-  assert.equal(await failover.tryPrimary(messages, false, keys, model), "healthy reply");
-  assert.equal(failover.keyCooldown("key-one", model)?.reason, "timeout");
+  await assert.rejects(
+    () => failover.tryPrimary(messages, false, keys, model, null, options),
+    (error) => error?.code === "AI_REQUEST_TIMEOUT"
+  );
+  assert.equal(failover.keyCooldown("key-one", model), null);
+  assert.equal(failover.modelCooldown(model)?.reason, "timeout");
 
-  assert.equal(await failover.tryPrimary(messages, false, keys, model), "healthy reply");
-  assert.deepEqual(calls, ["key-one", "key-two", "key-one", "key-two", "key-two"]);
+  await assert.rejects(
+    () => failover.tryPrimary(messages, false, keys, model, null, options),
+    (error) => error?.code === "GEMINI_MODEL_COOLING_DOWN"
+  );
+  assert.deepEqual(calls, ["key-one", "key-one"]);
   assert.equal(counters.gemini_timeout_cooldowns, 1);
+  assert.equal(counters.gemini_model_cooldown_skips, 1);
 });
