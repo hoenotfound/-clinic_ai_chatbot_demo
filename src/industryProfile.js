@@ -4,11 +4,14 @@ const { applyEstablishedLanguageContext } = require("./conversationLanguage");
 const { currentConversationContext } = require("./aiMemoryContext");
 
 const renovationAliases = new Set(["renovation", "home-renovation", "carpentry"]);
+const tcmAliases = new Set(["tcm", "traditional-chinese-medicine", "traditional chinese medicine", "chinese-medicine"]);
 const industryContext = new AsyncLocalStorage();
 
 function normalizeIndustryKey(value) {
   const selected = String(value || "clinic").trim().toLowerCase();
-  return renovationAliases.has(selected) ? "renovation" : "clinic";
+  if (renovationAliases.has(selected)) return "renovation";
+  if (tcmAliases.has(selected)) return "tcm";
+  return "clinic";
 }
 
 function fullConversationMessages(messages) {
@@ -83,6 +86,53 @@ function clinicProfile() {
   };
 }
 
+function tcmProfile() {
+  const config = require("./tcmConfig");
+  const { buildTcmSystemPrompt } = require("./tcmSystemPrompt");
+  const { buildTcmFallbackReply } = require("./tcmFallback");
+  const { buildTcmConcernFallback } = require("./tcmConcernFallback");
+  const { enforceTcmBookingRules } = require("./tcmBookingRules");
+  const { enforceTcmSafetyRules } = require("./tcmSafetyRules");
+  const { concernGuidanceForPrompt, bookingRulesForPrompt } = require("./tcmKnowledge");
+
+  return {
+    key: "tcm",
+    config,
+    selector: {
+      label: "Traditional Chinese Medicine (TCM)",
+      eyebrow: "CONSULTATIONS & TCM SERVICES",
+      description: "TCM service enquiries, pricing, practitioner consultation intent, multilingual replies and human takeover.",
+      highlights: ["TCM enquiries", "Appointment intent", "Practitioner handoff"],
+      icon: "tcm",
+    },
+    labels: {
+      customer: "Patient",
+      service: "TCM Service",
+      location: "Branch",
+      timing: "Timing",
+      appointment: "Appointment",
+      dashboard: "TCM Dashboard",
+      staff: "TCM team",
+    },
+    highIntentFields: ["bookingIntent"],
+    buildSystemPrompt: withStructuredMemoryPrompt(buildTcmSystemPrompt),
+    buildFallbackReply: withClinicConversationContext(buildTcmFallbackReply),
+    buildConcernFallback: withClinicConversationContext(buildTcmConcernFallback),
+    enforceBookingRules: withClinicConversationContext(enforceTcmBookingRules),
+    enforceSafetyRules: withClinicConversationContext(enforceTcmSafetyRules),
+    concernGuidanceForPrompt,
+    bookingRulesForPrompt,
+    salesCtaDefault: "Set up my TCM chatbot",
+    acquisitionPresets: {
+      "hifu-facebook": { key: "hifu-facebook", label: "Acupuncture Facebook Ad", source: "Meta Ads", campaign: "Acupuncture Demo Campaign", treatment: "Acupuncture", channel: "facebook" },
+      "pico-instagram": { key: "pico-instagram", label: "Tuina Instagram Ad", source: "Meta Ads", campaign: "Tuina Demo Campaign", treatment: "Tuina", channel: "instagram" },
+      "organic-whatsapp": { key: "organic-whatsapp", label: "Organic WhatsApp", source: "Organic", campaign: null, treatment: null, channel: "whatsapp" },
+      referral: { key: "referral", label: "Referral", source: "Referral", campaign: null, treatment: null, channel: "whatsapp" },
+    },
+    publicExperience: publicExperienceFor("tcm"),
+  };
+}
+
 function renovationProfile() {
   const config = require("./renovationConfig");
   const { buildSystemPrompt } = require("./renovationSystemPrompt");
@@ -135,7 +185,7 @@ function renovationProfile() {
   };
 }
 
-const profileFactories = { clinic: clinicProfile, renovation: renovationProfile };
+const profileFactories = { clinic: clinicProfile, tcm: tcmProfile, renovation: renovationProfile };
 const profileCache = new Map();
 const defaultIndustryKey = normalizeIndustryKey(process.env.DEMO_INDUSTRY || "clinic");
 
@@ -154,7 +204,7 @@ function runWithIndustry(value, callback) {
 }
 
 function listIndustryProfiles() {
-  return ["clinic", "renovation"].map((key) => {
+  return ["clinic", "tcm", "renovation"].map((key) => {
     const profile = getIndustryProfile(key);
     return { key: profile.key, ...profile.selector };
   });
