@@ -129,6 +129,30 @@ test("booking phrase can I take the 3pm slot is not treated as medical suitabili
   assert.doesNotMatch(reply, /personalised advice/i);
 });
 
+test("service plus scheduling wording stays in booking flow across English BM and Chinese", () => {
+  const cases = [
+    ["Can I do acupuncture Friday at 3pm in KL?", /Friday, 3:00 PM/i],
+    ["Boleh saya buat akupunktur Jumaat 3pm di KL?", /Friday, 3:00 PM/i],
+    ["星期五下午在KL可以针灸吗？", /Friday afternoon/i],
+  ];
+
+  for (const [message, timingPattern] of cases) {
+    const safety = enforceTcmSafetyRules([{ role: "user", content: message }]);
+    assert.equal(safety, null, message);
+    const reply = tcmFallback([{ role: "user", content: message }]);
+    assert.match(reply, timingPattern, message);
+    assert.match(reply, /\[\[HANDOFF\]\]/, message);
+    assert.doesNotMatch(reply, /personalised advice|nasihat peribadi|个人情况判断/, message);
+  }
+});
+
+test("medical safety still overrides a scheduling-shaped acupuncture request", () => {
+  const message = "I'm pregnant. Can I do acupuncture Friday at 3pm in KL?";
+  const reply = enforceTcmSafetyRules([{ role: "user", content: message }]);
+  assert.match(reply || "", /practitioner|TCM team/i);
+  assert.match(reply || "", /\[\[HANDOFF\]\]/);
+});
+
 test("TCM lead state promotes prompted branch and timing response to appointment intent", () => {
   const previousInterval = state.limits.minMessageIntervalMs;
   state.limits.minMessageIntervalMs = 0;
@@ -164,6 +188,32 @@ test("TCM lead stores exact AM/PM timing in appointment context", () => {
       assert.equal(session.lead.preferredBranch, "Kuala Lumpur");
       assert.equal(session.lead.preferredTiming, "Saturday, 3:00 PM");
     });
+  } finally {
+    state.limits.minMessageIntervalMs = previousInterval;
+  }
+});
+
+test("TCM lead preserves individual weekday names in English BM and Chinese", () => {
+  const previousInterval = state.limits.minMessageIntervalMs;
+  state.limits.minMessageIntervalMs = 0;
+  try {
+    const cases = [
+      ["KL, Friday afternoon can?", "Friday afternoon"],
+      ["KL, Jumaat 3pm boleh?", "Friday, 3:00 PM"],
+      ["KL，星期五下午可以吗？", "Friday afternoon"],
+    ];
+
+    for (const [message, expectedTiming] of cases) {
+      industry.runWithIndustry("tcm", () => {
+        const session = state.createSession({ ip: `tcm-weekday-${Date.now()}-${Math.random()}` });
+        state.addCustomerMessage(session, "I want acupuncture.");
+        state.addAssistantMessage(session, "Which branch and preferred day or time suit you?");
+        state.addCustomerMessage(session, message);
+        assert.equal(session.lead.bookingIntent, true, message);
+        assert.equal(session.lead.preferredBranch, "Kuala Lumpur", message);
+        assert.equal(session.lead.preferredTiming, expectedTiming, message);
+      });
+    }
   } finally {
     state.limits.minMessageIntervalMs = previousInterval;
   }
