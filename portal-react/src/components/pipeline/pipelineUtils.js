@@ -2,6 +2,7 @@ export function displayName(contact) {
   return contact?.name || contact?.whatsapp_profile_name || contact?.whatsappProfileName || (contact?.channel === "facebook" ? "Facebook user" : null) || (contact?.channel === "instagram" ? "Instagram user" : null) || contact?.whatsapp_number || "Contact";
 }
 export function formatMoney(value) {
+  if (value === null || value === undefined || value === "") return "";
   const amount = Number(value); if (!Number.isFinite(amount)) return "";
   return new Intl.NumberFormat("en-MY", { style: "currency", currency: "MYR", maximumFractionDigits: 0 }).format(amount);
 }
