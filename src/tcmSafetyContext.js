@@ -2,7 +2,7 @@ const { enforceTcmSafetyRules: baseSafetyRules, _test: basePatterns } = require(
 const { hasDirectServiceSchedulingRequest } = require("./tcmBookingIntent");
 const { detectConcernMappings } = require("./tcmKnowledge");
 
-const EXPLICIT_HUMAN_REQUEST = /(?:can|could|may)\s+i\s+(?:speak|talk|chat)\s+(?:to|with)\s+(?:a\s+)?(?:human|staff|practitioner|doctor)|(?:i\s+)?(?:want|need)\s+(?:to\s+)?(?:speak|talk|chat)\s+(?:to|with)\s+(?:a\s+)?(?:human|staff|practitioner|doctor)|(?:boleh|nak|mahu)\s+(?:saya\s+)?(?:cakap|bercakap|jumpa|berjumpa)\s+(?:dengan\s+)?(?:pengamal(?:\s+TCM)?|doktor|staff|orang)|(?:nak|mahu)\s+(?:jumpa|cakap\s+dengan)\s+(?:pengamal(?:\s+TCM)?|doktor|staff)|真人|转人工|轉人工|找医师|找醫師|找医生|找醫生|想找中医师|想找中醫師|想跟中医师聊|想跟中醫師聊/i;
+const EXPLICIT_HUMAN_REQUEST = /(?:can|could|may)\s+i\s+(?:speak|talk|chat)\s+(?:to|with)\s+(?:(?:a|the)\s+)?(?:tcm\s+)?(?:human|staff|practitioner|doctor)|(?:i\s+)?(?:want|need)\s+(?:to\s+)?(?:speak|talk|chat)\s+(?:to|with)\s+(?:(?:a|the)\s+)?(?:tcm\s+)?(?:human|staff|practitioner|doctor)|(?:boleh|nak|mahu)\s+(?:saya\s+)?(?:cakap|bercakap|jumpa|berjumpa)\s+(?:dengan\s+)?(?:pengamal(?:\s+TCM)?|doktor|staff|orang)|(?:nak|mahu)\s+(?:jumpa|cakap\s+dengan)\s+(?:pengamal(?:\s+TCM)?|doktor|staff)|真人|转人工|轉人工|找医师|找醫師|找医生|找醫生|想找中医师|想找中醫師|想跟中医师聊|想跟中醫師聊/i;
 const MALAY_HERBAL_SERVICE = /(?:ada(?:\s+jual)?|sediakan|jual|beli|boleh\s+(?:beli|order|dapat(?:kan)?)|nak(?:\s+(?:beli|cuba|order))?|mahu(?:\s+(?:beli|cuba|order))?|cari|harga|berapa|nak\s+tahu|tanya).{0,32}(?:ubat\s+herba|herba)|(?:ubat\s+herba|herba).{0,32}(?:ada|dijual|jual|beli|boleh\s+beli|nak|mahu|harga|berapa|service|rawatan)/i;
 const EXISTING_MEDICATION_CONTEXT = /medication|prescription|regular\s+medicine|current\s+medicine|my\s+medicine|taking\s+(?:a\s+)?medicine|blood\s+thinner|anticoagul|warfarin|aspirin|ubat\s+cair\s+darah|ubat\s+darah|ubat\s+preskripsi|ubat\s+doktor|(?:sedang|tengah)\s+(?:makan|ambil)\s+ubat|saya\s+(?:makan|ambil)\s+ubat|campur|sekali\s+dengan/i;
 const PRACTITIONER_INFO_QUERY = /(?:how|what|which|when|where|why|price|cost|fee|hours?|available).{0,60}(?:practitioner|doctor)|(?:practitioner|doctor).{0,60}(?:how|what|which|when|where|why|price|cost|fee|hours?|available|assess|check|explain|do)|(?:中医师|中醫師|医生|醫生).{0,28}(?:怎么|怎麼|如何|怎样|怎樣|什么|什麼|会|會|评估|評估|检查|檢查|看|多少钱|多少錢|价格|價格|收费|收費|几点|幾點)|(?:怎么|怎麼|如何|怎样|怎樣|什么|什麼|多少钱|多少錢|价格|價格|收费|收費).{0,28}(?:中医师|中醫師|医生|醫生)|(?:pengamal|doktor).{0,50}(?:macam mana|apa|bila|harga|berapa|check|periksa|nilai|assessment)/i;
@@ -53,7 +53,7 @@ function mustOverrideScheduling(text) {
   return herbInteraction || personalisedScheduling || [
     basePatterns.URGENT_PATTERN,
     basePatterns.COMPLAINT_PATTERN,
-    basePatterns.PREGNANCY_PATTERN,
+    basePatterns.PREGNY_PATTERN,
     basePatterns.POST_TREATMENT_PATTERN,
   ].some((pattern) => pattern.test(text));
 }
