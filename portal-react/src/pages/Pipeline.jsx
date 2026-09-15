@@ -4,9 +4,9 @@ import ContactAvatar from "../components/ContactAvatar";
 import { SAMPLE_LEADS, STAGES } from "../demoData";
 import { formatMoney } from "../components/pipeline/pipelineUtils";
 import { CloseIcon } from "../components/InboxIcons";
-import { industryProfile, isRenovationDemo } from "../config/industryProfile";
+import { industryProfile, isRenovationDemo, isTcmDemo } from "../config/industryProfile";
 
-const DEMO_CAMPAIGN_NAME = isRenovationDemo ? "Demo Renovation Campaign" : "Demo Clinic Campaign";
+const DEMO_CAMPAIGN_NAME = isRenovationDemo ? "Demo Renovation Campaign" : isTcmDemo ? "Demo TCM Campaign" : "Demo Clinic Campaign";
 const CATEGORY_OPTIONS = [
   ["all", "All leads"], ["hot", "Hot"], ["warm", "Warm"], ["cold", "Cold"],
   ["unassigned", "Unassigned"], ["no_reply", "No reply"], ["reschedule", "Reschedule"],
@@ -44,6 +44,7 @@ function mapLead(lead) {
     branch_name: lead.branch === "Unassigned" ? null : normalizedLocation(lead),
     owner_username: lead.owner === "Unassigned" ? null : lead.owner,
     treatment_interest: lead.treatment,
+    concern: lead.concern || null,
     estimated_value: lead.value,
     source: lead.source,
     campaign_name: lead.source === "Meta Ads" ? DEMO_CAMPAIGN_NAME : null,
@@ -132,7 +133,8 @@ export default function Pipeline() {
       branch_name: lead.preferredBranch || null,
       owner_username: live.mode === "human" ? "Demo Admin" : null,
       treatment_interest: lead.interests?.[0] || `${industryProfile.terms.service} not selected`,
-      estimated_value: isRenovationDemo ? estimatedBudget(lead.budget) : lead.bookingIntent ? 1800 : 0,
+      concern: lead.concern || null,
+      estimated_value: isRenovationDemo ? estimatedBudget(lead.budget) : isTcmDemo ? Number(lead.estimatedValue) || 0 : lead.bookingIntent ? 1800 : 0,
       source: "Live demo",
       campaign_name: null,
       appointment_status: lead.siteMeasurementIntent || (!isRenovationDemo && lead.bookingIntent) ? "requested" : "none",
@@ -160,7 +162,7 @@ export default function Pipeline() {
     if (!matchesCategory(lead, category, now)) return false;
     const query = search.trim().toLowerCase();
     if (query) {
-      const haystack = [lead.name, lead.whatsapp_number, lead.treatment_interest, lead.branch_name, lead.owner_username, lead.source, lead.campaign_name, lead.language, lead.summary, lead.intent_summary].filter(Boolean).join(" ").toLowerCase();
+      const haystack = [lead.name, lead.whatsapp_number, lead.treatment_interest, lead.concern, lead.branch_name, lead.owner_username, lead.source, lead.campaign_name, lead.language, lead.summary, lead.intent_summary].filter(Boolean).join(" ").toLowerCase();
       if (!haystack.includes(query)) return false;
     }
     return true;
@@ -204,6 +206,6 @@ export default function Pipeline() {
 function Metric({ label, value, detail, tone }) { return <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3.5 py-3 sm:px-4"><p className="text-[9px] font-bold uppercase tracking-wide text-[var(--color-text-muted)] sm:text-[10px]">{label}</p><div className="mt-1 flex items-end justify-between gap-3"><p className={`font-display text-xl font-bold ${tone === "danger" ? "text-[var(--color-danger)]" : ""}`}>{value}</p><p className="hidden pb-0.5 text-[10px] text-[var(--color-text-muted)] sm:block">{detail}</p></div></div>; }
 function SearchIcon() { return <svg viewBox="0 0 24 24" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>; }
 function LeadDrawer({ lead, onClose }) {
-  const detailRows = [["Temperature", lead.temperature], [industryProfile.terms.service, lead.treatment_interest], [industryProfile.terms.location, lead.branch_name || "Unassigned"], ["Owner", lead.owner_username || "Unassigned"], ["Source", lead.source], ["Value", formatMoney(lead.estimated_value)]];
+  const detailRows = [["Temperature", lead.temperature], ...(lead.concern ? [["Concern", lead.concern]] : []), [industryProfile.terms.service, lead.treatment_interest], [industryProfile.terms.location, lead.branch_name || "Unassigned"], ["Owner", lead.owner_username || "Unassigned"], ["Source", lead.source], ["Value", formatMoney(lead.estimated_value)]];
   return <><button aria-label="Close lead details" onClick={onClose} className="fixed inset-0 z-40 bg-black/20" /><aside className="fixed right-0 top-0 z-50 flex h-full w-[min(28rem,94vw)] flex-col border-l border-[var(--color-border)] bg-white shadow-2xl"><header className="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4"><div><p className="text-[10px] font-semibold uppercase tracking-[.12em] text-[var(--color-text-muted)]">Lead details</p><h2 className="mt-1 font-display text-lg font-bold">{lead.name}</h2></div><button aria-label="Close lead drawer" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-[var(--color-bg)]"><CloseIcon className="h-4 w-4" /></button></header><div className="min-h-0 flex-1 overflow-y-auto p-5"><div className="flex items-center gap-3"><ContactAvatar channel={lead.channel} size={52} /><div><strong className="text-sm">{lead.name}</strong><p className="mt-1 text-xs text-[var(--color-text-muted)]">{lead.whatsapp_number}</p></div></div>{lead.intent_summary && <div className="mt-5 rounded-2xl border border-[var(--color-primary)]/20 bg-[var(--color-primary-light)] p-4"><p className="text-[9px] font-bold uppercase tracking-wide text-[var(--color-primary)]">Current intent</p><p className="mt-1.5 text-sm font-semibold">{lead.intent_summary}</p></div>}<div className="mt-6 grid grid-cols-2 gap-3">{detailRows.map(([label, value]) => <div key={label} className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3"><p className="text-[9px] font-bold uppercase tracking-wide text-[var(--color-text-muted)]">{label}</p><p className="mt-1.5 text-xs font-semibold">{value || "—"}</p></div>)}</div><div className="mt-4 rounded-2xl border border-[var(--color-border)] p-4"><p className="text-[9px] font-bold uppercase tracking-wide text-[var(--color-text-muted)]">Conversation summary</p><p className="mt-2 text-sm leading-6">{lead.summary}</p></div><p className="mt-5 text-center text-[10px] text-[var(--color-text-muted)]">Sample/demo lead controls are read only.</p></div></aside></>;
 }

@@ -14,6 +14,7 @@ const normalized = String(
 ).trim().toLowerCase();
 
 const renovationAliases = new Set(["renovation", "home-renovation", "carpentry"]);
+const tcmAliases = new Set(["tcm", "traditional-chinese-medicine", "traditional chinese medicine", "chinese-medicine"]);
 
 const clinicProfile = {
   key: "clinic",
@@ -97,6 +98,91 @@ const clinicProfile = {
     breakdownTabs: ["Source", "Campaign", "Treatment", "Branch", "Channel", "Owner"],
     breakdownCopy: "Compare which sources, campaigns, treatments, branches, channels and owners drive results.",
     systemName: "AI receptionist",
+  },
+};
+
+const tcmProfile = {
+  key: "tcm",
+  businessName: "Harmony Demo TCM Centre",
+  shortBusinessName: "Harmony Demo TCM",
+  assistantName: "Jia",
+  terms: {
+    customer: "Patient",
+    customerLower: "patient",
+    business: "TCM centre",
+    businessTitle: "TCM Centre",
+    staff: "TCM team",
+    service: "TCM Service",
+    servicePlural: "TCM Services",
+    location: "Branch",
+    locationPlural: "Branches",
+    timing: "Timing",
+    appointment: "Appointment",
+    appointmentPlural: "Appointments",
+  },
+  serviceAreas: ["Kuala Lumpur", "Petaling Jaya"],
+  teamMembers: [
+    { name: "Demo Admin", username: "demo", role: "Admin", scope: "All leads", status: "Active" },
+    { name: "Li Wen", username: "liwen.demo", role: "Practitioner", scope: "Assigned leads", status: "Active" },
+    { name: "Aina", username: "aina.tcm", role: "Front Desk", scope: "Assigned leads", status: "Active" },
+  ],
+  acquisitionPresets: {
+    "hifu-facebook": { key: "hifu-facebook", label: "Acupuncture Facebook Ad", source: "Meta Ads", campaign: "Acupuncture Demo Campaign", treatment: "Acupuncture", channel: "facebook" },
+    "pico-instagram": { key: "pico-instagram", label: "Tuina Instagram Ad", source: "Meta Ads", campaign: "Tuina Demo Campaign", treatment: "Tuina", channel: "instagram" },
+    "organic-whatsapp": { key: "organic-whatsapp", label: "Organic WhatsApp", source: "Organic", campaign: null, treatment: null, channel: "whatsapp" },
+    referral: { key: "referral", label: "Referral", source: "Referral", campaign: null, treatment: null, channel: "whatsapp" },
+  },
+  settings: {
+    intro: "TCM centre configuration and AI receptionist preferences.",
+    profileTab: "TCM centre profile",
+    profileTitle: "TCM centre profile",
+    profileCopy: "The live product uses these details when answering routine TCM service and appointment enquiries.",
+    fields: { name: "Centre name", assistant: "AI assistant name", hours: "Business hours", locations: "Branches" },
+    values: { name: "Harmony Demo TCM Centre", assistant: "Jia", hours: "Mon–Sat, 10:00 AM – 7:00 PM", locations: "Kuala Lumpur, Petaling Jaya" },
+    aiTitle: "AI TCM receptionist",
+    aiCopy: "Control how the assistant answers routine enquiries, detects appointment intent and hands personalised medical judgement to the practitioner.",
+    aiRows: [
+      ["Match customer language", "Reply naturally in English, Bahasa Malaysia or Chinese based on the customer's language."],
+      ["Practitioner handoff", "Escalate personalised medical judgement, complaints and direct requests for a practitioner."],
+      ["Appointment intent detection", "Recognise booking intent and capture branch/timing preferences."],
+      ["Price guardrails", "Only quote service prices configured for the TCM centre."],
+    ],
+    channelsCopy: "Production deployments connect directly to the TCM centre's WhatsApp, Instagram and Facebook accounts.",
+    promotion: null,
+  },
+  tools: {
+    disconnectedCopy: "Demo settings are not connected to a real TCM centre.",
+    followUpDefaults: {
+      en: "Hi! Just checking in to see if you still need help with your TCM enquiry. Reply whenever you're ready 😊",
+      ms: "Hai! Nak follow up sekejap. Kalau masih perlukan bantuan tentang TCM, balas bila-bila anda dah sedia ya 😊",
+      zh: "嗨！想跟进一下，看看您是否还需要中医服务方面的帮助。方便时回复我们就可以了 😊",
+    },
+    sampleLeadName: "Michelle Tan",
+    sampleLeadService: "Acupuncture",
+    sampleLeadArea: "Kuala Lumpur",
+    quietCopy: "no reply after the TCM team's last message",
+    customerCheck: "Patient has not replied",
+    chatPreviewTitle: "Patient chat preview",
+    sampleCustomerMessage: "KL is easier. Saturday afternoon is usually okay for me.",
+    sampleAssistantMessage: "Got it. I've noted KL and Saturday afternoon. The TCM team can confirm an actual available time with you.",
+    checkingCopy: "Checking for a new patient reply…",
+    previewEligibility: "Before it sends, the production system checks that the patient has not already replied and that the conversation is still eligible.",
+    scoringTitle: "Prioritise the TCM enquiries most likely to book",
+    hotCopy: "Strong appointment intent, preferred timing, or a clear request to proceed.",
+    warmCopy: "Active service or pricing interest without a firm appointment request yet.",
+    comingNext: ["Appointment reminders", "Consultation follow-ups", "Review requests"],
+  },
+  analytics: {
+    locationOptions: [["all", "All branches"], ["Kuala Lumpur", "Kuala Lumpur"], ["Petaling Jaya", "Petaling Jaya"]],
+    campaignOptions: [["all", "All campaigns"], ["Demo", "Demo TCM Campaign"]],
+    serviceOptions: [["all", "All TCM services"], ["TCM Consultation", "TCM Consultation"], ["Acupuncture", "Acupuncture"], ["Tuina", "Tuina"], ["Cupping", "Cupping"], ["Gua Sha", "Gua Sha"], ["Chinese Herbal Medicine Consultation", "Herbal Consultation"]],
+    ownerOptions: [["all", "All owners"], ["Li Wen", "Li Wen"], ["Aina", "Aina"], ["Unassigned", "Unassigned"]],
+    funnel: ["New Leads", "Appointments", "Centre Visits", "Won"],
+    metrics: ["Appointments", "Centre Visits"],
+    rates: [["Appointment rate", "Lead → appointment"], ["Show rate", "Appointment → visit"], ["Close rate", "Visit → won"]],
+    breakdownTabs: ["Source", "Campaign", "TCM Service", "Branch", "Channel", "Owner"],
+    breakdownCopy: "Compare which sources, campaigns, TCM services, branches, channels and owners drive enquiries and visits.",
+    systemName: "AI TCM receptionist",
   },
 };
 
@@ -186,7 +272,12 @@ const renovationProfile = {
   },
 };
 
-export const industryProfile = renovationAliases.has(normalized) ? renovationProfile : clinicProfile;
+export const industryProfile = renovationAliases.has(normalized)
+  ? renovationProfile
+  : tcmAliases.has(normalized)
+    ? tcmProfile
+    : clinicProfile;
 export const demoIndustry = industryProfile.key;
 export const isRenovationDemo = industryProfile.key === "renovation";
+export const isTcmDemo = industryProfile.key === "tcm";
 export const demoTerms = industryProfile.terms;

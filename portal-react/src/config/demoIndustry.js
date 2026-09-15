@@ -1,1 +1,1 @@
-export { industryProfile, demoIndustry, isRenovationDemo, demoTerms } from "./industryProfile";
+export { industryProfile, demoIndustry, isRenovationDemo, isTcmDemo, demoTerms } from "./industryProfile";

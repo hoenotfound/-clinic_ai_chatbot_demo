@@ -1,4 +1,5 @@
 import ContactAvatar from "../ContactAvatar";
+import { industryProfile } from "../../config/industryProfile";
 import { displayName, formatDateTime, formatMoney, formatRelative, isNoReply, isOverdue, temperatureStyle } from "./pipelineUtils";
 
 export default function LeadCard({ lead, now, noReplyHours, onOpen, onDragStart }) {
@@ -23,7 +24,7 @@ export default function LeadCard({ lead, now, noReplyHours, onOpen, onDragStart 
         <div className="mb-3 flex items-center justify-between rounded-xl bg-[var(--color-primary-light)] px-2.5 py-2">
           <span className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[.12em] text-[var(--color-primary)]">
             <i className="h-2 w-2 animate-pulse rounded-full bg-[var(--color-primary)]" />
-            Live from Patient View
+            Live from {industryProfile.terms.customer} View
           </span>
           <span className="text-[9px] font-semibold text-[var(--color-primary)]">Auto-updating</span>
         </div>
@@ -33,7 +34,7 @@ export default function LeadCard({ lead, now, noReplyHours, onOpen, onDragStart 
         <ContactAvatar src={lead.photo_url} channel={lead.channel} size={38} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2"><p className="truncate text-sm font-semibold">{displayName(lead)}</p>{lead.estimated_value != null && <span className="shrink-0 text-[11px] font-semibold text-[var(--color-primary)]">{formatMoney(lead.estimated_value)}</span>}</div>
-          <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">{lead.treatment_interest || "Treatment not selected"}</p>
+          <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">{lead.treatment_interest || `${industryProfile.terms.service} not selected`}</p>
         </div>
       </div>
 
@@ -52,9 +53,9 @@ export default function LeadCard({ lead, now, noReplyHours, onOpen, onDragStart 
         <div key={`${lead.temperature}-${lead.stage_type}-${lead.treatment_interest}-${lead.branch_name}`} className="mt-3 grid animate-[pulse_650ms_ease-out_1] grid-cols-2 gap-1.5 rounded-xl border border-[var(--color-primary)]/15 bg-[var(--color-bg)] p-2.5">
           <LiveField label="Lead" value={capitalize(lead.temperature) || "Cold"} />
           <LiveField label="Stage" value={liveStage} />
-          <LiveField label="Treatment" value={lead.treatment_interest || "Detecting…"} />
-          <LiveField label="Branch" value={lead.branch_name || "Not selected"} />
-          <p className="col-span-2 mt-1 text-[9px] leading-4 text-[var(--color-text-muted)]">Watch these fields change as the prospect sends price, treatment and booking messages.</p>
+          <LiveField label={industryProfile.terms.service} value={lead.treatment_interest || "Detecting…"} />
+          <LiveField label={industryProfile.terms.location} value={lead.branch_name || "Not selected"} />
+          <p className="col-span-2 mt-1 text-[9px] leading-4 text-[var(--color-text-muted)]">Watch these fields change as the prospect sends price, {industryProfile.terms.service.toLowerCase()} and {industryProfile.terms.appointment.toLowerCase()} messages.</p>
         </div>
       )}
 

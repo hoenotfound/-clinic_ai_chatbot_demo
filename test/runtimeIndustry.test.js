@@ -10,13 +10,22 @@ const ai = require("../src/aiService");
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 test("runtime industry contexts stay isolated across concurrent async work", async () => {
-  const [clinic, renovation] = await Promise.all([
+  const [clinic, tcm, renovation] = await Promise.all([
     industry.runWithIndustry("clinic", async () => {
       await delay(15);
       return {
         key: industry.key,
         business: industry.config.clinicName,
         reply: ai.getFallbackReply([{ role: "user", content: "How much is HIFU?" }]),
+        prompt: ai._test.enhancedSystemPrompt(true),
+      };
+    }),
+    industry.runWithIndustry("tcm", async () => {
+      await delay(10);
+      return {
+        key: industry.key,
+        business: industry.config.clinicName,
+        reply: ai.getFallbackReply([{ role: "user", content: "针灸多少钱？" }]),
         prompt: ai._test.enhancedSystemPrompt(true),
       };
     }),
@@ -37,6 +46,13 @@ test("runtime industry contexts stay isolated across concurrent async work", asy
   assert.match(clinic.prompt, /CONCERN-TO-TREATMENT/i);
   assert.doesNotMatch(clinic.prompt, /AI-FIRST RENOVATION OVERRIDE/i);
 
+  assert.equal(tcm.key, "tcm");
+  assert.match(tcm.business, /Harmony Demo TCM Centre/i);
+  assert.match(tcm.reply, /Acupuncture|RM\s*80/i);
+  assert.match(tcm.prompt, /TCM FRONT-DESK BEHAVIOUR/i);
+  assert.match(tcm.prompt, /CONCERN-TO-TREATMENT/i);
+  assert.doesNotMatch(tcm.prompt, /HIFU|Pico Laser|AI-FIRST RENOVATION OVERRIDE/i);
+
   assert.equal(renovation.key, "renovation");
   assert.match(renovation.business, /Oakline Demo Renovation/i);
   assert.match(renovation.reply, /RM 6,800/i);
@@ -47,7 +63,8 @@ test("runtime industry contexts stay isolated across concurrent async work", asy
 
 test("profile registry exposes the selector choices", () => {
   const options = industry.listIndustryProfiles();
-  assert.deepEqual(options.map((item) => item.key), ["clinic", "renovation"]);
+  assert.deepEqual(options.map((item) => item.key), ["clinic", "tcm", "renovation"]);
   assert.match(options[0].label, /Aesthetic Clinic/i);
-  assert.match(options[1].label, /Home Renovation/i);
+  assert.match(options[1].label, /Traditional Chinese Medicine/i);
+  assert.match(options[2].label, /Home Renovation/i);
 });

@@ -78,6 +78,7 @@ function searchText(contact) {
     contact?.whatsapp_number,
     contact?.last_message,
     lead.treatment,
+    lead.concern,
     lead.summary,
     lead.branch,
     lead.timing,
@@ -144,6 +145,7 @@ export default function Inbox() {
       lead: {
         temperature: live.lead?.temperature || "cold",
         treatment: live.lead?.interests?.[0] || `${industryProfile.terms.service} not selected`,
+        concern: live.lead?.concern || null,
         summary: live.lead?.summary || "Live prospect conversation",
         branch: live.lead?.preferredBranch || "Unassigned",
         timing: live.lead?.preferredTiming || "Not specified",
@@ -477,6 +479,7 @@ function Details({ open, contact, onClose }) {
   if (!open || !contact) return null;
   const rows = [
     ["Lead temperature", contact.lead?.temperature?.toUpperCase()],
+    ...(contact.lead?.concern ? [["Concern", contact.lead.concern]] : []),
     [industryProfile.terms.service, contact.lead?.treatment],
     [industryProfile.terms.location, contact.lead?.branch],
     [industryProfile.terms.timing, contact.lead?.timing],
