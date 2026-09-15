@@ -2,9 +2,9 @@ const tcm = require("./tcmConfig");
 
 const BOOKING = /\bbook(?:ing)?\b|\bappointment\b|\bslot\b|can\s+i\s+come|want\s+to\s+visit|boleh\s+datang|nak\s+datang|mahu\s+datang|tempah|temujanji|预约|預約|有空位|可以来|可以來|想来|想來/i;
 const BRANCH = /petaling jaya|\bpj\b|kuala lumpur|\bkl\b|八打灵再也|八打靈再也|吉隆坡/i;
-const CLOCK_TIME = /\b(?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s*(?:am|pm)\b/i;
-const TIMING = /weekend|weekday|monday|tuesday|wednesday|thursday|friday|saturday|sunday|morning|afternoon|evening|night|tomorrow|hari biasa|isnin|selasa|rabu|khamis|jumaat|sabtu|ahad|pagi|petang|malam|esok|周末|週末|星期[一二三四五六日]|周[一二三四五六日]|週[一二三四五六日]|早上|上午|下午|晚上|明天|\b(?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s*(?:am|pm)\b/i;
-const BROWSING = /just checking|checking first|compare first|considering|check my schedule|tengok dulu|fikir dulu|先了解|先看看|比较一下|比較一下|考虑一下|考慮一下/i;
+const CLOCK_TIME = /\b(?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s*(?:am|pm)\b|\b(?:[01]?\d|2[0-3]):[0-5]\d\b|\bpukul\s*(?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s*(?:pagi|petang|malam)\b|(?:早上|上午|下午|晚上)\s*(?:1[0-2]|0?[1-9])\s*(?:点|點)/i;
+const TIMING = /weekend|weekday|monday|tuesday|wednesday|thursday|friday|saturday|sunday|morning|afternoon|evening|night|tomorrow|hari biasa|isnin|selasa|rabu|khamis|jumaat|sabtu|ahad|pagi|petang|malam|esok|周末|週末|星期[一二三四五六日]|周[一二三四五六日]|週[一二三四五六日]|早上|上午|下午|晚上|明天|\b(?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s*(?:am|pm)\b|\b(?:[01]?\d|2[0-3]):[0-5]\d\b|\bpukul\s*(?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s*(?:pagi|petang|malam)\b|(?:早上|上午|下午|晚上)\s*(?:1[0-2]|0?[1-9])\s*(?:点|點)/i;
+const BROWSING = /just checking|checking first|compare first|considering|check my schedule|tengok dulu|fikir dulu|survey dulu|先了解|先看看|比较一下|比較一下|考虑一下|考慮一下/i;
 const NEGATIVE = /not interested|no longer interested|never ?mind|don['’]t want|do not want|not booking|cancel|no thanks|tak berminat|tidak berminat|tak nak|tak jadi|batal|不要了|不想做|没兴趣|沒興趣|算了|取消|不预约|不預約/i;
 const PROCEEDING = /can\s+i\s+come|can\s*\??\s*$|boleh\s+(?:datang|book|tempah)|nak\s+datang|mahu\s+datang|可以吗|可以嗎|可以来|可以來|想来|想來|安排|预约|預約/i;
 const SERVICE_SCHEDULING_REQUEST = /(?:can|could)\s+i\s+(?:do|have|get)|boleh\s+(?:saya\s+)?(?:buat|ambil)|(?:nak|mahu)\s+(?:buat|ambil)|可以.{0,20}(?:吗|嗎)|能.{0,20}(?:吗|嗎)/i;
@@ -53,10 +53,9 @@ function serviceTermIsNegated(lower, index) {
   return NEGATED_SERVICE_PREFIX.test(prefix);
 }
 
-function serviceForText(text) {
+function rankedServiceCandidates(text) {
   const lower = String(text || "").toLowerCase();
-  if (!lower) return null;
-
+  if (!lower) return [];
   const candidates = [];
   for (const service of tcm.services) {
     for (const term of serviceTerms(service)) {
@@ -73,14 +72,23 @@ function serviceForText(text) {
       }
     }
   }
+  candidates.sort((left, right) => right.score - left.score || right.index - left.index || right.length - left.length);
+  return candidates;
+}
 
-  if (!candidates.length) return null;
-  candidates.sort((left, right) =>
-    right.score - left.score ||
-    right.index - left.index ||
-    right.length - left.length
-  );
-  return candidates[0].service;
+function servicesForText(text) {
+  const seen = new Set();
+  const services = [];
+  for (const candidate of rankedServiceCandidates(text)) {
+    if (seen.has(candidate.service.name)) continue;
+    seen.add(candidate.service.name);
+    services.push(candidate.service);
+  }
+  return services;
+}
+
+function serviceForText(text) {
+  return servicesForText(text)[0] || null;
 }
 
 function hasExplicitServiceRejection(text) {
@@ -121,12 +129,64 @@ function branchFromMessages(messages) {
   return null;
 }
 
+function toClockLabel(minutes) {
+  const hour24 = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  const period = hour24 >= 12 ? "PM" : "AM";
+  const hour12 = hour24 % 12 || 12;
+  return `${hour12}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
+function clockTimeDetailsFromText(text) {
+  const value = String(text || "");
+
+  let match = value.match(/\b(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*(am|pm)\b/i);
+  if (match) {
+    let hour = Number(match[1]);
+    const minute = Number(match[2] || 0);
+    const period = match[3].toLowerCase();
+    if (period === "pm" && hour !== 12) hour += 12;
+    if (period === "am" && hour === 12) hour = 0;
+    const minutes = hour * 60 + minute;
+    return { minutes, label: toClockLabel(minutes) };
+  }
+
+  match = value.match(/\b(?:pukul\s*)?(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*(pagi|petang|malam)\b/i);
+  if (match) {
+    let hour = Number(match[1]);
+    const minute = Number(match[2] || 0);
+    const part = match[3].toLowerCase();
+    const period = part === "pagi" ? "am" : "pm";
+    if (period === "pm" && hour !== 12) hour += 12;
+    if (period === "am" && hour === 12) hour = 0;
+    const minutes = hour * 60 + minute;
+    return { minutes, label: toClockLabel(minutes) };
+  }
+
+  match = value.match(/(?:早上|上午|下午|晚上)\s*(1[0-2]|0?[1-9])\s*(?:点|點)(?:\s*([0-5]?\d)\s*分?)?/i);
+  if (match) {
+    const partMatch = value.match(/(早上|上午|下午|晚上)\s*(?:1[0-2]|0?[1-9])\s*(?:点|點)/i);
+    const part = partMatch?.[1] || "";
+    let hour = Number(match[1]);
+    const minute = Number(match[2] || 0);
+    const period = /下午|晚上/.test(part) ? "pm" : "am";
+    if (period === "pm" && hour !== 12) hour += 12;
+    if (period === "am" && hour === 12) hour = 0;
+    const minutes = hour * 60 + minute;
+    return { minutes, label: toClockLabel(minutes) };
+  }
+
+  match = value.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+  if (match) {
+    const minutes = Number(match[1]) * 60 + Number(match[2]);
+    return { minutes, label: toClockLabel(minutes) };
+  }
+
+  return null;
+}
+
 function clockTimeFromText(text) {
-  const match = String(text || "").match(/\b(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*(am|pm)\b/i);
-  if (!match) return null;
-  const hour = Number(match[1]);
-  const minute = String(match[2] || "00").padStart(2, "0");
-  return `${hour}:${minute} ${match[3].toUpperCase()}`;
+  return clockTimeDetailsFromText(text)?.label || null;
 }
 
 function timingFromText(text) {
@@ -170,13 +230,27 @@ function hasDirectServiceSchedulingRequest(text) {
   return Boolean(serviceForText(text)) && TIMING.test(String(text || "")) && SERVICE_SCHEDULING_REQUEST.test(String(text || ""));
 }
 
+function messagesAfterLatestBrowsing(messages) {
+  const customerMessages = users(messages);
+  let lastBrowsing = -1;
+  for (let i = customerMessages.length - 1; i >= 0; i -= 1) {
+    if (BROWSING.test(String(customerMessages[i]?.content || ""))) {
+      lastBrowsing = i;
+      break;
+    }
+  }
+  return lastBrowsing >= 0 ? customerMessages.slice(lastBrowsing + 1) : customerMessages;
+}
+
 function hasTcmBookingIntent(messages) {
   const active = activeMessages(messages);
   const customerMessages = users(active);
   const latest = String(customerMessages.at(-1)?.content || "");
-  const all = customerMessages.map((message) => String(message.content || "")).join(" \n");
   if (!latest || BROWSING.test(latest)) return false;
-  if (BOOKING.test(all)) return true;
+
+  const intentMessages = messagesAfterLatestBrowsing(active);
+  const intentText = intentMessages.map((message) => String(message.content || "")).join(" \n");
+  if (BOOKING.test(intentText)) return true;
   if (hasDirectServiceSchedulingRequest(latest)) return true;
   if (!recentService(active) || !branchFromMessages(active) || !timingFromMessages(active)) return false;
   if (!BRANCH.test(latest) && !TIMING.test(latest)) return false;
@@ -191,11 +265,14 @@ module.exports = {
   BROWSING,
   NEGATIVE,
   SERVICE_SCHEDULING_REQUEST,
+  activeMessages,
+  servicesForText,
   serviceForText,
   hasExplicitServiceRejection,
   serviceSelectionFromMessages,
   recentService,
   branchFromMessages,
+  clockTimeDetailsFromText,
   clockTimeFromText,
   timingFromText,
   timingFromMessages,
