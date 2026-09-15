@@ -10,13 +10,19 @@ function latestUserText(messages) {
 
 function languageFor(text) {
   if (/\p{Script=Han}/u.test(String(text || ""))) return "zh";
-  if (/\b(saya|nak|boleh|sakit|bahu|leher|pinggang|tidur|perut)\b/i.test(String(text || ""))) return "ms";
+  if (/\b(saya|nak|boleh|sakit|bahu|leher|pinggang|tidur|perut|postur|muka)\b/i.test(String(text || ""))) return "ms";
   return "en";
 }
 
 function priceLine(service, lang) {
   if (!service) return "";
-  const price = String(service.priceRange || "").replace(/^From\s+/i, "");
+  const configured = String(service.priceRange || "").trim();
+  if (!configured || /not configured/i.test(configured)) {
+    if (lang === "zh") return `${service.name} 的价格目前没有配置在 demo 里，需要由 team 在评估后确认。`;
+    if (lang === "ms") return `Harga ${service.name} belum dikonfigurasi dalam demo dan perlu disahkan oleh team selepas assessment.`;
+    return `The price for ${service.name} is not configured in this demo and should be confirmed by the team after assessment.`;
+  }
+  const price = configured.replace(/^From\s+/i, "");
   if (lang === "zh") return `${service.name} 从 ${price} 起。`;
   if (lang === "ms") return `${service.name} bermula dari ${price}.`;
   return `${service.name} starts from ${price}.`;
