@@ -5,7 +5,7 @@ const { detectConcernMappings } = require("./tcmKnowledge");
 const EXPLICIT_HUMAN_REQUEST = /(?:can|could|may)\s+i\s+(?:speak|talk|chat)\s+(?:to|with)\s+(?:a\s+)?(?:human|staff|practitioner|doctor)|(?:i\s+)?(?:want|need)\s+(?:to\s+)?(?:speak|talk|chat)\s+(?:to|with)\s+(?:a\s+)?(?:human|staff|practitioner|doctor)|(?:boleh|nak|mahu)\s+(?:saya\s+)?(?:cakap|bercakap|jumpa|berjumpa)\s+(?:dengan\s+)?(?:pengamal(?:\s+TCM)?|doktor|staff|orang)|(?:nak|mahu)\s+(?:jumpa|cakap\s+dengan)\s+(?:pengamal(?:\s+TCM)?|doktor|staff)|真人|转人工|轉人工|找医师|找醫師|找医生|找醫生|想找中医师|想找中醫師|想跟中医师聊|想跟中醫師聊/i;
 const MALAY_HERBAL_SERVICE = /(?:ada(?:\s+jual)?|sediakan|jual|beli|boleh\s+(?:beli|order|dapat(?:kan)?)|nak(?:\s+(?:beli|cuba|order))?|mahu(?:\s+(?:beli|cuba|order))?|cari|harga|berapa|nak\s+tahu|tanya).{0,32}(?:ubat\s+herba|herba)|(?:ubat\s+herba|herba).{0,32}(?:ada|dijual|jual|beli|boleh\s+beli|nak|mahu|harga|berapa|service|rawatan)/i;
 const EXISTING_MEDICATION_CONTEXT = /medication|prescription|regular\s+medicine|current\s+medicine|my\s+medicine|taking\s+(?:a\s+)?medicine|blood\s+thinner|anticoagul|warfarin|aspirin|ubat\s+cair\s+darah|ubat\s+darah|ubat\s+preskripsi|ubat\s+doktor|(?:sedang|tengah)\s+(?:makan|ambil)\s+ubat|saya\s+(?:makan|ambil)\s+ubat|campur|sekali\s+dengan/i;
-const PRACTITIONER_INFO_QUERY = /(?:how much|price|cost|fee|hours?|available).{0,40}(?:practitioner|doctor)|(?:practitioner|doctor).{0,40}(?:price|cost|fee|hours?|available)|(?:中医师|中醫師|医生|醫生).{0,20}(?:多少钱|多少錢|价格|價格|收费|收費|几点|幾點)|(?:多少钱|多少錢|价格|價格|收费|收費).{0,20}(?:中医师|中醫師|医生|醫生)/i;
+const PRACTITIONER_INFO_QUERY = /(?:how|what|which|when|where|why|price|cost|fee|hours?|available).{0,60}(?:practitioner|doctor)|(?:practitioner|doctor).{0,60}(?:how|what|which|when|where|why|price|cost|fee|hours?|available|assess|check|explain|do)|(?:中医师|中醫師|医生|醫生).{0,28}(?:怎么|怎麼|如何|怎样|怎樣|什么|什麼|会|會|评估|評估|检查|檢查|看|多少钱|多少錢|价格|價格|收费|收費|几点|幾點)|(?:怎么|怎麼|如何|怎样|怎樣|什么|什麼|多少钱|多少錢|价格|價格|收费|收費).{0,28}(?:中医师|中醫師|医生|醫生)|(?:pengamal|doktor).{0,50}(?:macam mana|apa|bila|harga|berapa|check|periksa|nilai|assessment)/i;
 const SELF_REPORTED_MEDICAL_CONTEXT = /(?:\bi\s+(?:have|had|have\s+been\s+diagnosed\s+with)|\bi['’]?ve\s+got|\bdiagnosed\s+with|\bhistory\s+of|\bsuffering\s+from).{0,80}(?:condition|disease|problem|pain|blood\s+pressure|hypertension|diabetes|asthma|allerg|heart|kidney|liver|cancer|epilep|stroke)|(?:\bsaya\s+(?:ada|menghidap)|\bsaya\s+kena).{0,80}(?:penyakit|masalah|sakit|darah\s+tinggi|kencing\s+manis|asma|alahan|jantung|buah\s+pinggang|hati)|(?:我有|我患有|我被诊断|我被診斷|我以前有).{0,40}(?:疾病|病|问题|問題|高血压|高血壓|糖尿病|哮喘|过敏|過敏|心脏|心臟|肾|腎|肝|癌|中风|中風)/i;
 
 function latestUserText(messages) {
@@ -39,8 +39,7 @@ function hasHighPrioritySafetySignal(text) {
 }
 
 function isBenignMalayHerbalService(text) {
-  return MALAY_HERBAL_SERVICE.test(text)
-    && !EXISTING_MEDICATION_CONTEXT.test(text);
+  return MALAY_HERBAL_SERVICE.test(text) && !EXISTING_MEDICATION_CONTEXT.test(text);
 }
 
 function mustOverrideScheduling(text) {
@@ -49,13 +48,20 @@ function mustOverrideScheduling(text) {
     && basePatterns.MEDICATION_PATTERN.test(text)
     && !herbalServiceOnly;
   const personalisedScheduling = basePatterns.PERSONAL_SUITABILITY_PATTERN.test(text)
-    && hasPersonalMedicalContext(text);
+    && SELF_REPORTED_MEDICAL_CONTEXT.test(text);
   return herbInteraction || personalisedScheduling || [
     basePatterns.URGENT_PATTERN,
     basePatterns.COMPLAINT_PATTERN,
     basePatterns.PREGNANCY_PATTERN,
     basePatterns.POST_TREATMENT_PATTERN,
   ].some((pattern) => pattern.test(text));
+}
+
+function isInformationalPractitionerMention(text) {
+  if (EXPLICIT_HUMAN_REQUEST.test(text)) return false;
+  if (!basePatterns.HUMAN_PATTERN.test(text)) return false;
+  if (basePatterns.COMPLAINT_PATTERN.test(text)) return false;
+  return PRACTITIONER_INFO_QUERY.test(text) || /\b(?:practitioner|doctor)\b|中医师|中醫師|医生|醫生|\b(?:pengamal|doktor)\b/i.test(text);
 }
 
 function enforceTcmSafetyRules(messages) {
@@ -69,11 +75,12 @@ function enforceTcmSafetyRules(messages) {
 
   if (mustOverrideScheduling(latest)) return baseReply;
   if (hasDirectServiceSchedulingRequest(latest)) return null;
-  if (hasHighPrioritySafetySignal(latest)) return baseReply;
 
   if (isBenignMalayHerbalService(latest)) return null;
-
+  if (isInformationalPractitionerMention(latest)) return null;
   if (PRACTITIONER_INFO_QUERY.test(latest)) return null;
+
+  if (hasHighPrioritySafetySignal(latest)) return baseReply;
   return baseReply;
 }
 
@@ -89,5 +96,6 @@ module.exports = {
     hasHighPrioritySafetySignal,
     isBenignMalayHerbalService,
     mustOverrideScheduling,
+    isInformationalPractitionerMention,
   },
 };
