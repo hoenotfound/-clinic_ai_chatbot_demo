@@ -66,7 +66,7 @@ function rankedServiceCandidates(text) {
           const isOfficialName = normalizedTerm === String(service.name || "").toLowerCase();
           const isGeneric = GENERIC_SERVICE_TERMS.has(normalizedTerm);
           const score = (isOfficialName ? 10_000 : isGeneric ? 10 : 1_000) + normalizedTerm.length;
-          candidates.push({ service, score, index, length: normalizedTerm.length });
+          candidates.push({ service, score, index, length: normalizedTerm.length, isGeneric });
         }
         index = lower.indexOf(normalizedTerm, index + normalizedTerm.length);
       }
@@ -76,10 +76,21 @@ function rankedServiceCandidates(text) {
   return candidates;
 }
 
+function genericTermBelongsToSpecificService(candidate, candidates) {
+  if (!candidate.isGeneric) return false;
+  return candidates.some((other) => {
+    if (other.isGeneric || other.service.name === candidate.service.name) return false;
+    const otherEnd = other.index + other.length;
+    return candidate.index >= other.index && candidate.index <= otherEnd + 2;
+  });
+}
+
 function servicesForText(text) {
+  const candidates = rankedServiceCandidates(text);
   const seen = new Set();
   const services = [];
-  for (const candidate of rankedServiceCandidates(text)) {
+  for (const candidate of candidates) {
+    if (genericTermBelongsToSpecificService(candidate, candidates)) continue;
     if (seen.has(candidate.service.name)) continue;
     seen.add(candidate.service.name);
     services.push(candidate.service);
