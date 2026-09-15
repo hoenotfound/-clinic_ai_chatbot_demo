@@ -76,21 +76,30 @@ function rankedServiceCandidates(text) {
   return candidates;
 }
 
-function genericTermBelongsToSpecificService(candidate, candidates) {
+function genericTermBelongsToSpecificService(candidate, candidates, lower) {
   if (!candidate.isGeneric) return false;
   return candidates.some((other) => {
     if (other.isGeneric || other.service.name === candidate.service.name) return false;
+
+    const candidateEnd = candidate.index + candidate.length;
     const otherEnd = other.index + other.length;
-    return candidate.index >= other.index && candidate.index <= otherEnd + 2;
+    if (candidate.index >= other.index && candidate.index <= otherEnd + 2) return true;
+
+    if (other.index >= candidateEnd && other.index - candidateEnd <= 24) {
+      const connector = lower.slice(candidateEnd, other.index);
+      return /^\s*(?:for|about|regarding|with|of|[:\-–—])\s*$/i.test(connector);
+    }
+    return false;
   });
 }
 
 function servicesForText(text) {
+  const lower = String(text || "").toLowerCase();
   const candidates = rankedServiceCandidates(text);
   const seen = new Set();
   const services = [];
   for (const candidate of candidates) {
-    if (genericTermBelongsToSpecificService(candidate, candidates)) continue;
+    if (genericTermBelongsToSpecificService(candidate, candidates, lower)) continue;
     if (seen.has(candidate.service.name)) continue;
     seen.add(candidate.service.name);
     services.push(candidate.service);
@@ -167,9 +176,13 @@ function clockTimeDetailsFromText(text) {
     let hour = Number(match[1]);
     const minute = Number(match[2] || 0);
     const part = match[3].toLowerCase();
-    const period = part === "pagi" ? "am" : "pm";
-    if (period === "pm" && hour !== 12) hour += 12;
-    if (period === "am" && hour === 12) hour = 0;
+    if (part === "malam" && hour === 12) {
+      hour = 0;
+    } else if (part !== "pagi" && hour !== 12) {
+      hour += 12;
+    } else if (part === "pagi" && hour === 12) {
+      hour = 0;
+    }
     const minutes = hour * 60 + minute;
     return { minutes, label: toClockLabel(minutes) };
   }
@@ -180,9 +193,13 @@ function clockTimeDetailsFromText(text) {
     const part = partMatch?.[1] || "";
     let hour = Number(match[1]);
     const minute = Number(match[2] || 0);
-    const period = /下午|晚上/.test(part) ? "pm" : "am";
-    if (period === "pm" && hour !== 12) hour += 12;
-    if (period === "am" && hour === 12) hour = 0;
+    if (part === "晚上" && hour === 12) {
+      hour = 0;
+    } else if (/下午|晚上/.test(part) && hour !== 12) {
+      hour += 12;
+    } else if (/早上|上午/.test(part) && hour === 12) {
+      hour = 0;
+    }
     const minutes = hour * 60 + minute;
     return { minutes, label: toClockLabel(minutes) };
   }
@@ -245,7 +262,9 @@ function messagesAfterLatestBrowsing(messages) {
   const customerMessages = users(messages);
   let lastBrowsing = -1;
   for (let i = customerMessages.length - 1; i >= 0; i -= 1) {
-    if (BROWSING.test(String(customerMessages[i]?.content || ""))) {
+    const text = String(customerMessages[i]?.content || "");
+    const freshBookingSignal = BOOKING.test(text) || hasDirectServiceSchedulingRequest(text);
+    if (BROWSING.test(text) && !freshBookingSignal) {
       lastBrowsing = i;
       break;
     }
@@ -257,12 +276,15 @@ function hasTcmBookingIntent(messages) {
   const active = activeMessages(messages);
   const customerMessages = users(active);
   const latest = String(customerMessages.at(-1)?.content || "");
-  if (!latest || BROWSING.test(latest)) return false;
+  if (!latest) return false;
+
+  const freshBookingSignal = BOOKING.test(latest) || hasDirectServiceSchedulingRequest(latest);
+  if (BROWSING.test(latest) && !freshBookingSignal) return false;
+  if (freshBookingSignal) return true;
 
   const intentMessages = messagesAfterLatestBrowsing(active);
   const intentText = intentMessages.map((message) => String(message.content || "")).join(" \n");
   if (BOOKING.test(intentText)) return true;
-  if (hasDirectServiceSchedulingRequest(latest)) return true;
   if (!recentService(active) || !branchFromMessages(active) || !timingFromMessages(active)) return false;
   if (!BRANCH.test(latest) && !TIMING.test(latest)) return false;
   return PROCEEDING.test(latest) || previousAssistantPrompted(active);
