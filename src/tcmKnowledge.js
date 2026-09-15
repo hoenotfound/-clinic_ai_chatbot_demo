@@ -40,9 +40,11 @@ function normalise(text) {
 }
 
 function mappings() {
-  return Array.isArray(tcm.concernMappings) && tcm.concernMappings.length
+  const primary = Array.isArray(tcm.concernMappings) && tcm.concernMappings.length
     ? tcm.concernMappings
     : DEFAULT_CONCERN_MAPPINGS;
+  const extended = Array.isArray(tcm.extendedConcernMappings) ? tcm.extendedConcernMappings : [];
+  return [...primary, ...extended];
 }
 
 function detectConcernMappings(text) {
