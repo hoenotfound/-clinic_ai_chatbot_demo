@@ -8,6 +8,7 @@ const tcm = require("../src/tcmConfig");
 const { buildTcmSystemPrompt } = require("../src/tcmSystemPrompt");
 const { serviceForText } = require("../src/tcmBookingIntent");
 const { detectConcernMappings } = require("../src/tcmKnowledge");
+const { enforceTcmSafetyRules } = require("../src/tcmSafetyContext");
 const industry = require("../src/industryProfile");
 const ai = require("../src/aiService");
 
@@ -44,6 +45,8 @@ test("TCM system prompt contains supplied service knowledge but not the source s
   assert.match(prompt, /3D小颜术|3D 小颜术/);
   assert.match(prompt, /habitual one-sided chewing/i);
   assert.match(prompt, /9D/);
+  assert.match(prompt, /one overall adjustment\/service price/i);
+  assert.match(prompt, /postpartum customers/i);
   assert.match(prompt, /results vary/i);
   assert.doesNotMatch(prompt, /Neutro\s+Sense/i);
   assert.doesNotMatch(JSON.stringify(tcm), /Neutro\s+Sense/i);
@@ -54,6 +57,7 @@ test("pelvic posture fallback explains assessment and manual approach in Chinese
   assert.match(reply, /1对1/);
   assert.match(reply, /徒手/);
   assert.match(reply, /骨盆/);
+  assert.doesNotMatch(reply, /This service starts|manual techniques/i);
   assert.doesNotMatch(reply, /Neutro\s+Sense/i);
 });
 
@@ -63,6 +67,7 @@ test("3D facial fallback explains manual adjustment and optional 9D in Chinese",
   assert.match(reply, /徒手/);
   assert.match(reply, /9D/);
   assert.match(reply, /紧致|保湿|提亮/);
+  assert.doesNotMatch(reply, /starts with an assessment|manual techniques/i);
 });
 
 test("new service price questions do not invent an amount", () => {
@@ -73,6 +78,32 @@ test("new service price questions do not invent an amount", () => {
   const facial = tcmFallback("小颜术多少钱？");
   assert.match(facial, /价格目前没有配置|评估后确认/);
   assert.doesNotMatch(facial, /RM\s*\d/i);
+});
+
+test("new TCM services keep personalised medical suitability behind practitioner handoff", () => {
+  const cases = [
+    "I have a heart condition. Can I do pelvic adjustment?",
+    "Saya ada darah tinggi. Boleh saya buat rawatan postur?",
+    "我有高血压，可以做骨盆调理吗？",
+    "我有高血压，可以做小颜术吗？",
+  ];
+
+  for (const message of cases) {
+    const reply = enforceTcmSafetyRules([{ role: "user", content: message }]);
+    assert.match(reply || "", /\[\[HANDOFF\]\]/, message);
+  }
+});
+
+test("plain scheduling-shaped new-service requests can continue without false medical handoff", () => {
+  const cases = [
+    "Can I do pelvic adjustment Friday at 3pm in KL?",
+    "Boleh saya buat rawatan postur Jumaat 3pm di KL?",
+    "星期五下午在KL可以做小颜术吗？",
+  ];
+
+  for (const message of cases) {
+    assert.equal(enforceTcmSafetyRules([{ role: "user", content: message }]), null, message);
+  }
 });
 
 test("configured practice claims stay exact and are not tied to the source brand", () => {
