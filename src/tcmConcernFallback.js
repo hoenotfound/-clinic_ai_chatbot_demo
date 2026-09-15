@@ -10,13 +10,19 @@ function latestUserText(messages) {
 
 function languageFor(text) {
   if (/\p{Script=Han}/u.test(String(text || ""))) return "zh";
-  if (/\b(saya|nak|boleh|sakit|bahu|leher|pinggang|tidur|perut)\b/i.test(String(text || ""))) return "ms";
+  if (/\b(saya|nak|boleh|sakit|bahu|leher|pinggang|tidur|perut|postur|muka)\b/i.test(String(text || ""))) return "ms";
   return "en";
 }
 
 function priceLine(service, lang) {
   if (!service) return "";
-  const price = String(service.priceRange || "").replace(/^From\s+/i, "");
+  const configured = String(service.priceRange || "").trim();
+  if (!configured || /not configured/i.test(configured)) {
+    if (lang === "zh") return `${service.name} 的价格目前没有配置在 demo 里，需要由 team 在评估后确认。`;
+    if (lang === "ms") return `Harga ${service.name} belum dikonfigurasi dalam demo dan perlu disahkan oleh team selepas assessment.`;
+    return `The price for ${service.name} is not configured in this demo and should be confirmed by the team after assessment.`;
+  }
+  const price = configured.replace(/^From\s+/i, "");
   if (lang === "zh") return `${service.name} 从 ${price} 起。`;
   if (lang === "ms") return `${service.name} bermula dari ${price}.`;
   return `${service.name} starts from ${price}.`;
@@ -32,7 +38,13 @@ function buildTcmConcernFallback(messages) {
   const lang = languageFor(latest);
   const names = services.slice(0, 2).join(" and ");
   const namedService = serviceForText(latest);
-  const price = PRICE_PATTERN.test(latest) && namedService ? priceLine(namedService, lang) : "";
+  const askedPrice = PRICE_PATTERN.test(latest);
+
+  // If the visitor explicitly names a service without asking for price, let the richer
+  // service fallback explain the configured process instead of reducing it to concern guidance.
+  if (namedService && !askedPrice) return null;
+
+  const price = askedPrice && namedService ? priceLine(namedService, lang) : "";
 
   if (lang === "zh") {
     return `${price}${price ? " " : ""}针对你提到的情况，${names} 是这里比较常见会讨论的服务方向。不过实际适合哪一种，还是要让中医师了解你的情况后判断。`;
