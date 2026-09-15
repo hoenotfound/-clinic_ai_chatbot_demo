@@ -85,8 +85,21 @@ function preferenceReply(messages, service, lang) {
   return `${summary ? `I've noted ${summary}. ` : ""}If you decide to book, tell me and I can continue the appointment flow.`;
 }
 
+function localizedServiceSummary(service, lang) {
+  if (!service) return "";
+  if (service.name === "Pelvic & Posture Manual Adjustment") {
+    if (lang === "zh") return "这个项目会先做 1对1 体态和日常习惯评估，再根据评估结果以徒手方式针对骨盆、腰背、髋部、肩颈或头颈前倾等相关部位做整体调理，不是固定模板，也不是机器处理。";
+    if (lang === "ms") return "Servis ini bermula dengan assessment postur dan tabiat harian secara 1-to-1. Berdasarkan assessment, pengamal boleh fokus pada pelvis, pinggang, pinggul, bahu/leher atau postur kepala ke depan menggunakan teknik manual, bukan mesin dan bukan template tetap.";
+  }
+  if (service.name === "3D Facial Contour Manual Adjustment") {
+    if (lang === "zh") return "3D 小颜术会先评估左右脸的肌肉紧绷、整体平衡和相关生活习惯，再用非侵入式徒手方式针对需要的位置做调整；9D 可作为搭配，侧重紧致、保湿、提亮和皮肤状态护理。";
+    if (lang === "ms") return "3D facial manual adjustment bermula dengan assessment ketegangan otot muka, keseimbangan kiri-kanan dan tabiat harian. Teknik manual digunakan secara non-invasive, manakala 9D boleh digabungkan sebagai sokongan untuk firming, hydration, brightness dan penjagaan keadaan kulit.";
+  }
+  return String(service.frontDeskSummary || service.description || "").trim();
+}
+
 function serviceReply(service, lang) {
-  const summary = String(service?.frontDeskSummary || service?.description || "").trim();
+  const summary = localizedServiceSummary(service, lang);
   if (summary) {
     if (lang === "zh") return `${service.name} 是这里提供的 TCM service 之一。${summary} 具体是否适合个人情况，需要由中医师进一步评估。`;
     if (lang === "ms") return `${service.name} ialah salah satu service TCM yang disediakan. ${summary} Pengamal TCM akan tentukan kesesuaian berdasarkan assessment individu.`;
@@ -135,4 +148,4 @@ function buildTcmFallbackReply(messages) {
   return "What would you like to know? I can help with TCM services, prices, branches or appointment enquiries.";
 }
 
-module.exports = { buildTcmFallbackReply, _test: { priceReply, schedulingInvite, languageFor, serviceReply } };
+module.exports = { buildTcmFallbackReply, _test: { priceReply, schedulingInvite, languageFor, localizedServiceSummary, serviceReply } };
