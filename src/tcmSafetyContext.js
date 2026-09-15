@@ -7,6 +7,7 @@ const MALAY_HERBAL_SERVICE = /(?:ada(?:\s+jual)?|sediakan|jual|beli|boleh\s+(?:b
 const EXISTING_MEDICATION_CONTEXT = /medication|prescription|regular\s+medicine|current\s+medicine|my\s+medicine|taking\s+(?:a\s+)?medicine|blood\s+thinner|anticoagul|warfarin|aspirin|ubat\s+cair\s+darah|ubat\s+darah|ubat\s+preskripsi|ubat\s+doktor|(?:sedang|tengah)\s+(?:makan|ambil)\s+ubat|saya\s+(?:makan|ambil)\s+ubat|campur|sekali\s+dengan/i;
 const PRACTITIONER_INFO_QUERY = /(?:how|what|which|when|where|why|price|cost|fee|hours?|available).{0,60}(?:practitioner|doctor)|(?:practitioner|doctor).{0,60}(?:how|what|which|when|where|why|price|cost|fee|hours?|available|assess|check|explain|do)|(?:中医师|中醫師|医生|醫生).{0,28}(?:怎么|怎麼|如何|怎样|怎樣|什么|什麼|会|會|评估|評估|检查|檢查|看|多少钱|多少錢|价格|價格|收费|收費|几点|幾點)|(?:怎么|怎麼|如何|怎样|怎樣|什么|什麼|多少钱|多少錢|价格|價格|收费|收費).{0,28}(?:中医师|中醫師|医生|醫生)|(?:pengamal|doktor).{0,50}(?:macam mana|apa|bila|harga|berapa|check|periksa|nilai|assessment)/i;
 const SELF_REPORTED_MEDICAL_CONTEXT = /(?:\bi\s+(?:have|had|have\s+been\s+diagnosed\s+with)|\bi['’]?ve\s+got|\bdiagnosed\s+with|\bhistory\s+of|\bsuffering\s+from).{0,80}(?:condition|disease|problem|pain|blood\s+pressure|hypertension|diabetes|asthma|allerg|heart|kidney|liver|cancer|epilep|stroke)|(?:\bsaya\s+(?:ada|menghidap)|\bsaya\s+kena).{0,80}(?:penyakit|masalah|sakit|darah\s+tinggi|kencing\s+manis|asma|alahan|jantung|buah\s+pinggang|hati)|(?:我有|我患有|我被诊断|我被診斷|我以前有).{0,40}(?:疾病|病|问题|問題|高血压|高血壓|糖尿病|哮喘|过敏|過敏|心脏|心臟|肾|腎|肝|癌|中风|中風)/i;
+const SIGNIFICANT_MEDICAL_CONTEXT = /(?:\bi\s+(?:have|had|have\s+been\s+diagnosed\s+with)|\bi['’]?ve\s+got|\bdiagnosed\s+with|\bhistory\s+of).{0,80}(?:blood\s+pressure|hypertension|diabetes|asthma|allerg|heart\s+(?:condition|disease|problem)|kidney\s+(?:condition|disease|problem)|liver\s+(?:condition|disease|problem)|cancer|epilep|stroke)|(?:\bsaya\s+(?:ada|menghidap)|\bsaya\s+kena).{0,80}(?:darah\s+tinggi|kencing\s+manis|asma|alahan|penyakit\s+jantung|masalah\s+jantung|penyakit\s+buah\s+pinggang|penyakit\s+hati|kanser|epilep|strok)|(?:我有|我患有|我被诊断|我被診斷|我以前有).{0,40}(?:高血压|高血壓|糖尿病|哮喘|严重过敏|嚴重過敏|心脏病|心臟病|肾病|腎病|肝病|癌|癫痫|癲癇|中风|中風)/i;
 
 function latestUserText(messages) {
   return String((messages || []).filter((message) => message?.role === "user").at(-1)?.content || "").trim();
@@ -48,7 +49,7 @@ function mustOverrideScheduling(text) {
     && basePatterns.MEDICATION_PATTERN.test(text)
     && !herbalServiceOnly;
   const personalisedScheduling = basePatterns.PERSONAL_SUITABILITY_PATTERN.test(text)
-    && SELF_REPORTED_MEDICAL_CONTEXT.test(text);
+    && SIGNIFICANT_MEDICAL_CONTEXT.test(text);
   return herbInteraction || personalisedScheduling || [
     basePatterns.URGENT_PATTERN,
     basePatterns.COMPLAINT_PATTERN,
@@ -92,6 +93,7 @@ module.exports = {
     EXISTING_MEDICATION_CONTEXT,
     PRACTITIONER_INFO_QUERY,
     SELF_REPORTED_MEDICAL_CONTEXT,
+    SIGNIFICANT_MEDICAL_CONTEXT,
     hasPersonalMedicalContext,
     hasHighPrioritySafetySignal,
     isBenignMalayHerbalService,
