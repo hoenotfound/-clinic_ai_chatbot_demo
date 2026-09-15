@@ -24,7 +24,7 @@ function latestUserText(messages) {
 
 function languageFor(text) {
   if (/\p{Script=Han}/u.test(String(text || ""))) return "zh";
-  if (/\b(saya|nak|boleh|harga|berapa|sakit|cawangan|datang|pagi|petang|malam)\b/i.test(String(text || ""))) return "ms";
+  if (/\b(saya|nak|boleh|harga|berapa|sakit|cawangan|datang|isnin|selasa|rabu|khamis|jumaat|sabtu|ahad|pagi|petang|malam|cuti\s+umum|hari\s+kelepasan\s+am)\b/i.test(String(text || ""))) return "ms";
   return "en";
 }
 
@@ -124,4 +124,4 @@ function buildTcmFallbackReply(messages) {
   return "What would you like to know? I can help with TCM services, prices, branches or appointment enquiries.";
 }
 
-module.exports = { buildTcmFallbackReply, _test: { priceReply, schedulingInvite } };
+module.exports = { buildTcmFallbackReply, _test: { priceReply, schedulingInvite, languageFor } };
