@@ -17,12 +17,12 @@ function tcmFallback(content) {
 }
 
 test("TCM profile recognises pelvic posture and 3D facial service terms", () => {
-  const pelvicTerms = ["盆骨", "骨盆trt", "骨盆前倾", "posture adjustment"];
+  const pelvicTerms = ["盆骨", "骨盆trt", "骨盆前倾", "posture adjustment", "rawatan postur", "rawatan pelvis"];
   for (const term of pelvicTerms) {
     assert.equal(serviceForText(term)?.name, "Pelvic & Posture Manual Adjustment", term);
   }
 
-  const facialTerms = ["小颜术", "3D小颜术", "大小脸", "9D逆龄抗衰"];
+  const facialTerms = ["小颜术", "3D小颜术", "大小脸", "9D逆龄抗衰", "3D muka", "muka tak simetri"];
   for (const term of facialTerms) {
     assert.equal(serviceForText(term)?.name, "3D Facial Contour Manual Adjustment", term);
   }
