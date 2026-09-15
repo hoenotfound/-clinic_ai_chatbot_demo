@@ -1,6 +1,11 @@
 const tcm = require("./tcmConfig");
 const { detectConcernMappings } = require("./tcmKnowledge");
-const { hasTcmBookingIntent, branchFromMessages, timingFromMessages, recentService } = require("./tcmBookingIntent");
+const {
+  hasTcmBookingIntent,
+  branchFromMessages,
+  timingFromMessages,
+  serviceSelectionFromMessages,
+} = require("./tcmBookingIntent");
 
 function concernFromMessages(messages) {
   const customers = (messages || []).filter((message) => message?.role === "user");
@@ -19,12 +24,17 @@ function startingValue(serviceName) {
 
 function updateAppointmentLead(session) {
   const messages = session.messages || [];
-  const service = recentService(messages);
+  const serviceSelection = serviceSelectionFromMessages(messages);
+  const service = serviceSelection.service;
   const reducedInterest = Boolean(session.lead?.reducedInterest);
   const bookingIntent = !reducedInterest && hasTcmBookingIntent(messages);
   const preferredBranch = branchFromMessages(messages);
   const preferredTiming = timingFromMessages(messages);
-  const interests = service ? [service.name] : (session.lead?.interests || []);
+  const interests = service
+    ? [service.name]
+    : serviceSelection.cleared
+      ? []
+      : (session.lead?.interests || []);
   const concern = concernFromMessages(messages) || session.lead?.concern || null;
   const value = interests.length ? startingValue(interests[0]) : 0;
   const context = [preferredBranch, preferredTiming].filter(Boolean).join(" · ");
