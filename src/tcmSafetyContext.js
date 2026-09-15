@@ -53,7 +53,7 @@ function mustOverrideScheduling(text) {
   return herbInteraction || personalisedScheduling || [
     basePatterns.URGENT_PATTERN,
     basePatterns.COMPLAINT_PATTERN,
-    basePatterns.PREGNY_PATTERN,
+    basePatterns.PREGNANCY_PATTERN,
     basePatterns.POST_TREATMENT_PATTERN,
   ].some((pattern) => pattern.test(text));
 }
