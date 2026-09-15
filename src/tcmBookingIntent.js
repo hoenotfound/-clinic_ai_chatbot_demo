@@ -9,6 +9,8 @@ const NEGATIVE = /not interested|no longer interested|never ?mind|don['’]t wan
 const PROCEEDING = /can\s+i\s+come|can\s*\??\s*$|boleh\s+(?:datang|book|tempah)|nak\s+datang|mahu\s+datang|可以吗|可以嗎|可以来|可以來|想来|想來|安排|预约|預約/i;
 const SERVICE_SCHEDULING_REQUEST = /(?:can|could)\s+i\s+(?:do|have|get)|boleh\s+(?:saya\s+)?(?:buat|ambil)|(?:nak|mahu)\s+(?:buat|ambil)|可以.{0,20}(?:吗|嗎)|能.{0,20}(?:吗|嗎)/i;
 const PROMPT = /which branch|branch.*convenient|weekday|weekend|which day|what day|what time|preferred day|preferred time|tell me.*branch|branch.*(?:day|time)|arrange (?:a )?visit|cawangan|hari.*sesuai|masa.*sesuai|beritahu.*(?:branch|cawangan)|比较方便|比較方便|哪一天|告诉我.*branch|告訴我.*branch|日期|时段|時段|预约|預約|appointment/i;
+const GENERIC_SERVICE_TERMS = new Set(["consultation"]);
+const NEGATED_SERVICE_PREFIX = /(?:\bnot|\bno|\binstead\s+of|\brather\s+than|\bbukan|\btak\s+nak|\btidak\s+mahu|不要|不是|不做|不想做)\s*[,:;\-–—]*\s*$/i;
 
 const DAY_PATTERNS = [
   ["Monday", /monday|isnin|星期一|周一|週一/i],
@@ -36,9 +38,45 @@ function activeMessages(messages) {
   return lastNegative >= 0 ? items.slice(lastNegative + 1) : items;
 }
 
+function serviceTerms(service) {
+  return [service.name, ...(service.aliases || [])]
+    .map((term) => String(term || "").trim())
+    .filter(Boolean);
+}
+
+function serviceTermIsNegated(lower, index) {
+  const prefix = lower.slice(Math.max(0, index - 28), index);
+  return NEGATED_SERVICE_PREFIX.test(prefix);
+}
+
 function serviceForText(text) {
   const lower = String(text || "").toLowerCase();
-  return tcm.services.find((service) => [service.name, ...(service.aliases || [])].some((term) => lower.includes(String(term).toLowerCase()))) || null;
+  if (!lower) return null;
+
+  const candidates = [];
+  for (const service of tcm.services) {
+    for (const term of serviceTerms(service)) {
+      const normalizedTerm = term.toLowerCase();
+      let index = lower.indexOf(normalizedTerm);
+      while (index >= 0) {
+        if (!serviceTermIsNegated(lower, index)) {
+          const isOfficialName = normalizedTerm === String(service.name || "").toLowerCase();
+          const isGeneric = GENERIC_SERVICE_TERMS.has(normalizedTerm);
+          const score = (isOfficialName ? 10_000 : isGeneric ? 10 : 1_000) + normalizedTerm.length;
+          candidates.push({ service, score, index, length: normalizedTerm.length });
+        }
+        index = lower.indexOf(normalizedTerm, index + normalizedTerm.length);
+      }
+    }
+  }
+
+  if (!candidates.length) return null;
+  candidates.sort((left, right) =>
+    right.score - left.score ||
+    right.index - left.index ||
+    right.length - left.length
+  );
+  return candidates[0].service;
 }
 
 function recentService(messages) {
