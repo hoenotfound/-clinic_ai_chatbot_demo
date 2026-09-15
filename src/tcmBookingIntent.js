@@ -10,7 +10,7 @@ const PROCEEDING = /can\s+i\s+come|can\s*\??\s*$|boleh\s+(?:datang|book|tempah)|
 const SERVICE_SCHEDULING_REQUEST = /(?:can|could)\s+i\s+(?:do|have|get)|boleh\s+(?:saya\s+)?(?:buat|ambil)|(?:nak|mahu)\s+(?:buat|ambil)|可以.{0,20}(?:吗|嗎)|能.{0,20}(?:吗|嗎)/i;
 const PROMPT = /which branch|branch.*convenient|weekday|weekend|which day|what day|what time|preferred day|preferred time|tell me.*branch|branch.*(?:day|time)|arrange (?:a )?visit|cawangan|hari.*sesuai|masa.*sesuai|beritahu.*(?:branch|cawangan)|比较方便|比較方便|哪一天|告诉我.*branch|告訴我.*branch|日期|时段|時段|预约|預約|appointment/i;
 const GENERIC_SERVICE_TERMS = new Set(["consultation"]);
-const NEGATED_SERVICE_PREFIX = /(?:\bnot|\bno|\binstead\s+of|\brather\s+than|\bbukan|\btak\s+nak|\btidak\s+mahu|不要|不是|不做|不想做)\s*[,:;\-–—]*\s*$/i;
+const NEGATED_SERVICE_PREFIX = /(?:\bnot|\bno|\binstead\s+of|\brather\s+than|\bdon['’]?t\s+(?:want|need)|\bdo\s+not\s+(?:want|need)|\bno\s+longer\s+(?:want|need)|\bnot\s+interested\s+in|\bno\s+longer\s+interested\s+in|\bbukan|\btak\s+nak|\btak\s+mahu|\btidak\s+mahu|\bdah\s+tak\s+nak|\btak\s+berminat(?:\s+dengan)?|\btidak\s+berminat(?:\s+dengan)?|不要|不是|不做|不想做|不想要|不需要|不再想要|不再要)\s*[,:;\-–—]*\s*$/i;
 
 const DAY_PATTERNS = [
   ["Monday", /monday|isnin|星期一|周一|週一/i],
@@ -45,7 +45,7 @@ function serviceTerms(service) {
 }
 
 function serviceTermIsNegated(lower, index) {
-  const prefix = lower.slice(Math.max(0, index - 28), index);
+  const prefix = lower.slice(Math.max(0, index - 48), index);
   return NEGATED_SERVICE_PREFIX.test(prefix);
 }
 
@@ -79,12 +79,33 @@ function serviceForText(text) {
   return candidates[0].service;
 }
 
-function recentService(messages) {
+function hasExplicitServiceRejection(text) {
+  const lower = String(text || "").toLowerCase();
+  if (!lower) return false;
+  for (const service of tcm.services) {
+    for (const term of serviceTerms(service)) {
+      const normalizedTerm = term.toLowerCase();
+      let index = lower.indexOf(normalizedTerm);
+      while (index >= 0) {
+        if (serviceTermIsNegated(lower, index)) return true;
+        index = lower.indexOf(normalizedTerm, index + normalizedTerm.length);
+      }
+    }
+  }
+  return false;
+}
+
+function serviceSelectionFromMessages(messages) {
   for (const message of [...users(messages)].reverse()) {
     const service = serviceForText(message.content);
-    if (service) return service;
+    if (service) return { service, cleared: false };
+    if (hasExplicitServiceRejection(message.content)) return { service: null, cleared: true };
   }
-  return null;
+  return { service: null, cleared: false };
+}
+
+function recentService(messages) {
+  return serviceSelectionFromMessages(messages).service;
 }
 
 function branchFromMessages(messages) {
@@ -167,6 +188,8 @@ module.exports = {
   NEGATIVE,
   SERVICE_SCHEDULING_REQUEST,
   serviceForText,
+  hasExplicitServiceRejection,
+  serviceSelectionFromMessages,
   recentService,
   branchFromMessages,
   clockTimeFromText,
