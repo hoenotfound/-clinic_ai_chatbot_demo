@@ -1,5 +1,7 @@
 const tcm = require("./tcmConfig");
 
+const PUBLIC_HOLIDAY_PATTERN = /public\s+holiday|cuti\s+umum|hari\s+kelepasan\s+am|公共假期|公众假期|公眾假期/i;
+
 const DEFAULT_CONCERN_MAPPINGS = [
   {
     concern: "shoulder / neck tightness or discomfort",
@@ -84,6 +86,9 @@ function extractRequestedDay(text) {
 }
 
 function bookingRuleViolation(text) {
+  if (PUBLIC_HOLIDAY_PATTERN.test(String(text || ""))) {
+    return { type: "public_holiday" };
+  }
   const day = extractRequestedDay(text);
   if (!day) return null;
   const rules = configuredBookingRules();
@@ -100,12 +105,14 @@ function bookingRulesForPrompt() {
   return [
     `- Open days: ${rules.openDays.join(", ")}`,
     `- Closed days: ${rules.closedDays.join(", ")}`,
+    "- Closed on public holidays.",
     "- Never invent appointment availability or confirm a slot as booked.",
-    "- If a customer requests a closed day, explain it is closed and ask for another day.",
+    "- If a customer requests a closed day or public holiday, explain it is closed and ask for another day.",
   ].join("\n");
 }
 
 module.exports = {
+  PUBLIC_HOLIDAY_PATTERN,
   detectConcernMappings,
   concernGuidanceForPrompt,
   extractRequestedDay,
