@@ -7,10 +7,10 @@ function source(file) {
   return fs.readFileSync(path.join(__dirname, "..", file), "utf8");
 }
 
-test("TCM pipeline uses TCM campaign and service-derived live value", () => {
+test("TCM pipeline uses TCM campaign and preserves unknown live value", () => {
   const pipeline = source("portal-react/src/pages/Pipeline.jsx");
   assert.match(pipeline, /isTcmDemo \? "Demo TCM Campaign"/);
-  assert.match(pipeline, /isTcmDemo \? Number\(lead\.estimatedValue\) \|\| 0/);
+  assert.match(pipeline, /isTcmDemo \? \(lead\.estimatedValue == null \? null : Number\(lead\.estimatedValue\)\)/);
   assert.match(pipeline, /lead\.concern/);
 });
 

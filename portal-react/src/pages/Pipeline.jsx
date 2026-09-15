@@ -134,7 +134,7 @@ export default function Pipeline() {
       owner_username: live.mode === "human" ? "Demo Admin" : null,
       treatment_interest: lead.interests?.[0] || `${industryProfile.terms.service} not selected`,
       concern: lead.concern || null,
-      estimated_value: isRenovationDemo ? estimatedBudget(lead.budget) : isTcmDemo ? Number(lead.estimatedValue) || 0 : lead.bookingIntent ? 1800 : 0,
+      estimated_value: isRenovationDemo ? estimatedBudget(lead.budget) : isTcmDemo ? (lead.estimatedValue == null ? null : Number(lead.estimatedValue)) : lead.bookingIntent ? 1800 : 0,
       source: "Live demo",
       campaign_name: null,
       appointment_status: lead.siteMeasurementIntent || (!isRenovationDemo && lead.bookingIntent) ? "requested" : "none",

@@ -24,22 +24,22 @@ test("TCM profile is independent from aesthetic clinic knowledge", () => {
 
 test("TCM fallback answers Chinese acupuncture pricing without aesthetic leakage", () => {
   const reply = tcmFallback([{ role: "user", content: "请问针灸一次多少钱？" }]);
-  assert.match(reply, /Acupuncture/);
+  assert.match(reply, /针灸/);
   assert.match(reply, /RM\s*80/);
   assert.doesNotMatch(reply, /HIFU|Pico|Botox|Skin Booster/i);
 });
 
 test("TCM concern fallback remains practitioner-led", () => {
   const reply = tcmFallback([{ role: "user", content: "最近肩颈一直很紧，有什么服务可以了解？" }]);
-  assert.match(reply, /Acupuncture|Tuina/);
+  assert.match(reply, /针灸|推拿/);
   assert.match(reply, /中医师|practitioner|pengamal/i);
 });
 
 test("TCM compound concern and price question answers both parts", () => {
   const reply = tcmFallback([{ role: "user", content: "最近肩颈很紧，针灸多少钱？" }]);
   assert.match(reply, /RM\s*80/);
-  assert.match(reply, /Acupuncture/);
-  assert.match(reply, /Tuina|中医师/i);
+  assert.match(reply, /针灸/);
+  assert.match(reply, /推拿|中医师/i);
 });
 
 test("TCM booking flow remembers branch and timing then hands off", () => {
@@ -104,7 +104,7 @@ test("Chinese herbal medicine service enquiry is not mistaken for a medication i
 
 test("Malay ubat herba enquiry answers configured consultation price without handoff", () => {
   const reply = tcmFallback([{ role: "user", content: "Ada ubat herba? Harga berapa?" }]);
-  assert.match(reply, /Chinese Herbal Medicine Consultation|herba/i);
+  assert.match(reply, /Konsultasi Herba Cina|herba/i);
   assert.match(reply, /RM\s*50/);
   assert.doesNotMatch(reply, /\[\[HANDOFF\]\]/);
 });
