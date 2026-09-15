@@ -38,7 +38,13 @@ function buildTcmConcernFallback(messages) {
   const lang = languageFor(latest);
   const names = services.slice(0, 2).join(" and ");
   const namedService = serviceForText(latest);
-  const price = PRICE_PATTERN.test(latest) && namedService ? priceLine(namedService, lang) : "";
+  const askedPrice = PRICE_PATTERN.test(latest);
+
+  // If the visitor explicitly names a service without asking for price, let the richer
+  // service fallback explain the configured process instead of reducing it to concern guidance.
+  if (namedService && !askedPrice) return null;
+
+  const price = askedPrice && namedService ? priceLine(namedService, lang) : "";
 
   if (lang === "zh") {
     return `${price}${price ? " " : ""}针对你提到的情况，${names} 是这里比较常见会讨论的服务方向。不过实际适合哪一种，还是要让中医师了解你的情况后判断。`;
