@@ -4,7 +4,7 @@ const COMPLAINT_PATTERN = /complain|complaint|refund|bad experience|unhappy|angr
 const MEDICATION_PATTERN = /medication|prescription|regular\s+medicine|current\s+medicine|my\s+medicine|taking\s+(?:a\s+)?medicine|blood thinner|anticoagul|warfarin|aspirin|ubat|ubat cair darah|处方药|處方藥|正在吃药|正在吃藥|在吃药|在吃藥|吃药|吃藥|在服药|在服藥|服药|服藥|药物|藥物|抗凝|薄血/i;
 const HERBAL_PATTERN = /herb|herbal|chinese medicine|中药|中藥|草药|草藥|药方|藥方|方剂|方劑/i;
 const PREGNANCY_PATTERN = /pregnan|breastfeed|hamil|menyusu|怀孕|懷孕|哺乳/i;
-const PERSONAL_SUITABILITY_PATTERN = /am i suitable|is it safe for me|can i do acupuncture|can i do cupping|what should i take|what herbs should i take|what do i have|what condition do i have|diagnos|can i take\s+(?:this|these|the)?\s*(?:herb|herbs|formula|medicine|medication|supplement)|sesuai (?:untuk )?saya|selamat untuk saya|boleh saya buat|ubat apa|herba apa|适合我吗|適合我嗎|我适合|我適合|我可以做针灸吗|我可以做針灸嗎|我可以拔罐吗|我可以拔罐嗎|我应该吃什么中药|我應該吃什麼中藥|我是什么病|我是什麼病/i;
+const PERSONAL_SUITABILITY_PATTERN = /am i suitable|is it safe for me|can i (?:do|have|get) acupuncture|can i (?:do|have|get) cupping|what should i take|what herbs should i take|what do i have|what condition do i have|diagnos|can i take\s+(?:this|these|the)?\s*(?:herb|herbs|formula|medicine|medication|supplement)|sesuai (?:untuk )?saya|selamat untuk saya|boleh saya (?:buat|ambil)\s+(?:akupunktur|cupping|bekam)|ubat apa|herba apa|适合我吗|適合我嗎|我适合|我適合|我可以做针灸吗|我可以做針灸嗎|可以针灸吗|可以針灸嗎|能针灸吗|能針灸嗎|我可以拔罐吗|我可以拔罐嗎|可以拔罐吗|可以拔罐嗎|我应该吃什么中药|我應該吃什麼中藥|我是什么病|我是什麼病/i;
 const POST_TREATMENT_PATTERN = /after (?:my )?(?:acupuncture|cupping|gua sha|tuina|treatment)|after taking (?:the )?herbs|post[- ]?treatment|selepas (?:akupunktur|rawatan)|lepas (?:akupunktur|rawatan)|针灸后|針灸後|拔罐后|拔罐後|刮痧后|刮痧後|推拿后|推拿後|吃了中药|吃了中藥/i;
 
 function latestUserText(messages) {
