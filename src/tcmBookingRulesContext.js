@@ -8,11 +8,16 @@ function latestUserText(messages) {
 
 function languageFor(text) {
   if (/\p{Script=Han}/u.test(text)) return "zh";
-  if (/\b(sabtu|ahad|pagi|petang|malam|boleh|saya)\b/i.test(text)) return "ms";
+  if (/\b(isnin|selasa|rabu|khamis|jumaat|sabtu|ahad|pagi|petang|malam|boleh|saya|cuti\s+umum|hari\s+kelepasan\s+am)\b/i.test(text)) return "ms";
   return "en";
 }
 
-function closedDayReply(lang) {
+function closureReply(lang, type) {
+  if (type === "public_holiday") {
+    if (lang === "zh") return "TCM centre 公共假期休息，所以当天不能安排预约。可以告诉我另一个方便的日期吗？";
+    if (lang === "ms") return "Pusat TCM tutup pada cuti umum, jadi appointment tak boleh diatur pada hari itu. Boleh pilih hari lain yang sesuai?";
+    return "The TCM centre is closed on public holidays, so an appointment can't be arranged that day. Would another day work?";
+  }
   if (lang === "zh") return "我们星期日休息，所以星期日不能安排预约。星期六或平日哪一天比较方便？";
   if (lang === "ms") return "Pusat TCM tutup pada hari Ahad. Sabtu atau hari biasa lebih sesuai?";
   return "The TCM centre is closed on Sundays. Would Saturday or a weekday work better?";
@@ -33,7 +38,9 @@ function enforceTcmBookingRules(messages) {
   if (!latest) return null;
   const lang = languageFor(latest);
   const violation = bookingRuleViolation(latest);
-  if (violation?.type === "closed_day") return closedDayReply(lang);
+  if (violation?.type === "closed_day" || violation?.type === "public_holiday") {
+    return closureReply(lang, violation.type);
+  }
 
   const time = bookingHelpers.requestedTime(latest);
   if (time !== null) {
