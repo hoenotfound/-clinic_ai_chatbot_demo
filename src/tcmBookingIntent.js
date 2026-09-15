@@ -11,6 +11,10 @@ const SERVICE_SCHEDULING_REQUEST = /(?:can|could)\s+i\s+(?:do|have|get)|boleh\s+
 const PROMPT = /which branch|branch.*convenient|weekday|weekend|which day|what day|what time|preferred day|preferred time|tell me.*branch|branch.*(?:day|time)|arrange (?:a )?visit|cawangan|hari.*sesuai|masa.*sesuai|beritahu.*(?:branch|cawangan)|比较方便|比較方便|哪一天|告诉我.*branch|告訴我.*branch|日期|时段|時段|预约|預約|appointment/i;
 const GENERIC_SERVICE_TERMS = new Set(["consultation"]);
 const NEGATED_SERVICE_PREFIX = /(?:\bnot|\bno|\binstead\s+of|\brather\s+than|\bdon['’]?t\s+(?:want|need)|\bdo\s+not\s+(?:want|need)|\bno\s+longer\s+(?:want|need)|\bnot\s+interested\s+in|\bno\s+longer\s+interested\s+in|\bbukan|\btak\s+nak|\btak\s+mahu|\btidak\s+mahu|\bdah\s+tak\s+nak|\btak\s+berminat(?:\s+dengan)?|\btidak\s+berminat(?:\s+dengan)?|不要|不是|不做|不想做|不想要|不需要|不再想要|不再要)\s*[,:;\-–—]*\s*$/i;
+const EXTRA_SERVICE_TERMS = {
+  "Pelvic & Posture Manual Adjustment": ["rawatan postur", "rawatan pelvis", "pelarasan postur", "pelarasan pelvis"],
+  "3D Facial Contour Manual Adjustment": ["rawatan muka 3d", "3d muka", "muka tak simetri", "muka tidak simetri"],
+};
 
 const DAY_PATTERNS = [
   ["Monday", /monday|isnin|星期一|周一|週一/i],
@@ -39,7 +43,7 @@ function activeMessages(messages) {
 }
 
 function serviceTerms(service) {
-  return [service.name, ...(service.aliases || [])]
+  return [service.name, ...(service.aliases || []), ...(EXTRA_SERVICE_TERMS[service.name] || [])]
     .map((term) => String(term || "").trim())
     .filter(Boolean);
 }
