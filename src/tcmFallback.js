@@ -24,7 +24,7 @@ function latestUserText(messages) {
 
 function languageFor(text) {
   if (/\p{Script=Han}/u.test(String(text || ""))) return "zh";
-  if (/\b(saya|nak|boleh|harga|berapa|sakit|cawangan|datang|isnin|selasa|rabu|khamis|jumaat|sabtu|ahad|pagi|petang|malam|cuti\s+umum|hari\s+kelepasan\s+am)\b/i.test(String(text || ""))) return "ms";
+  if (/\b(saya|nak|boleh|harga|berapa|sakit|cawangan|datang|isnin|selasa|rabu|khamis|jumaat|sabtu|ahad|pagi|petang|malam|cuti\s+umum|hari\s+kelepasan\s+am|postur|muka|herba)\b/i.test(String(text || ""))) return "ms";
   return "en";
 }
 
@@ -38,6 +38,11 @@ function pricingNote(service, lang) {
 function priceReply(service, lang) {
   if (!service) return null;
   const price = String(service.priceRange || "").trim();
+  if (!price || /not configured/i.test(price)) {
+    if (lang === "zh") return `${service.name} 的价格目前没有配置在 demo 里，需要由 team 在评估后确认实际价格。`;
+    if (lang === "ms") return `Harga ${service.name} belum dikonfigurasi dalam demo ini. Team perlu confirm harga sebenar selepas assessment.`;
+    return `The price for ${service.name} is not configured in this demo. The team should confirm the actual price after assessment.`;
+  }
   const base = lang === "zh"
     ? `${service.name} ${/^From\s+/i.test(price) ? `从 ${price.replace(/^From\s+/i, "")} 起` : `价格是 ${price}`}。`
     : lang === "ms"
@@ -81,6 +86,12 @@ function preferenceReply(messages, service, lang) {
 }
 
 function serviceReply(service, lang) {
+  const summary = String(service?.frontDeskSummary || service?.description || "").trim();
+  if (summary) {
+    if (lang === "zh") return `${service.name} 是这里提供的 TCM service 之一。${summary} 具体是否适合个人情况，需要由中医师进一步评估。`;
+    if (lang === "ms") return `${service.name} ialah salah satu service TCM yang disediakan. ${summary} Pengamal TCM akan tentukan kesesuaian berdasarkan assessment individu.`;
+    return `${service.name} is one of the configured TCM services. ${summary} A TCM practitioner should still confirm personal suitability after assessment.`;
+  }
   if (lang === "zh") return `${service.name} 是这里提供的 TCM service 之一。具体是否适合个人情况，需要由中医师进一步了解后判断。`;
   if (lang === "ms") return `${service.name} ialah salah satu service TCM yang disediakan. Pengamal TCM akan tentukan kesesuaian berdasarkan keadaan individu.`;
   return `${service.name} is one of the configured TCM services. A TCM practitioner can confirm whether it is appropriate for an individual situation.`;
@@ -124,4 +135,4 @@ function buildTcmFallbackReply(messages) {
   return "What would you like to know? I can help with TCM services, prices, branches or appointment enquiries.";
 }
 
-module.exports = { buildTcmFallbackReply, _test: { priceReply, schedulingInvite, languageFor } };
+module.exports = { buildTcmFallbackReply, _test: { priceReply, schedulingInvite, languageFor, serviceReply } };
