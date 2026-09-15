@@ -10,7 +10,7 @@ function latestUserText(messages) {
 
 function languageFor(text) {
   if (/\p{Script=Han}/u.test(String(text || ""))) return "zh";
-  if (/\b(nak|boleh|saya|datang|sabtu|ahad|pagi|petang|malam)\b/i.test(String(text || ""))) return "ms";
+  if (/\b(nak|boleh|saya|datang|isnin|selasa|rabu|khamis|jumaat|sabtu|ahad|pagi|petang|malam|cuti\s+umum|hari\s+kelepasan\s+am)\b/i.test(String(text || ""))) return "ms";
   return "en";
 }
 
@@ -39,6 +39,17 @@ function requestedTime(text) {
   return hour * 60 + minute;
 }
 
+function closureReply(lang, type) {
+  if (type === "public_holiday") {
+    if (lang === "zh") return "TCM centre 公共假期休息，所以当天不能安排预约。可以告诉我另一个方便的日期吗？";
+    if (lang === "ms") return "Pusat TCM tutup pada cuti umum, jadi appointment tak boleh diatur pada hari itu. Boleh pilih hari lain yang sesuai?";
+    return "The TCM centre is closed on public holidays, so an appointment can't be arranged that day. Would another day work?";
+  }
+  if (lang === "zh") return "我们星期日休息，所以星期日不能安排预约。星期六或平日哪一天比较方便？";
+  if (lang === "ms") return "Pusat TCM tutup pada hari Ahad. Sabtu atau hari biasa lebih sesuai?";
+  return "The TCM centre is closed on Sundays. Would Saturday or a weekday work better?";
+}
+
 function enforceTcmBookingRules(messages) {
   const latest = latestUserText(messages);
   if (!latest) return null;
@@ -49,10 +60,8 @@ function enforceTcmBookingRules(messages) {
   if (!hasBookingContext) return null;
 
   const lang = languageFor(latest);
-  if (violation?.type === "closed_day") {
-    if (lang === "zh") return "我们星期日休息，所以星期日不能安排预约。星期六或平日哪一天比较方便？";
-    if (lang === "ms") return "Pusat TCM tutup pada hari Ahad. Sabtu atau hari biasa lebih sesuai?";
-    return "The TCM centre is closed on Sundays. Would Saturday or a weekday work better?";
+  if (violation?.type === "closed_day" || violation?.type === "public_holiday") {
+    return closureReply(lang, violation.type);
   }
 
   if (time !== null) {
@@ -66,4 +75,4 @@ function enforceTcmBookingRules(messages) {
   return null;
 }
 
-module.exports = { enforceTcmBookingRules, _test: { configuredHours, requestedTime } };
+module.exports = { enforceTcmBookingRules, _test: { configuredHours, requestedTime, languageFor, closureReply } };
