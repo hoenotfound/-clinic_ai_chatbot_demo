@@ -80,21 +80,21 @@ test("explicit TCM service rejection clears stale service interest without resur
 
       state.addCustomerMessage(session, "Actually I don't want acupuncture anymore.");
       assert.deepEqual(session.lead.interests, []);
-      assert.equal(session.lead.estimatedValue, 0);
+      assert.equal(session.lead.estimatedValue, null);
 
       state.addCustomerMessage(session, "KL branch.");
       assert.deepEqual(session.lead.interests, []);
-      assert.equal(session.lead.estimatedValue, 0);
+      assert.equal(session.lead.estimatedValue, null);
     });
   } finally {
     state.limits.minMessageIntervalMs = previousInterval;
   }
 });
 
-test("personal medical context overrides a scheduling-shaped suitability question", () => {
+test("significant personal medical context overrides a scheduling-shaped suitability question", () => {
   const cases = [
     "I have a heart condition. Can I do acupuncture Friday at 3pm in KL?",
-    "I have neck pain. Can I do acupuncture Friday at 3pm in KL?",
+    "I have hypertension. Can I do acupuncture Friday at 3pm in KL?",
     "Saya ada darah tinggi. Boleh saya buat akupunktur Jumaat 3pm di KL?",
     "我有高血压，星期五下午在KL可以针灸吗？",
   ];
@@ -103,6 +103,11 @@ test("personal medical context overrides a scheduling-shaped suitability questio
     const reply = enforceTcmSafetyRules([{ role: "user", content: message }]);
     assert.match(reply || "", /\[\[HANDOFF\]\]/, message);
   }
+});
+
+test("routine mapped concern plus scheduling stays in booking flow", () => {
+  const message = "I have neck pain. Can I do acupuncture Friday at 3pm in KL?";
+  assert.equal(enforceTcmSafetyRules([{ role: "user", content: message }]), null);
 });
 
 test("plain service scheduling without medical context stays in booking flow", () => {
@@ -127,7 +132,7 @@ test("natural Malay herbal sales enquiries stay in front-desk flow", () => {
   for (const message of cases) {
     assert.equal(enforceTcmSafetyRules([{ role: "user", content: message }]), null, message);
     const reply = tcmFallback([{ role: "user", content: message }]);
-    assert.match(reply, /Chinese Herbal Medicine Consultation|herba/i, message);
+    assert.match(reply, /Konsultasi Herba Cina|herba/i, message);
     assert.doesNotMatch(reply, /\[\[HANDOFF\]\]/, message);
   }
 });
