@@ -30,6 +30,24 @@ test("appointment pipeline shows the full enquiry-to-conversion journey", async 
   await expect(allBranches).toContainText("2 confirmed");
 });
 
+test("pipeline lead cards can be dragged between stages", async ({ page }) => {
+  await page.goto("/");
+  const frame = await openDashboard(page);
+
+  await frame.getByRole("link", { name: "Pipeline" }).click();
+  await expect(frame.getByRole("heading", { name: "Lead Pipeline" })).toBeVisible();
+
+  const sourceStage = frame.getByLabel("Qualified pipeline stage");
+  const targetStage = frame.getByLabel("Appointment Requested pipeline stage");
+  const amanda = sourceStage.getByRole("button", { name: /Amanda Lee/ });
+
+  await expect(amanda).toBeVisible();
+  await amanda.dragTo(targetStage);
+
+  await expect(sourceStage.getByRole("button", { name: /Amanda Lee/ })).toHaveCount(0);
+  await expect(targetStage.getByRole("button", { name: /Amanda Lee/ })).toBeVisible();
+});
+
 test("automated follow-up demo visualises a quiet lead being re-engaged", async ({ page }) => {
   await page.goto("/");
   const frame = await openDashboard(page);
