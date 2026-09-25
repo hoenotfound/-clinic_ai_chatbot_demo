@@ -13,6 +13,8 @@ const CATEGORY_OPTIONS = [
   ["cancelled", "Cancelled"], ["overdue", "Follow-up overdue"], ["attention", "Needs attention"],
 ];
 
+let demoStageOverrides = {};
+
 function stageByKey(key) { return STAGES.find((stage) => stage.key === key) || STAGES[0]; }
 
 function estimatedBudget(value) {
@@ -93,7 +95,7 @@ export default function Pipeline() {
   const [mobileStageId, setMobileStageId] = useState(STAGES[0].id);
   const [selectedId, setSelectedId] = useState(null);
   const [now, setNow] = useState(Date.now());
-  const [stageOverrides, setStageOverrides] = useState({});
+  const [stageOverrides, setStageOverrides] = useState(() => demoStageOverrides);
   const [draggedLeadId, setDraggedLeadId] = useState(null);
   const [dragOverStageId, setDragOverStageId] = useState(null);
   const suppressOpenRef = useRef(false);
@@ -228,7 +230,11 @@ export default function Pipeline() {
     event.preventDefault();
     const droppedId = Number(event.dataTransfer.getData("text/plain")) || draggedLeadId;
     if (droppedId != null) {
-      setStageOverrides((current) => ({ ...current, [droppedId]: stage.id }));
+      setStageOverrides((current) => {
+        const next = { ...current, [droppedId]: stage.id };
+        demoStageOverrides = next;
+        return next;
+      });
     }
     clearDragState();
   }
