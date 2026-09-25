@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import LeadCard from "../components/pipeline/LeadCard";
 import ContactAvatar from "../components/ContactAvatar";
 import { SAMPLE_LEADS, STAGES } from "../demoData";
@@ -93,6 +93,10 @@ export default function Pipeline() {
   const [mobileStageId, setMobileStageId] = useState(STAGES[0].id);
   const [selectedId, setSelectedId] = useState(null);
   const [now, setNow] = useState(Date.now());
+  const [stageOverrides, setStageOverrides] = useState({});
+  const [draggedLeadId, setDraggedLeadId] = useState(null);
+  const [dragOverStageId, setDragOverStageId] = useState(null);
+  const suppressOpenRef = useRef(false);
 
   async function loadLive() {
     const id = sessionStorage.getItem("clinicDemoSessionId");
@@ -151,7 +155,21 @@ export default function Pipeline() {
     };
   }, [live]);
 
-  const leads = useMemo(() => [liveLead, ...SAMPLE_LEADS.map(mapLead)].filter(Boolean), [liveLead]);
+  const leads = useMemo(() => {
+    const sampleLeads = SAMPLE_LEADS.map(mapLead).map((lead) => {
+      const overrideStageId = stageOverrides[lead.id];
+      if (!overrideStageId) return lead;
+      const stage = STAGES.find((item) => item.id === overrideStageId);
+      if (!stage) return lead;
+      return {
+        ...lead,
+        stage_id: stage.id,
+        stage_type: stage.key,
+        is_closed: stage.key === "won",
+      };
+    });
+    return [liveLead, ...sampleLeads].filter(Boolean);
+  }, [liveLead, stageOverrides]);
   const branches = useMemo(() => [...new Set(leads.map((lead) => lead.branch_name).filter(Boolean))], [leads]);
   const selected = leads.find((lead) => lead.id === selectedId) || null;
   const open = leads.filter((lead) => !lead.is_closed);
@@ -179,6 +197,47 @@ export default function Pipeline() {
   const mobileStage = STAGES.find((stage) => stage.id === mobileStageId) || STAGES[0];
   const mobileLeads = filtered.filter((lead) => lead.stage_id === mobileStage.id);
 
+  function handleOpenLead(leadId) {
+    if (!suppressOpenRef.current) setSelectedId(leadId);
+  }
+
+  function handleDragStart(event, lead) {
+    if (lead.source === "Live demo") return;
+    suppressOpenRef.current = true;
+    setDraggedLeadId(lead.id);
+    setDragOverStageId(lead.stage_id);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(lead.id));
+  }
+
+  function handleDragOver(event, stageId) {
+    if (draggedLeadId == null) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDragOverStageId(stageId);
+  }
+
+  function clearDragState() {
+    setDraggedLeadId(null);
+    setDragOverStageId(null);
+    window.setTimeout(() => {
+      suppressOpenRef.current = false;
+    }, 0);
+  }
+
+  function handleDrop(event, stage) {
+    event.preventDefault();
+    const droppedId = Number(event.dataTransfer.getData("text/plain")) || draggedLeadId;
+    if (droppedId != null) {
+      setStageOverrides((current) => ({ ...current, [droppedId]: stage.id }));
+    }
+    clearDragState();
+  }
+
+  function handleDragEnd() {
+    clearDragState();
+  }
+
   return (
     <div className="flex h-full min-w-0 flex-col overflow-hidden bg-[var(--color-bg)]">
       <header className="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-4 sm:px-5 lg:px-6">
@@ -195,9 +254,9 @@ export default function Pipeline() {
 
       <div className="shrink-0 border-b border-[var(--color-border)] bg-white px-3 py-2 md:hidden"><div className="flex gap-2 overflow-x-auto">{STAGES.map((stage) => <button key={stage.id} onClick={() => setMobileStageId(stage.id)} className={`flex h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-semibold ${mobileStage.id === stage.id ? "bg-[var(--color-text)] text-white" : "border border-[var(--color-border)] bg-white text-[var(--color-text-muted)]"}`}><span className="h-2 w-2 rounded-full" style={{ backgroundColor: stage.color }} />{stage.name}<span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[9px]">{filtered.filter((lead) => lead.stage_id === stage.id).length}</span></button>)}</div></div>
 
-      <main className="min-h-0 flex-1 overflow-y-auto px-3.5 py-3.5 md:hidden"><div className="mb-3 flex items-center justify-between rounded-2xl border border-[var(--color-border)] bg-white px-3.5 py-3 shadow-sm"><div><div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: mobileStage.color }} /><h2 className="text-sm font-bold">{mobileStage.name}</h2></div><p className="mt-1 pl-[18px] text-[10px] text-[var(--color-text-muted)]">{mobileLeads.length} leads · {formatMoney(mobileLeads.reduce((sum, lead) => sum + (lead.estimated_value || 0), 0)) || "RM 0"}</p></div><span className="rounded-full bg-[var(--color-bg)] px-2.5 py-1 text-[10px] font-bold text-[var(--color-text-muted)]">{filtered.length} shown</span></div><div className="space-y-2.5">{mobileLeads.map((lead) => <LeadCard key={lead.id} lead={lead} now={now} noReplyHours={1} onOpen={setSelectedId} />)}{!mobileLeads.length && <div className="rounded-2xl border border-dashed border-[var(--color-border)] bg-white/60 px-4 py-10 text-center text-xs text-[var(--color-text-muted)]">No leads here. Try another stage or filter.</div>}</div></main>
+      <main className="min-h-0 flex-1 overflow-y-auto px-3.5 py-3.5 md:hidden"><div className="mb-3 flex items-center justify-between rounded-2xl border border-[var(--color-border)] bg-white px-3.5 py-3 shadow-sm"><div><div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: mobileStage.color }} /><h2 className="text-sm font-bold">{mobileStage.name}</h2></div><p className="mt-1 pl-[18px] text-[10px] text-[var(--color-text-muted)]">{mobileLeads.length} leads · {formatMoney(mobileLeads.reduce((sum, lead) => sum + (lead.estimated_value || 0), 0)) || "RM 0"}</p></div><span className="rounded-full bg-[var(--color-bg)] px-2.5 py-1 text-[10px] font-bold text-[var(--color-text-muted)]">{filtered.length} shown</span></div><div className="space-y-2.5">{mobileLeads.map((lead) => <LeadCard key={lead.id} lead={lead} now={now} noReplyHours={1} onOpen={handleOpenLead} />)}{!mobileLeads.length && <div className="rounded-2xl border border-dashed border-[var(--color-border)] bg-white/60 px-4 py-10 text-center text-xs text-[var(--color-text-muted)]">No leads here. Try another stage or filter.</div>}</div></main>
 
-      <main className="hidden min-h-0 flex-1 overflow-x-auto overflow-y-hidden p-5 md:block lg:p-6"><div className="flex h-full min-w-max gap-4">{STAGES.map((stage) => { const items = filtered.filter((lead) => lead.stage_id === stage.id); return <section key={stage.id} className="flex h-full w-[19rem] flex-col rounded-2xl bg-[#f1f2ee]"><header className="border-b border-black/5 px-3.5 py-3"><div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: stage.color }} /><h2 className="min-w-0 flex-1 truncate text-sm font-bold">{stage.name}</h2><span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-[var(--color-text-muted)]">{items.length}</span></div><p className="mt-1.5 pl-[18px] text-[10px] text-[var(--color-text-muted)]">{formatMoney(items.reduce((sum, lead) => sum + (Number(lead.estimated_value) || 0), 0)) || "RM 0"}</p></header><div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-2.5">{items.map((lead) => <LeadCard key={lead.id} lead={lead} now={now} noReplyHours={1} onOpen={setSelectedId} />)}{!items.length && <div className="rounded-2xl border border-dashed border-[var(--color-border)] px-4 py-8 text-center text-xs text-[var(--color-text-muted)]">No leads here</div>}</div></section>; })}</div></main>
+      <main className="hidden min-h-0 flex-1 overflow-x-auto overflow-y-hidden p-5 md:block lg:p-6"><div className="flex h-full min-w-max gap-4">{STAGES.map((stage) => { const items = filtered.filter((lead) => lead.stage_id === stage.id); const isDropTarget = draggedLeadId != null && dragOverStageId === stage.id; return <section key={stage.id} aria-label={`${stage.name} pipeline stage`} onDragOver={(event) => handleDragOver(event, stage.id)} onDrop={(event) => handleDrop(event, stage)} className={`flex h-full w-[19rem] flex-col rounded-2xl bg-[#f1f2ee] transition-all ${isDropTarget ? "ring-2 ring-[var(--color-primary)] ring-offset-2" : ""}`}><header className="border-b border-black/5 px-3.5 py-3"><div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: stage.color }} /><h2 className="min-w-0 flex-1 truncate text-sm font-bold">{stage.name}</h2><span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-[var(--color-text-muted)]">{items.length}</span></div><p className="mt-1.5 pl-[18px] text-[10px] text-[var(--color-text-muted)]">{formatMoney(items.reduce((sum, lead) => sum + (Number(lead.estimated_value) || 0), 0)) || "RM 0"}</p></header><div className={`min-h-0 flex-1 space-y-2.5 overflow-y-auto p-2.5 transition-colors ${isDropTarget ? "bg-[var(--color-primary-light)]/40" : ""}`}>{items.map((lead) => <LeadCard key={lead.id} lead={lead} now={now} noReplyHours={1} onOpen={handleOpenLead} onDragStart={lead.source === "Live demo" ? undefined : handleDragStart} onDragEnd={handleDragEnd} />)}{!items.length && <div className={`rounded-2xl border border-dashed px-4 py-8 text-center text-xs transition-colors ${isDropTarget ? "border-[var(--color-primary)] bg-white text-[var(--color-primary)]" : "border-[var(--color-border)] text-[var(--color-text-muted)]"}`}>{isDropTarget ? "Drop lead here" : "No leads here"}</div>}</div></section>; })}</div></main>
       {selected && <LeadDrawer lead={selected} onClose={() => setSelectedId(null)} />}
     </div>
   );
