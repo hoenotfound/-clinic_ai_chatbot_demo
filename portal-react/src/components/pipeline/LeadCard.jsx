@@ -2,7 +2,7 @@ import ContactAvatar from "../ContactAvatar";
 import { industryProfile } from "../../config/industryProfile";
 import { displayName, formatDateTime, formatMoney, formatRelative, isNoReply, isOverdue, temperatureStyle } from "./pipelineUtils";
 
-export default function LeadCard({ lead, now, noReplyHours, onOpen, onDragStart }) {
+export default function LeadCard({ lead, now, noReplyHours, onOpen, onDragStart, onDragEnd }) {
   const overdue = isOverdue(lead, now);
   const noReply = isNoReply(lead, noReplyHours, now);
   const live = lead.source === "Live demo";
@@ -17,8 +17,9 @@ export default function LeadCard({ lead, now, noReplyHours, onOpen, onDragStart 
       type="button"
       draggable={typeof onDragStart === "function"}
       onDragStart={onDragStart ? (event) => onDragStart(event, lead) : undefined}
+      onDragEnd={onDragEnd}
       onClick={() => onOpen(lead.id)}
-      className={`w-full rounded-2xl border bg-[var(--color-surface)] p-3.5 text-left shadow-sm transition-all duration-500 hover:-translate-y-0.5 hover:border-[var(--color-primary)]/40 hover:shadow-md active:translate-y-0 ${live ? "border-[var(--color-primary)]/45 ring-2 ring-[var(--color-primary-light)]" : "border-[var(--color-border)]"}`}
+      className={`w-full rounded-2xl border bg-[var(--color-surface)] p-3.5 text-left shadow-sm transition-all duration-500 hover:-translate-y-0.5 hover:border-[var(--color-primary)]/40 hover:shadow-md active:translate-y-0 ${typeof onDragStart === "function" ? "cursor-grab active:cursor-grabbing" : ""} ${live ? "border-[var(--color-primary)]/45 ring-2 ring-[var(--color-primary-light)]" : "border-[var(--color-border)]"}`}
     >
       {live && (
         <div className="mb-3 flex items-center justify-between rounded-xl bg-[var(--color-primary-light)] px-2.5 py-2">
