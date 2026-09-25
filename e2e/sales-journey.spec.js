@@ -46,6 +46,11 @@ test("pipeline lead cards can be dragged between stages", async ({ page }) => {
 
   await expect(sourceStage.getByRole("button", { name: /Amanda Lee/ })).toHaveCount(0);
   await expect(targetStage.getByRole("button", { name: /Amanda Lee/ })).toBeVisible();
+  await expect(frame.getByText("Lead details")).toHaveCount(0);
+
+  await frame.getByRole("link", { name: "Inbox" }).click();
+  await frame.getByRole("link", { name: "Pipeline" }).click();
+  await expect(frame.getByLabel("Appointment Requested pipeline stage").getByRole("button", { name: /Amanda Lee/ })).toBeVisible();
 });
 
 test("automated follow-up demo visualises a quiet lead being re-engaged", async ({ page }) => {
