@@ -211,10 +211,9 @@ export default function Pipeline() {
   }
 
   function handleDragOver(event, stageId) {
-    if (draggedLeadId == null) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
-    setDragOverStageId(stageId);
+    if (draggedLeadId != null) setDragOverStageId(stageId);
   }
 
   function clearDragState() {
